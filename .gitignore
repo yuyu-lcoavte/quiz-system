@@ -1,5 +1,6 @@
 # PlantUML 執行工具
 plantuml.jar
+plantuml*.jar
 
 # 環境變數與敏感資料
 .env
