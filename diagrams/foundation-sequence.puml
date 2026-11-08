@@ -1,0 +1,57 @@
+@startuml
+actor Teacher
+actor Student
+participant "Shared Application" as App
+participant "Shared Session State" as State
+participant "Shared Domain Contract" as Domain
+participant "Connected Teacher and Student Clients" as Clients
+Teacher -> App: Open /
+App --> Teacher: Show shared home and role entries
+Student -> App: Open /
+App --> Student: Show shared home and role entries
+Teacher -> App: Navigate to /teacher/login or /teacher/dashboard
+App --> Teacher: Show teacher route placeholder
+Student -> App: Navigate to /student/join or /student/session/:sessionId
+App --> Student: Show student route placeholder
+Teacher -> App: Select next question
+App -> State: Create Round and set target to Waiting
+State --> App: Waiting with current Round
+State -> Clients: Notify connected users of target, Round and Waiting
+Teacher -> App: Start current question
+App -> State: Activate current Round
+State --> App: Active
+State -> Clients: Notify connected users of Active
+Teacher -> App: End current Round
+App -> State: Set Ended and expose current result
+State --> App: Ended; result available
+State -> Clients: Notify connected users of Ended and result availability
+note over App,Clients
+When connected, both teacher and student clients
+show every phase change within 2 seconds.
+end note
+Teacher -> App: Reopen ended question
+App -> State: Create distinct Round and set Waiting
+State --> App: Waiting with new Round
+State -> Clients: Notify connected users of new Round and Waiting
+Teacher -> App: Start reopened question
+App -> State: Activate existing new Round
+State --> App: Active
+State -> Clients: Notify connected users of Active
+App -> State: On completion, replace prior result with new result
+State -> Clients: Notify connected users that result is available
+Teacher -> App: View current state
+App -> State: Read shared state
+State --> App: Waiting / active / ended
+App --> Teacher: Show route placeholder and state
+Student -> App: View current state
+App -> State: Read shared state
+State --> App: Waiting / active / ended
+App -> Domain: Read current question and blanks
+Domain --> App: Question and blank concepts
+App --> Student: Show route placeholder and shared state
+note over Teacher,Student
+Business actions such as teacher authentication,
+student joining and answer submission belong
+to subsequent features.
+end note
+@enduml

@@ -1,0 +1,40 @@
+@startuml
+left to right direction
+actor Teacher
+actor Student
+package "Shared Foundation" {
+  [Shared Home]
+  [Shared Route Areas]
+  [/] as HomeRoute
+  [/teacher/login] as TeacherLoginRoute
+  [/teacher/dashboard] as TeacherDashboardRoute
+  [/student/join] as StudentJoinRoute
+  [/student/session/:sessionId] as StudentSessionRoute
+  [Session State]
+  [Shared Domain Concepts]
+  [Shared Interface Contract]
+}
+[Teacher Module] as TeacherModule
+[Student Module] as StudentModule
+Teacher --> [Shared Home]
+Student --> [Shared Home]
+[Shared Home] --> HomeRoute
+[Shared Route Areas] --> TeacherLoginRoute
+[Shared Route Areas] --> TeacherDashboardRoute
+[Shared Route Areas] --> StudentJoinRoute
+[Shared Route Areas] --> StudentSessionRoute
+[Shared Route Areas] --> TeacherModule
+[Shared Route Areas] --> StudentModule
+TeacherModule --> [Shared Interface Contract]
+StudentModule --> [Shared Interface Contract]
+[Shared Interface Contract] --> [Session State]
+[Shared Interface Contract] --> [Shared Domain Concepts]
+note bottom of TeacherModule
+Excel processing and teacher business flows
+are delivered by later features.
+end note
+note bottom of StudentModule
+Joining, answering and result flows
+are delivered by later features.
+end note
+@enduml

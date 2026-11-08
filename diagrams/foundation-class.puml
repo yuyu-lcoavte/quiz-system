@@ -1,0 +1,50 @@
+@startuml
+class Session {
+  internal identity
+  activity code
+}
+class Round
+class Question
+class Blank
+class QuestionGroup
+class Team
+class Participant
+class Submission {
+  backend arrival order / rank
+}
+class Result
+Session "1" o-- "0..*" Round
+Round "0..*" --> "0..1" Question
+Round "0..*" --> "0..1" QuestionGroup
+Question "1" o-- "0..*" Blank
+QuestionGroup "0..1" o-- "1..*" Question
+Session "1" o-- "0..*" Team
+Team "1" o-- "0..*" Participant
+Round "1" --> "0..*" Submission
+Team "1" --> "0..*" Submission
+note on link
+Each Submission is associated with exactly one Team and one Round.
+A Question may be retried across multiple Rounds.
+A Question may be standalone or belong to one QuestionGroup.
+A Round targets exactly one Question XOR one QuestionGroup.
+Question may have 0..* Blanks per FR-005.
+Session may have no Rounds or Teams when created.
+end note
+Submission "1" --> "0..1" Result
+Round "1" --> "0..1" Result
+note right of Session
+Activity Code is distinct from
+Session internal identity.
+Session represents one activity.
+end note
+note bottom of QuestionGroup
+A group of questions differs from
+multiple blanks in one question.
+Each Round targets exactly one Question
+or one QuestionGroup.
+A repeated question uses a new Round.
+Submissions are ranked by backend arrival order.
+A Result refers to the winning Submission.
+The new Result replaces the prior result.
+end note
+@enduml
