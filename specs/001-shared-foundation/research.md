@@ -56,5 +56,6 @@
 
 ## Deferred, Non-blocking
 
-- The exact integration branch name conflicts (`main` in Constitution, `master` in the request) and needs member alignment before integration. It does not affect application architecture.
+- Both SpecKit members confirmed `master` as the integration branch. Constitution v2.0.0 now records this under the required amendment process; Feature Branch and Pull Request governance remains unchanged. No Git operation was performed.
+- The Foundation owner defines the common HTTP, DTO and Socket.IO contract version and hands it to the Teacher Feature member for integration. This ownership decision is not evidence that the other member has reviewed every contract item; changes spanning modules must be coordinated.
 - Exact classroom concurrency is unspecified. Do not advertise a capacity target until the team sets one.

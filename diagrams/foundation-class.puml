@@ -19,6 +19,7 @@ class Round {
 class Question {
   id: UUID
   sessionId: UUID
+  questionGroupId: UUID?
   displayNumber: string?
   prompt: string?
   position: integer
@@ -64,6 +65,7 @@ class Result {
   createdAt: UTC timestamp
 }
 Session "1" o-- "0..*" Round
+Session "0..1" --> "0..1" Round : currentRoundId
 Session "1" o-- "0..*" Question
 Session "1" o-- "0..*" QuestionGroup
 Session "1" o-- "0..*" Team
@@ -82,11 +84,13 @@ note right of Round
 A Round targets exactly one Question XOR one QuestionGroup.
 A logical target may have multiple historical Rounds.
 New target/reopen creates Waiting; Start activates that same Round.
+Scoped foreign keys require its Question/QuestionGroup and its Session current pointer to belong to the same Session.
 end note
 note bottom of Submission
 Unique Team + Round prevents duplicate successful submissions.
 acceptedOrder is assigned by the server within the Round.
-A Result references the winning Submission for its Round.
+Team and Round must be in the same Session; SubmissionAnswer Blanks must belong to the Round target.
+A Result references a winning Submission from its own Round.
 end note
 note bottom of Session
 A new Session may have no Rounds or Teams.

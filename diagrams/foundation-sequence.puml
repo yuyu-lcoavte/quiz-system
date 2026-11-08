@@ -10,6 +10,17 @@ Teacher -> Web: Open / and choose role route
 Student -> Web: Open / and choose role route
 Web --> Teacher: Render shared layout / route placeholder
 Web --> Student: Render shared layout / route placeholder
+Student -> Web: Resolve activity code before joining
+Web -> Server: GET /api/v1/sessions/by-code/{activityCode} (anonymous, rate limited)
+Server -> Service: Validate/normalize code and resolve minimal summary
+Service -> Repo: Read public activity summary
+Repo --> Service: sessionId, phase
+Server --> Web: Summary or 429 RATE_LIMITED
+Student -> Web: Query state, current-target and results before any Round exists
+Web -> Server: GET state/current-target/results (verified ActorContext)
+Server -> Service: Read Session with no current Round
+Service --> Server: Waiting snapshot; null target; empty results
+Server --> Web: state Waiting/null; current-target {data:null}; results {data:[]}
 Teacher -> Web: Choose next target
 Web -> Server: Teacher command (verified ActorContext)
 Server -> Service: select next target
@@ -18,6 +29,15 @@ Repo --> Service: committed snapshot
 Service --> Server: Waiting snapshot
 Server -> Room: Emit session:state:changed
 Room --> Web: Notify connected teacher/student clients
+Teacher -> Web: Preview target in Waiting
+Web -> Server: GET current-target (verified Teacher ActorContext)
+Server -> Service: Authorize teacher preview; read target
+Service -> Repo: Read Question/QuestionGroup and Blanks
+Repo --> Service: CurrentTargetView
+Server --> Web: CurrentTargetView
+Student -> Web: Request current-target in Waiting
+Web -> Server: GET current-target (verified Participant ActorContext)
+Server --> Web: 403 FORBIDDEN; no question content
 Teacher -> Web: Start current Round
 Web -> Server: Teacher start command
 Server -> Service: start existing Round
@@ -25,11 +45,17 @@ Service -> Repo: Transaction: Waiting -> Active, increment version
 Repo --> Service: committed snapshot
 Server -> Room: Emit session:state:changed
 Room --> Web: Notify connected clients of Active
+Student -> Web: Request current-target in Active
+Web -> Server: GET current-target (verified Participant ActorContext)
+Server -> Service: Authorize Active Participant; read target
+Service -> Repo: Read Question/QuestionGroup and Blanks
+Repo --> Service: CurrentTargetView
+Server --> Web: CurrentTargetView
 Teacher -> Web: End current Round
 Web -> Server: Teacher end command
-Server -> Service: end current Round
-Service -> Repo: Transaction: Active -> Ended, increment version
-Repo --> Service: committed snapshot/result availability
+Server -> Service: end current Round (winner supplied by owning Feature, if any)
+Service -> Repo: Transaction: Active -> Ended; persist/replace Result if owner supplies winner
+Repo --> Service: committed Ended snapshot and current Result (or no result)
 Server -> Room: Emit session:state:changed
 Room --> Web: Notify connected clients of Ended
 note over Web,Room
@@ -48,13 +74,26 @@ Server -> Service: activate existing new Round
 Service -> Repo: Transaction: Waiting -> Active, increment version
 Server -> Room: Emit session:state:changed
 Room --> Web: Notify connected clients of Active
-Server -> Service: Complete Round when winner is determined by owning feature
-Service -> Repo: Replace prior target Result with new Result atomically
-Server -> Room: Emit current result availability
+Teacher -> Web: End reopened Round
+Web -> Server: Teacher end command
+Server -> Service: end current Round (winner supplied by owning Feature, if any)
+Service -> Repo: Transaction: Active -> Ended; persist/replace Result if owner supplies winner
+Repo --> Service: committed Ended snapshot and current Result (or no result)
+Server -> Room: Emit session:state:changed with Ended snapshot
+Room --> Web: Notify connected clients of Ended
+Student -> Web: View result after Ended
+Web -> Server: GET /api/v1/sessions/{sessionId}/results
+Server --> Web: Existing results response contract
 Student -> Web: Reconnect and watch Session
 Web -> Server: session:watch {sessionId}
 Server -> Service: Read authoritative current snapshot
 Service -> Repo: Read Session + current Round + stateVersion
 Repo --> Service: Latest snapshot
 Server --> Web: session:state snapshot
+note over Service,Repo
+Foundation persists a winner supplied by the owning Feature;
+it does not determine correctness, submission order or winner.
+The Ended state and Result commit before the Ended broadcast.
+State snapshots contain references only, never Question/Blank content.
+end note
 @enduml

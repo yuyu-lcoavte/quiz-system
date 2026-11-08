@@ -44,11 +44,13 @@ Web ..> Contracts : shared types
 Express ..> Contracts : shared types
 Gateway ..> Contracts : event types
 note bottom of TeacherUI
-Authentication, Excel, activity controls
-and results belong to Teacher Feature.
+Authentication, teacher operation entry points,
+authorization, Excel and teacher UI belong to Teacher Feature.
+Shared state transitions and data transactions belong to Foundation.
 end note
 note bottom of StudentUI
-Enrollment, team membership, editing,
-submission and results belong to Student Feature.
+Enrollment, team membership, answer editing,
+submission and student UI belong to Student Feature.
+Foundation does not determine correctness, order or winner.
 end note
 @enduml

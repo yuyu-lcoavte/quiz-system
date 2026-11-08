@@ -26,7 +26,7 @@
 
 ### III. Git 版本管理與 AI 操作界線
 
-- `main` 為共同整合分支；各功能必須使用獨立 Feature Branch，透過 Pull Request 整合。
+- `master` 為共同整合分支；各功能必須使用獨立 Feature Branch，透過 Pull Request 整合。
 - PR 必須列出目的、影響範圍與實際驗證結果，並由另一位組員審查。
 - AI 未取得使用者明確授權，不得執行 Commit、Push、Merge 或可能造成資料遺失的 Git 操作。
   腳本、掛鉤或工作流程不得取代此授權。
@@ -115,5 +115,15 @@
   趕工或 AI 建議不得構成默許例外。
 - 本版依使用者授權首次建立，制定日期為 2026-11-08；PR 整合仍須另一位組員審閱。
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-08
+## Amendment History
+
+### 2.0.0 — 2026-11-09
+
+- **Reason**: 兩位 SpecKit 組員確認本專案共同整合分支採用 `master`，與原憲章條文的 `main` 不同。
+- **Change**: Principle III 將共同整合分支由 `main` 改為 `master`；Feature Branch、Pull Request、審查及 AI Git 操作限制維持不變。
+- **Affected documents**: `specs/001-shared-foundation/spec.md`、`specs/001-shared-foundation/plan.md`、`specs/001-shared-foundation/research.md` 已同步本次分支決議及規範狀態。
+- **Migration**: 後續整合以 `master` 為目標分支，仍須使用 Feature Branch 與 Pull Request。本次只修訂規範及文件，未執行任何 Git 分支操作。
+- **Approval**: 兩位 SpecKit 組員已確認此分支決議。
+
+**Version**: 2.0.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-09
 

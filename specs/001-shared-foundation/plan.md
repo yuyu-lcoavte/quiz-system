@@ -32,7 +32,7 @@
 
 - **需求一致性**: PASS — 依共同需求與 Clarify 決議；未決的欄位與傳輸契約在本 Plan 依使用者指定技術做明確設計。
 - **模組化與協作**: PASS — 一個 Web app、一個共用 API/realtime server、一份 shared contracts；Teacher／Student 模組分層，不另建獨立系統。
-- **Git 管理與 AI 操作界線**: PASS WITH FOLLOW-UP — 本工作不執行 Git 操作。憲章記錄 `main` 為共同整合分支，本次需求文字提到 `master`；需在整合前由組員統一分支名稱，這不阻礙技術設計。
+- **Git 管理與 AI 操作界線**: PASS — 兩位組員已確認 `master` 為共同整合分支，並已依 Governance 將 Constitution 修訂為 v2.0.0；Feature Branch、PR 審查及 AI Git 操作限制維持不變。本次未執行 Git 操作。
 - **資料正確性與安全**: PASS — 外部輸入由 API 驗證；授權由伺服器端 middleware 與模組政策執行；憑證不入庫或日誌。
 - **測試與品質證據**: PASS — 規劃 unit、API、資料庫、socket 與人工路由／雙端同步驗收。
 - **Diagram First**: PASS — 三圖已更新為指定技術分層及一致的資料、狀態流程，PNG 與 `.puml` 同目錄。
@@ -52,6 +52,9 @@
 - **SQLite**: migration 建立 schema；foreign keys 每個連線啟用。以 transaction 原子化 Round 狀態、版本及 Result 替換。
 - **本機連線**: 開發時 Vite 將 `/api` 與 `/socket.io` 代理至 Express；Demo／build 時由同一 Express 程序提供前端 build 與 API。只有一個前端 app。
 - **身分邊界**: API／Socket middleware 將已驗證身分轉成共用 `ActorContext`（kind、actorId、sessionId、可選 teamId）。教師登入方式由 Teacher Feature、學生加入與組別歸屬由 Student Feature 提供；Foundation 不信任客戶端自行宣告的角色或 teamId。
+- **活動代碼入口**: 僅 `GET /sessions/by-code/{activityCode}` 作為加入前可匿名呼叫的唯讀入口，因學生此時尚無 Participant ActorContext。只回 `sessionId` 與 phase；伺服器驗證／正規化代碼並套用可設定節流，超限以 HTTP 429 `RATE_LIMITED` 回覆。此入口不建立成員身分。其他活動 API 與 Socket.IO watch 一律要求伺服器驗證 ActorContext。
+- **題目存取政策**: `GET /sessions/{sessionId}/current-target` 由後端依可信 ActorContext 與 Round phase 授權；有預覽權限的教師可在 Waiting 讀取，Participant 僅在 Active 讀取。Participant 在 Waiting／Ended 不取得題目內容；state/socket snapshot 只含 phase 與目標識別資訊，不含 Question／Blank 內容。
+- **模組責任**: Foundation 提供共用活動狀態轉換服務及其資料交易；Teacher Feature 負責教師操作入口、教師授權與教師介面；Student Feature 負責學生加入、填答與提交。Foundation 不判斷答案正確性、不決定搶答順位，也不判定勝者。勝出 Submission 由後續負責該業務規則的 Feature 提供，Foundation 僅提供結果保存／替換所需的共用原子性邊界。
 
 ### Data Model Summary
 
@@ -61,7 +64,7 @@
 |---|---|
 | Session | 一場活動；具內部 ID 與唯一 Activity Code；可建立時沒有 Team 或 Round；指向目前 Round（可空）。 |
 | Round | 一次搶答；隸屬 Session，Question 或 QuestionGroup 二擇一；同一題可有多輪。狀態為 Waiting／Active／Ended。 |
-| Question | 隸屬 Session，可有 0..* Blank；可單獨成為 Round 目標，或屬於一個 QuestionGroup。 |
+| Question | 隸屬 Session，可有 0..* Blank；以可空 `questionGroupId` 表達其所屬 0..1 QuestionGroup；可單獨成為 Round 目標，或屬於一個 QuestionGroup。 |
 | Blank | 隸屬一個 Question，以穩定 ID 與順序區分；答案另由 SubmissionAnswer 關聯保存。 |
 | QuestionGroup | 隸屬 Session，包含 1..* Question；代表多題共同提交的目標。 |
 | Team | 隸屬 Session，可有多個 Participant／Submission。 |
@@ -71,9 +74,9 @@
 
 ### API and Realtime Contracts
 
-契約細節見 [contracts/http-api.md](contracts/http-api.md)、[contracts/realtime.md](contracts/realtime.md) 與 [contracts/errors-and-identity.md](contracts/errors-and-identity.md)。
+契約細節見 [contracts/http-api.md](contracts/http-api.md)、[contracts/realtime.md](contracts/realtime.md) 與 [contracts/errors-and-identity.md](contracts/errors-and-identity.md)。Foundation 負責人主導本版 API、DTO 與 Socket.IO 定義，正式契約供 Teacher Feature 組員介接；此責任決議不代表對方已逐項審閱。任何跨模組契約變更仍須先協調。
 
-HTTP 使用 `/api/v1`，成功與錯誤均採 JSON。Foundation 的契約先定義查詢與型別邊界；Teacher／Student Feature 擁有開始／結束／下一題／重新開題、正式加入、提交與結果操作的業務實作。Socket.IO 以 session room 廣播 versioned phase snapshot；連線、重新連線或重新訂閱都取得伺服器最新 snapshot，不能只依賴恢復遺失事件。
+HTTP 使用 `/api/v1`，成功與錯誤均採 JSON。Foundation 提供正式共用查詢／型別契約及狀態轉換原語；Teacher Feature 擁有教師操作入口與身份建立，Student Feature 擁有正式加入、填答與提交，勝者判定由後續指定的業務 Feature 負責。所有題目內容存取政策由後端檢查可信 ActorContext 與階段。Socket.IO 以 session room 廣播不含題目內容的 versioned phase snapshot；連線、重新連線或重新訂閱都取得伺服器最新 snapshot，不能只依賴恢復遺失事件。
 
 ### Project Structure
 
@@ -122,19 +125,20 @@ specs/001-shared-foundation/
 
 ### State and Transaction Design
 
-1. 建立 Session 時 phase 為 Waiting，currentRound 為空。
+1. 建立 Session 時 phase 為 Waiting，currentRound 為空。此時 state 回 `{ phase: Waiting, currentRoundId: null, target: null }`，current-target 回 `{ data: null }`，results 回 `{ data: [] }`。`SessionStateSnapshot.changedAt` 由已持久化時間推導：無 current Round 時取 Session `createdAt`；有 current Round 時，Waiting 取 Round `createdAt`、Active 取 `startedAt`、Ended 取 `endedAt`。不新增 Session 狀態時間欄位。
 2. 選擇下一題或重新開題時，在 transaction 內建立新的 Waiting Round，並更新 Session.currentRoundId 與 stateVersion。
 3. 教師開始時啟用目前 Waiting Round；不得在 Start 再建立另一個 Round。
-4. 教師結束時將目前 Active Round 設為 Ended。結束後可讀目前 Result。
-5. 新 Round 首次產生勝出結果時，在 transaction 內刪除同一題／題組舊 Result，新增指向新 Round 與勝出 Submission 的 Result；不提供歷史 Result 查詢契約。
-6. Commit 後對 `session:{sessionId}` room 發送 `session:state:changed`。若 client reconnect 或重送 watch，server 回傳 `session:state` 最新快照與 stateVersion。
+4. 結束流程先由負責勝負判定的 Feature 決定是否有勝出 Submission，並將該 Submission（若有）交給共用完成交易；同一 SQLite transaction 內將 Round 設為 Ended、持久化／替換該目標 Result（若有勝者）並更新 stateVersion。沒有勝者時不建立 Result。
+5. 只有上述 transaction commit 後才對 `session:{sessionId}` room 發送既有 `session:state:changed` Ended 快照。學生收到 Ended 後再呼叫既有結果查詢，必定讀到已提交的新 Result 或空清單；不新增 Socket.IO 事件。Reconnect 或重送 watch 仍取得最新 `session:state` 快照與 stateVersion。
+6. Session.currentRoundId 必須指向同一 Session 的 Round。建立 Round 前須驗證題目／題組同 Session；Submission、SubmissionAnswer、Result 的跨 Session／輪次完整性依 [data-model.md](data-model.md) 的 SQLite 約束、trigger 與同交易 Domain Validation 保證。
+7. 無 current Round 時，state 查詢回 Waiting/null target 快照，current-target 回 `{ data: null }`，results 回 `{ data: [] }`。End transaction commit 後才廣播 Ended，並以既有 results query 取得已持久化結果。
 
 ### Testing Strategy
 
-- **Unit**: domain validators、Question/Blank 0..*、Round target XOR、錯誤碼映射、ActorContext 驗證。
-- **Persistence integration**: SQLite foreign keys、unique (teamId, roundId)、Question 零 Blank、Round 目標二擇一、狀態轉換 transaction、Result 替換原子性。
-- **API integration**: Supertest 驗證成功 envelope、Not Found／Validation／Unauthorized／Forbidden／Conflict 錯誤與不能繞過 server authorization。
-- **Realtime integration**: 兩個 client 訂閱同 session，start/end/next/reopen 事件均更新；量測正常連線下 ≤2 秒；重新連線後取得最新快照，不重播成過時狀態。
+- **Unit**: domain validators 的正常與異常案例、Question/Blank 0..*、非空 QuestionGroup 提交目標、Round target XOR、錯誤碼映射、ActorContext 驗證。
+- **Persistence integration**: SQLite scoped composite foreign keys、same-Session triggers、unique (teamId, roundId)、Question 零 Blank、空題組目標拒絕、Round 目標二擇一、SubmissionAnswer 目標 Blank、Result winner 同 Round、Ended/Result 同交易原子性。
+- **API integration**: Supertest 驗證 pre-join Activity Code lookup 可在無 Participant ActorContext 時執行、只回必要摘要並超限回 429；受保護 API 的 Unauthorized／Forbidden；Waiting 教師預覽、Waiting/Ended 學生拒絕、Active 學生讀取；no-Round state/current-target/results 行為；以及 response envelope 與偽造身分不可繞過後端授權。
+- **Realtime integration**: 兩個 client 訂閱同 session，start/end/next/reopen 事件均更新；驗證未授權 watch 收到錯誤且未加入 room；量測正常連線下 ≤2 秒；重新連線後取得最新快照，不重播成過時狀態。
 - **Manual**: 五個 Route、placeholder 邊界、視窗重新載入、老師及兩個學生組別對同一狀態的一致呈現。核心業務行為由後續 Feature 驗收。
 
 ### Constitution Check (Post-Design)
@@ -144,8 +148,8 @@ specs/001-shared-foundation/
 - **PASS**: backend-authoritative identity and authorization boundary; secrets stay outside source and logs.
 - **PASS**: Unit/API/integration/realtime/manual validation planned; 2-second status criterion is measurable.
 - **PASS**: updated diagrams represent the proposed client/server/shared package architecture and the lifecycle/relationship rules.
-- **FOLLOW-UP**: integration branch name (`main` per Constitution versus `master` in the current request) must be aligned by the two members before repository integration; this plan performs no Git operation.
+- **PASS**: 專案整合分支與 Constitution §III 均採用 `master`；本次僅同步文件，未執行 Git 操作。
 
 ## Complexity Tracking
 
-No constitution violations requiring an exception. Three runtime packages are the minimum needed to keep a single frontend, shared backend, and reusable types separate while both members work in one repository.
+No outstanding Constitution mismatch remains. Three runtime packages are the minimum needed to keep a single frontend, shared backend, and reusable types separate while both members work in one repository.

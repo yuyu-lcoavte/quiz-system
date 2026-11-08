@@ -45,11 +45,11 @@
 
 ### User Story 3 - 共用活動階段與模組契約 (Priority: P2)
 
-老師端與學生端能依共同活動狀態理解目前是否等待、搶答進行中或已結束，並能交換完成加入、讀取題目與狀態、提交及讀取結果所需的資訊。Foundation 只定義責任及資訊需求，不實作這些業務操作。
+老師端與學生端能依共同活動狀態理解目前是否等待、搶答進行中或已結束，並透過共用契約交換讀取題目與狀態、提交及讀取結果所需的資訊。Foundation 定義共用契約及伺服器端階段存取政策，不實作登入、加入、填答或提交業務流程。
 
 **Why this priority**: 兩端必須對活動階段與跨模組交換資訊有一致理解，後續功能才能整合。
 
-**Independent Test**: 以規格所定的狀態案例檢查兩端可理解相同階段，並確認介面責任涵蓋指定資訊交換；具體契約格式留待 Plan。
+**Independent Test**: 驗證無 Round 與 Waiting／Active／Ended 的狀態及存取案例，確認老師可在 Waiting 預覽、學生在 Waiting 無法取得題目內容且在 Active 可取得；另確認既有活動代碼、結果與即時同步契約。
 
 **Acceptance Scenarios**:
 
@@ -58,6 +58,8 @@
 3. **Given** 搶答已結束且老師選擇下一題，**When** 系統切換題目，**Then** 兩端回到等待階段，直到老師開始該題。
 4. **Given** 活動切換至下一題或重新開啟題目，**When** 兩端取得更新，**Then** 都能識別目前題目及其輪次。
 5. **Given** 跨模組操作發生錯誤，**When** 呼叫端接收錯誤，**Then** 能取得共同錯誤概念及可理解的錯誤訊息；具體格式於 Plan 定義。
+6. **Given** 目前 Round 為 Waiting，**When** 學生以伺服器驗證的 Participant ActorContext 呼叫目前題目查詢，**Then** 後端拒絕請求且不回傳 Question 或 Blank 內容；具預覽權限的伺服器驗證教師可讀取預覽。
+7. **Given** 目前 Round 為 Active，**When** 已加入活動的學生呼叫目前題目查詢，**Then** 後端允許讀取目前 Question／QuestionGroup 與動態 Blank；前端隱藏不能取代此後端檢查。
 
 ### Edge Cases
 
@@ -85,8 +87,11 @@
 - **FR-012**: Foundation MUST 定義模組責任與共用契約的邊界，不得在本 Feature 實作教師驗證、Excel 處理、學生加入、組長判定、多人編輯、答案提交、順位判定、CSV 匯出或題組操作。
 - **FR-013**: 系統 MUST 以資料關聯表達題目及填空數量，不得依賴寫死的題號、題數、填空數或 Excel 儲存格位置。
 - **FR-014**: 具體資料庫欄位、儲存方式、API 格式及 Socket.IO 事件格式 MUST 留待 Plan 階段依雙方協調結果決定。
-- **FR-015**: 每筆 Submission MUST 對應且僅對應一個 Team 與一個 Round。
+- **FR-015**: 每筆 Submission MUST 對應且僅對應一個 Team 與一個 Round；同一 Team 在同一 Round MUST 至多有一筆有效 Submission。本限制是共用資料不變條件；Foundation 不實作學生正式填答或提交流程。
 - **FR-016**: 同一題目重新開放時建立新 Round；新一輪完成後，新 Result MUST 覆蓋該題原有結果，不要求查詢舊結果版本。
+- **FR-017**: 目前題目內容的存取 MUST 由後端依伺服器驗證的 ActorContext 與 Round 階段授權。具預覽權限的教師可在 Waiting 讀取題目；學生在 Waiting 不得透過 API 取得 Question／Blank 內容，僅在 Active 可讀取目前題目。Socket.IO 狀態快照不得包含題目內容；此規則不得只由前端隱藏實現。
+- **FR-018**: `GET /sessions/by-code/{activityCode}` MUST 是加入前唯一受限制的匿名唯讀查詢，只回傳 `sessionId` 與活動階段；伺服器 MUST 驗證及正規化代碼，套用可設定的請求節流，超限回傳 HTTP 429，且不得建立成員身分或授予其他 API 權限。
+- **FR-019**: Session 尚無 current Round 時，state MUST 為 Waiting 且 `currentRoundId` 與 target 為 null；`GET current-target` MUST 回 `{ "data": null }`，`GET results` MUST 回 `{ "data": [] }`。
 
 ### Key Entities
 
@@ -110,6 +115,8 @@
 - **SC-003**: 兩位組員使用同一份共用資料語意與介面責任說明，能辨識所有九種核心實體及其必要關聯，且無需建立第二套互不相容的系統架構。
 - **SC-004**: 兩端的狀態驗收案例對等待、進行中、結束、下一題及重新開題能得到相同階段解讀；連線正常時，階段切換於 2 秒內顯示於兩端。
 - **SC-005**: 驗收文件能逐項對應活動代號、活動資訊、題目與填空、狀態同步、參與者、提交、結果及錯誤回覆等八類介面責任，且不要求本 Feature 完成其業務操作。
+- **SC-006**: 100% 的 Waiting 階段學生題目讀取案例均由後端拒絕且不含題目／填空內容；具預覽權限的教師能讀取預覽；Active 階段已加入活動的學生能取得目前題目，且 Socket.IO snapshot 不含題目內容。
+- **SC-007**: 匿名活動代碼查詢只回傳 Session ID 與階段、不建立成員權限，且伺服器節流超限案例均回 HTTP 429；無 Round 的 state/current-target/results 查詢 100% 符合 FR-019 的回覆形狀。
 
 ## Assumptions
 
@@ -130,4 +137,12 @@
 - Q: 老師重新開啟已結束的題目時，新一輪應立即開始，還是先回到等待並由老師再按「開始」？ → A: 先回到等待，由老師再按開始後才開放新 Round。
 - Q: 在連線正常時，老師切換活動狀態後，老師端與學生端最遲應在多久內顯示更新？ → A: 2 秒內。
 - Q: 雙方確認的共同資料概念與關聯為何？ → A: Session 代表一場活動；Round 代表一次搶答輪次，每個 Round 對應一個 Question 或一個 QuestionGroup；Question 可有多個 Blank，QuestionGroup 可有多個 Question；Submission 對應特定 Team 與 Round；重新開題建立新 Round，新 Result 覆蓋原結果。具體欄位、API 與 Socket.IO 事件格式留待 Plan。
+
+### Session 2026-11-09
+
+- Foundation 負責人主導定義共用 API、DTO 與 Socket.IO 契約，正式契約提供 Teacher Feature 組員介接；此記錄不代表另一位組員已逐項審閱所有契約。跨模組契約變更仍須先協調。
+- 學生只能在 Active 透過後端授權取得目前題目內容；具預覽權限的教師可在 Waiting 讀取。活動代碼查詢是受限匿名唯讀入口，不授予活動成員權限。
+- 無 Round 時 state 為 Waiting 且 Round／target 為 null；current-target 回 `{ data: null }`；results 回 `{ data: [] }`。
+- 加入前匿名活動代碼查詢只回傳 `sessionId` 與 phase，伺服器驗證／正規化輸入並以可設定節流保護，超限回 HTTP 429；該查詢不授予成員權限。
+- 本專案整合分支採用 `master`；Constitution §III 已依雙方確認及修訂程序同步為 `master`（v2.0.0）。
 

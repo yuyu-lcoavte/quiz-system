@@ -6,16 +6,16 @@ This design uses SQLite primary/foreign keys and shared TypeScript DTOs. IDs are
 
 | Entity | Planned fields | Keys and validation |
 |---|---|---|
-| Session | `id`, `activityCode`, `currentRoundId?`, `stateVersion`, `createdAt` | `id` primary key; `activityCode` unique, normalized before lookup; `currentRoundId` nullable and references Round. New Session has no Round and is Waiting by interpretation. A Session may initially have zero Teams. |
-| Round | `id`, `sessionId`, `questionId?`, `questionGroupId?`, `phase`, `createdAt`, `startedAt?`, `endedAt?` | `id` primary key; `sessionId` foreign key; exactly one of `questionId` or `questionGroupId` is non-null; phase is Waiting, Active or Ended. A Question or QuestionGroup can have multiple historical Rounds. |
-| Question | `id`, `sessionId`, `displayNumber?`, `prompt?`, `position` | `id` primary key; `sessionId` foreign key; question order is explicit. May belong to zero or one QuestionGroup. |
+| Session | `id`, `activityCode`, `currentRoundId?`, `stateVersion`, `createdAt` | `id` primary key; `activityCode` unique, normalized before lookup; `currentRoundId` nullable and references a Round in the same Session via a composite foreign key. New Session has no Round and is Waiting by interpretation. A Session may initially have zero Teams. |
+| Round | `id`, `sessionId`, `questionId?`, `questionGroupId?`, `phase`, `createdAt`, `startedAt?`, `endedAt?` | `id` primary key; unique `(sessionId, id)` supports scoped references; `sessionId` foreign key; exactly one of `questionId` or `questionGroupId` is non-null; phase is Waiting, Active or Ended. Composite foreign keys require the selected Question or QuestionGroup to belong to this Session. A Question or QuestionGroup can have multiple historical Rounds. |
+| Question | `id`, `sessionId`, `questionGroupId?`, `displayNumber?`, `prompt?`, `position` | `id` primary key; `sessionId` foreign key; unique `(sessionId, id)` supports scoped references; optional composite foreign key `(sessionId, questionGroupId)` ensures a group belongs to the same Session. Question order is explicit. May belong to zero or one QuestionGroup. |
 | Blank | `id`, `questionId`, `label?`, `position` | `id` primary key; `questionId` foreign key; unique position per Question. A Question may have 0..* Blanks. |
-| QuestionGroup | `id`, `sessionId`, `label?`, `position` | `id` primary key; `sessionId` foreign key; contains one or more Questions when configured as a submission target. |
+| QuestionGroup | `id`, `sessionId`, `label?`, `position` | `id` primary key; unique `(sessionId, id)` supports scoped references; `sessionId` foreign key; contains one or more Questions when configured as a submission target. |
 | Team | `id`, `sessionId`, `name`, `createdAt` | `id` primary key; `sessionId` foreign key; name is display data, not identity. Session may have zero Teams initially. |
 | Participant | `id`, `teamId`, `displayName?`, `createdAt` | `id` primary key; `teamId` foreign key. Login/session credential and enrollment lifecycle are owned by Student Feature. |
-| Submission | `id`, `teamId`, `roundId`, `receivedAt`, `acceptedOrder` | `id` primary key; exactly one Team and Round; unique `(teamId, roundId)` enforces one successful submission by a Team per Round; unique `(roundId, acceptedOrder)` provides backend ordering. Creation/authorization belongs to Student Feature. |
-| SubmissionAnswer | `submissionId`, `blankId`, `value` | Composite primary key `(submissionId, blankId)`; links independently entered answers to Blank records; this supports zero or multiple blanks without fixed counts. |
-| Result | `id`, `roundId`, `winningSubmissionId`, `createdAt` | One Result at most per Round; winner must be a Submission from the same Round. On completion of a new Round for the same Question/QuestionGroup, prior Result for that logical target is deleted and replaced transactionally. |
+| Submission | `id`, `teamId`, `roundId`, `receivedAt`, `acceptedOrder` | `id` primary key; exactly one Team and Round; unique `(teamId, roundId)` enforces one effective Submission by a Team per Round; unique `(roundId, id)` supports same-Round Result references; unique `(roundId, acceptedOrder)` provides backend ordering. A database trigger requires Team and Round to belong to the same Session. Creation/authorization belongs to Student Feature. |
+| SubmissionAnswer | `submissionId`, `blankId`, `value` | Composite primary key `(submissionId, blankId)`; links independently entered answers to Blank records; a database trigger requires the Blank's Question to be the Round's direct Question or a member of its targeted QuestionGroup. This supports zero or multiple blanks without fixed counts. |
+| Result | `id`, `roundId`, `winningSubmissionId`, `createdAt` | One Result at most per Round; a composite foreign key `(roundId, winningSubmissionId)` requires the winner Submission to belong to that same Round. On completion of a new Round for the same Question/QuestionGroup, prior Result for that logical target is deleted and replaced transactionally. |
 
 ## Relationships
 
@@ -25,14 +25,29 @@ This design uses SQLite primary/foreign keys and shared TypeScript DTOs. IDs are
 - Question 1 — 0..* Blank; each Blank belongs to exactly one Question.
 - QuestionGroup 1 — 1..* Question when a group is configured; a Question can be standalone or belong to 0..1 group.
 - Round targets exactly one Question XOR one QuestionGroup. One target may have multiple Rounds.
+- A Round's selected Question or QuestionGroup must belong to the same Session as the Round; the Session's nullable `currentRoundId` must also refer to a Round in that Session.
 - Team 1 — 0..* Participant and Submission.
 - Round 1 — 0..* Submission and 0..1 Result.
 - Result selects exactly one winning Submission from its Round.
 - Submission 1 — 0..* SubmissionAnswer; each answer targets one Blank.
 
+## Cross-Session and Target Integrity
+
+Use SQLite as the final integrity boundary and Domain Validation inside the owning service/transaction for clear errors before persistence:
+
+| Invariant | SQLite enforcement | Domain/service validation |
+|---|---|---|
+| Round's Question or QuestionGroup belongs to the Round's Session | Composite foreign keys from `(sessionId, questionId)` / `(sessionId, questionGroupId)` to unique scoped keys; retain the XOR `CHECK`. A trigger rejects using an empty QuestionGroup as a Round target. | Validate the target exists in the selected Session and a QuestionGroup has at least one member before creating the Round. |
+| Session's `currentRoundId` belongs to that Session | Composite foreign key from `(id, currentRoundId)` to `(sessionId, id)` on Round; nullable current pointer remains allowed. | Validate current-Round transitions and state version in the same transaction. |
+| Submission's Team and Round belong to the same Session | SQLite `BEFORE INSERT/UPDATE` trigger checks the Session IDs, avoiding a redundant `sessionId` field on Submission. | Validate membership before accepting the Student Feature transaction. |
+| SubmissionAnswer's Blank belongs to the Round target | SQLite trigger follows Submission → Round and Blank → Question, allowing either the direct Question or a Question in the target QuestionGroup. | Validate the Blank is in the submitted target before storing the answer. |
+| Result's winning Submission belongs to its Round | Unique parent key `(roundId, id)` on Submission plus composite foreign key `(roundId, winningSubmissionId)`. | Validate the supplied winner belongs to the completed Round before atomically replacing the Result. |
+
+Enable `PRAGMA foreign_keys=ON` on every connection. Triggers and foreign keys protect writes even if a path bypasses normal application validation; Domain Validation remains responsible for actionable errors. An empty QuestionGroup is not a valid Round submission target and is rejected by Domain Validation before transition creation.
+
 ## Lifecycle and Constraints
 
-1. A Session without a current Round is Waiting.
+1. A Session without a current Round is Waiting. `SessionStateSnapshot.changedAt` is derived from persisted timestamps: Session `createdAt` when there is no current Round; otherwise the current Round's `createdAt` in Waiting, `startedAt` in Active, or `endedAt` in Ended. No separate Session state-change timestamp field is required.
 2. Choosing a new target or reopening a target creates a new Round in Waiting and updates `currentRoundId`.
 3. Start changes the current Round from Waiting to Active; End changes Active to Ended.
 4. `stateVersion` increments on every observable session phase/current-round change in the same transaction.
