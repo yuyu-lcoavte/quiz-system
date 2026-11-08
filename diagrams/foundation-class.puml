@@ -1,50 +1,104 @@
 @startuml
 class Session {
-  internal identity
-  activity code
+  id: UUID
+  activityCode: string (unique)
+  currentRoundId: UUID?
+  stateVersion: integer
+  createdAt: UTC timestamp
 }
-class Round
-class Question
-class Blank
-class QuestionGroup
-class Team
-class Participant
+class Round {
+  id: UUID
+  sessionId: UUID
+  questionId: UUID?
+  questionGroupId: UUID?
+  phase: Waiting | Active | Ended
+  createdAt: UTC timestamp
+  startedAt: UTC timestamp?
+  endedAt: UTC timestamp?
+}
+class Question {
+  id: UUID
+  sessionId: UUID
+  displayNumber: string?
+  prompt: string?
+  position: integer
+}
+class Blank {
+  id: UUID
+  questionId: UUID
+  label: string?
+  position: integer
+}
+class QuestionGroup {
+  id: UUID
+  sessionId: UUID
+  label: string?
+  position: integer
+}
+class Team {
+  id: UUID
+  sessionId: UUID
+  name: string
+}
+class Participant {
+  id: UUID
+  teamId: UUID
+  displayName: string?
+}
 class Submission {
-  backend arrival order / rank
+  id: UUID
+  teamId: UUID
+  roundId: UUID
+  receivedAt: UTC timestamp
+  acceptedOrder: integer
 }
-class Result
+class SubmissionAnswer {
+  submissionId: UUID
+  blankId: UUID
+  value: string
+}
+class Result {
+  id: UUID
+  roundId: UUID (unique)
+  winningSubmissionId: UUID (unique)
+  createdAt: UTC timestamp
+}
 Session "1" o-- "0..*" Round
+Session "1" o-- "0..*" Question
+Session "1" o-- "0..*" QuestionGroup
+Session "1" o-- "0..*" Team
 Round "0..*" --> "0..1" Question
 Round "0..*" --> "0..1" QuestionGroup
 Question "1" o-- "0..*" Blank
 QuestionGroup "0..1" o-- "1..*" Question
-Session "1" o-- "0..*" Team
 Team "1" o-- "0..*" Participant
-Round "1" --> "0..*" Submission
 Team "1" --> "0..*" Submission
-note on link
-Each Submission is associated with exactly one Team and one Round.
-A Question may be retried across multiple Rounds.
-A Question may be standalone or belong to one QuestionGroup.
-A Round targets exactly one Question XOR one QuestionGroup.
-Question may have 0..* Blanks per FR-005.
-Session may have no Rounds or Teams when created.
-end note
-Submission "1" --> "0..1" Result
+Round "1" --> "0..*" Submission
+Submission "1" o-- "0..*" SubmissionAnswer
+Blank "1" --> "0..*" SubmissionAnswer
 Round "1" --> "0..1" Result
-note right of Session
-Activity Code is distinct from
-Session internal identity.
-Session represents one activity.
+Submission "1" --> "0..1" Result
+note right of Round
+A Round targets exactly one Question XOR one QuestionGroup.
+A logical target may have multiple historical Rounds.
+New target/reopen creates Waiting; Start activates that same Round.
 end note
-note bottom of QuestionGroup
-A group of questions differs from
-multiple blanks in one question.
-Each Round targets exactly one Question
-or one QuestionGroup.
-A repeated question uses a new Round.
-Submissions are ranked by backend arrival order.
-A Result refers to the winning Submission.
-The new Result replaces the prior result.
+note bottom of Submission
+Unique Team + Round prevents duplicate successful submissions.
+acceptedOrder is assigned by the server within the Round.
+A Result references the winning Submission for its Round.
+end note
+note bottom of Session
+A new Session may have no Rounds or Teams.
+No current Round means Waiting.
+stateVersion increments after observable state changes.
+end note
+note right of Question
+0..* Blanks is intentional per FR-005.
+A zero-Blank target is valid data; Student Feature rejects submission.
+end note
+note bottom of Result
+On new-round completion, replace the previous Result
+for the same Question or QuestionGroup in one transaction.
 end note
 @enduml

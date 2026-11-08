@@ -2,39 +2,53 @@
 left to right direction
 actor Teacher
 actor Student
-package "Shared Foundation" {
-  [Shared Home]
-  [Shared Route Areas]
-  [/] as HomeRoute
-  [/teacher/login] as TeacherLoginRoute
-  [/teacher/dashboard] as TeacherDashboardRoute
-  [/student/join] as StudentJoinRoute
-  [/student/session/:sessionId] as StudentSessionRoute
-  [Session State]
-  [Shared Domain Concepts]
-  [Shared Interface Contract]
+package "Single Web Application" {
+  component "React + TypeScript + Vite" as Web
+  component "React Router + Shared Layout" as Router
+  component "Teacher Routes (Foundation placeholder)" as TeacherUI
+  component "Student Routes (Foundation placeholder)" as StudentUI
+  component "HTTP Client" as HttpClient
+  component "Socket.IO Client" as SocketClient
 }
-[Teacher Module] as TeacherModule
-[Student Module] as StudentModule
-Teacher --> [Shared Home]
-Student --> [Shared Home]
-[Shared Home] --> HomeRoute
-[Shared Route Areas] --> TeacherLoginRoute
-[Shared Route Areas] --> TeacherDashboardRoute
-[Shared Route Areas] --> StudentJoinRoute
-[Shared Route Areas] --> StudentSessionRoute
-[Shared Route Areas] --> TeacherModule
-[Shared Route Areas] --> StudentModule
-TeacherModule --> [Shared Interface Contract]
-StudentModule --> [Shared Interface Contract]
-[Shared Interface Contract] --> [Session State]
-[Shared Interface Contract] --> [Shared Domain Concepts]
-note bottom of TeacherModule
-Excel processing and teacher business flows
-are delivered by later features.
+package "Shared Server" {
+  component "Express API" as Express
+  component "API Routers + Validation" as Api
+  component "ActorContext Middleware" as AuthBoundary
+  component "Session / State Services" as Services
+  component "Socket.IO Gateway (Session Rooms)" as Gateway
+  component "Repositories + Migrations" as Persistence
+}
+package "Shared Contracts" {
+  component "TypeScript DTOs (Errors + Events)" as Contracts
+}
+database "SQLite" as DB
+Teacher --> Web
+Student --> Web
+Web --> Router
+Router --> TeacherUI
+Router --> StudentUI
+TeacherUI --> HttpClient
+StudentUI --> HttpClient
+TeacherUI --> SocketClient
+StudentUI --> SocketClient
+HttpClient --> Express : /api/v1
+SocketClient --> Gateway : session watch/state
+Express --> Api
+Api --> AuthBoundary
+AuthBoundary --> Services
+Services --> Persistence
+Gateway --> AuthBoundary
+Gateway --> Services : snapshot / state version
+Persistence --> DB
+Web ..> Contracts : shared types
+Express ..> Contracts : shared types
+Gateway ..> Contracts : event types
+note bottom of TeacherUI
+Authentication, Excel, activity controls
+and results belong to Teacher Feature.
 end note
-note bottom of StudentModule
-Joining, answering and result flows
-are delivered by later features.
+note bottom of StudentUI
+Enrollment, team membership, editing,
+submission and results belong to Student Feature.
 end note
 @enduml
