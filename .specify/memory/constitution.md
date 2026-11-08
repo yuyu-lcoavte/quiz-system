@@ -1,13 +1,3 @@
-<!--
-Sync Impact Report
-- Version change: 未制定（佔位範本） → 1.0.0；首次建立治理基準。
-- Modified principles: 五個未定義原則佔位區 → 七項專案原則。
-- Added sections: 共同約束與需求來源、開發流程與品質關卡、治理規則。
-- Removed sections: 無已生效規範；移除範本示例與佔位文字。
-- Follow-up TODOs: 無未填佔位符；未決功能留待 Specify／Clarify 確認。
-- Dependent templates/commands: 不修改，執行時讀取本憲章。
-- 本報告為人工審閱用暫存註解，須於提交本次憲章前移除。
--->
 # 課堂搶答系統 Constitution
 
 ## Core Principles
@@ -126,3 +116,4 @@ Sync Impact Report
 - 本版依使用者授權首次建立，制定日期為 2026-11-08；PR 整合仍須另一位組員審閱。
 
 **Version**: 1.0.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-08
+
