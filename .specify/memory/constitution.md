@@ -1,50 +1,128 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: 未制定（佔位範本） → 1.0.0；首次建立治理基準。
+- Modified principles: 五個未定義原則佔位區 → 七項專案原則。
+- Added sections: 共同約束與需求來源、開發流程與品質關卡、治理規則。
+- Removed sections: 無已生效規範；移除範本示例與佔位文字。
+- Follow-up TODOs: 無未填佔位符；未決功能留待 Specify／Clarify 確認。
+- Dependent templates/commands: 不修改，執行時讀取本憲章。
+- 本報告為人工審閱用暫存註解，須於提交本次憲章前移除。
+-->
+# 課堂搶答系統 Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. 需求一致性
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+- 開發必須依據課程官方要求與已確認的共同需求，不得擅自刪改老師規定的核心功能。
+- `docs/shared-requirements.md` 是共同 HackMD 的本機副本。必須區分強制要求、已確認決議、
+  建議及待確認事項，不得將建議或未決問題當成正式規格。
+- 尚未確認的需求必須在 Specify 或 Clarify 階段釐清並記錄決議。
+  發現需求矛盾時必須先與相關組員確認，AI 不得自行裁決。
+- SpecKit 與 OpenSpec 的功能及驗收行為必須一致。影響共同功能的變更必須協調，
+  先更新共同 HackMD，再同步兩組文件；兩組技術與內部實作不必相同。
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+此原則避免分工或工具差異造成需求漂移。
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### II. 模組化與協作
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+- 兩位 SpecKit 組員必須使用同一個 GitHub Repository、同一套應用程式，分別負責學生端與老師端。
+  不得重複建立互不相容的系統架構。
+- 必須明確界定模組責任，以共用契約互動並降低耦合。
+  共用基礎架構、資料模型、API 與模組介面必須一致；變更須由雙方協調並同步受影響模組。
+- 學生端必須透過共用資料模型或 API 取得處理後的題目與填空資料，動態呈現答案欄位。
+  Excel 匯入、解析與答案回寫由老師端負責。
+- 共用首頁、Route 命名及 API 格式必須由雙方協調；本憲章不指定具體格式。
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### III. Git 版本管理與 AI 操作界線
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- `main` 為共同整合分支；各功能必須使用獨立 Feature Branch，透過 Pull Request 整合。
+- PR 必須列出目的、影響範圍與實際驗證結果，並由另一位組員審查。
+- AI 未取得使用者明確授權，不得執行 Commit、Push、Merge 或可能造成資料遺失的 Git 操作。
+  腳本、掛鉤或工作流程不得取代此授權。
+- AI 必須保留使用者與其他組員既有變更，不得擅自覆寫或清除。
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+### IV. 資料正確性與安全
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+- 所有外部輸入必須驗證，包括上傳檔案、活動代號、答案、識別碼及即時訊息。
+  後端必須驗證格式、資料所屬關係與操作狀態；前端檢查不得取代後端檢查。
+- 不得以硬編碼題目、答案、題數、填空數或 Excel 儲存格位置實作產品邏輯。
+  固定內容僅能作為明確隔離的測試資料，不得成為產品對特定範本的依賴。
+- 使用者操作必須經後端身分與權限驗證，包括教師管理及組長提交資格。
+  Route、前端按鈕及客戶端角色資訊不得作為唯一權限依據。
+- 密碼、API Key、Token 等機敏資料不得寫入程式碼、版本庫或 GitHub，
+  必須透過安全組態或憑證保存機制管理，並避免記錄於日誌；明文憑證不得進入日誌。
+
+### V. 測試與品質證據
+
+- 每項重要功能必須包含正常及異常案例測試，涵蓋輸入、權限、狀態及模組整合邊界。
+- 必須執行自動化測試與人工操作測試；AI 自動測試不得取代人工驗證。
+- 每個開發階段必須通過必要驗證才能進入下一階段。
+  失敗或未執行的檢查必須記錄，AI 必須回報實際執行項目、結果及未驗證限制，不得虛報通過。
+- 規格、設計文件、圖表與程式碼必須一致；變更時必須同步受影響產物並記錄一致性檢查結果。
+
+### VI. Diagram First Development（課程強制要求）
+
+- Specification Phase：每個 Feature 必須在 `speckit.specify` 階段產出 Component Diagram、
+  Class Diagram、Sequence Diagram，使用 PlantUML `.puml` 格式，存放於 `./diagrams/`。
+- 不同 Feature 必須使用不同檔名，包含 Feature 識別及圖表類型，例如
+  `feature-id-component.puml`、`feature-id-class.puml`、`feature-id-sequence.puml`，避免覆蓋。
+- Specify 圖表必須描述邏輯元件、領域類別及互動，不得提前鎖定未確認的框架或 API 格式。
+  Plan 選型後必須同步細化圖表。
+- Artifact Generation：必須使用 PlantUML CLI，依老師要求的形式執行：
+  `java -jar plantuml.jar "./diagrams/*.puml"`。
+  PNG 必須與原始 `.puml` 放在相同目錄；必須檢查命令成功、各來源有對應 PNG，且圖片可開啟及閱讀。
+- Planning Phase：`speckit.plan` 必須以 PlantUML 圖表作為主要設計依據，
+  架構、資料模型與互動流程必須與圖表一致。
+- Implementation Phase：`speckit.implement` 完成後，必須核對程式碼與圖表的元件責任、
+  類別／資料關係及互動流程，記錄差異與驗證結果。
+- 設計變更時必須同步更新 `.puml`、重新生成 PNG，並更新相關規格、計畫與文件。
+  Java 或 PlantUML CLI 不可用時必須回報阻礙，不得宣稱完成轉圖或圖表驗證。
+
+### VII. SpecKit 階段紀律
+
+- 必須遵循 Constitution → Specify → Clarify → Plan → Tasks → Analyze → Implement → Converge。
+  Clarify 必須處理未決需求；無待釐清事項時必須記錄其結論。
+- Specify 以需求與驗收行為為主，不得提前決定具體框架。
+  Plan 階段才進行技術選型、架構規劃及介面契約設計。
+- Tasks 必須產出可驗證且具依賴順序的工作；Analyze 必須檢查規格、計畫與任務一致性。
+- Implement 必須依 Tasks 分階段實作；Converge 必須核對成果與規格、計畫及任務，追蹤缺漏。
+- 發現需求矛盾時必須先確認，不得進行依賴該決議的實作。
+
+## 共同約束與需求來源
+
+- 本憲章定義治理原則；共同需求與後續確認的 Feature 規格定義產品行為。
+  課程官方要求不可由本憲章或單組文件推翻，來源衝突時必須提出討論並同步修訂。
+- `docs/examples/` 的老師 Excel 範本僅為解析及驗收參考，不得假設其他 Guided Notes 儲存格位置相同。
+- 必須區分「單題多填空」與「多題共同提交」。範本名稱、合併題號、分列及填空標記，
+  不得由 AI 擅自解讀為已確認的提交規則。
+- 已確認共同決議持續有效。帳號管理、組長恢復、多人編輯同步、填空標記保留、題組辨識、
+  Excel 流程合規性與共同測試細節等未決事項，須於相關規格追蹤，不透過憲章定案。
+- 課程允許本機模擬，技術選型不得將公開部署增加為必要條件。
+
+## 開發流程與品質關卡
+
+- Constitution：原則可檢查、無未解釋佔位符，且未將未決功能定案。
+- Specify／Clarify：需求來源、範圍與驗收可追溯，影響後續工作的歧義已確認；
+  三類 `.puml` 與成功生成且可閱讀的 PNG 齊備。
+- Plan：選型有依據，共用契約與模組責任已協調，通過憲章及圖表一致性檢查。
+- Tasks／Analyze：重要需求與測試有對應任務、依賴明確，阻礙實作的矛盾已處理。
+- Implement：依任務交付、自動化驗證通過、程式碼與圖表一致。
+  必要人工驗證尚未完成時，必須標示待驗證，不得將關卡標為通過。
+- Converge／整合：需求缺漏已追蹤及處理，人工與跨模組測試完成，
+  並可依課程要求展示教師端與至少兩個學生組別的完整流程。
+- 每次 PR 與階段審查必須核對適用原則、需求來源、契約影響、測試證據與圖表同步狀態。
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- 所有組員與 AI Agent 必須遵守本憲章。與課程要求或已確認共同需求衝突時，
+  必須提出並修訂，不得自行忽略要求。
+- 修訂必須記錄原因、條文差異、受影響文件與遷移方式，經兩位 SpecKit 組員確認後，
+  依 Feature Branch 與 PR 流程整合；涉及共同功能或驗收行為時，另須協調 OpenSpec 小組。
+- 採語意化版本：移除或不相容地重定義原則升 MAJOR；新增原則或實質擴充治理升 MINOR；
+  不改變規範意義的澄清與文字修正升 PATCH。修訂須更新版本與最後修訂日期，保留初始制定日期。
+- 違反憲章的產物不得標記為通過；必須修正，或先完成正式憲章修訂。
+  趕工或 AI 建議不得構成默許例外。
+- 本版依使用者授權首次建立，制定日期為 2026-11-08；PR 整合仍須另一位組員審閱。
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-08
