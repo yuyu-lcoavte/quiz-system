@@ -1,14 +1,23 @@
-# PlantUML 執行工具
-plantuml.jar
-plantuml*.jar
+# Dependencies
+node_modules/
 
-# 環境變數與敏感資料
+# Build output
+dist/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Vite cache
+.vite/
+
+# Environment variables
 .env
 .env.*
 !.env.example
 
-# Node.js 套件
-node_modules/
+# Logs
+*.log
 
-# 編譯產物
-dist/
+# PlantUML executable
+plantuml*.jar
