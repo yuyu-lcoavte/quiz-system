@@ -18,11 +18,11 @@
 
 **Purpose**: Establish one repository workspace with one web application, one server, and shared contracts.
 
-- [ ] T001 Define root npm workspaces, shared TypeScript configuration, and development scripts in `package.json`, `tsconfig.base.json`, and `package-lock.json`.
-- [ ] T002 [P] Scaffold the single React, TypeScript, Vite, React Router, and Tailwind web workspace in `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/tsconfig.json`, and `apps/web/src/main.tsx`.
-- [ ] T003 [P] Scaffold the Express and Socket.IO server workspace and SQLite configuration entry points in `apps/server/package.json`, `apps/server/tsconfig.json`, and `apps/server/src/app.ts`.
-- [ ] T004 [P] Scaffold the framework-independent shared contracts workspace and package exports in `packages/contracts/package.json`, `packages/contracts/tsconfig.json`, and `packages/contracts/src/index.ts`.
-- [ ] T005 Configure Vitest, Supertest, and Socket.IO client test environments and root test scripts in `vitest.config.ts`, `tests/setup.ts`, and `package.json`.
+- [X] T001 Define root npm workspaces, shared TypeScript configuration, and development scripts in `package.json`, `tsconfig.base.json`, and `package-lock.json`.
+- [X] T002 [P] Scaffold the single React, TypeScript, Vite, React Router, and Tailwind web workspace in `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/tsconfig.json`, and `apps/web/src/main.tsx`.
+- [X] T003 [P] Scaffold the Express and Socket.IO server workspace and SQLite configuration entry points in `apps/server/package.json`, `apps/server/tsconfig.json`, and `apps/server/src/app.ts`.
+- [X] T004 [P] Scaffold the framework-independent shared contracts workspace and package exports in `packages/contracts/package.json`, `packages/contracts/tsconfig.json`, and `packages/contracts/src/index.ts`.
+- [X] T005 Configure Vitest, Supertest, and Socket.IO client test environments and root test scripts in `vitest.config.ts`, `tests/setup.ts`, and `package.json`.
 
 ---
 
