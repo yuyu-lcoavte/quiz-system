@@ -19,5 +19,11 @@ coverage/
 # Logs
 *.log
 
+# Local SQLite files
+data/
+*.sqlite
+*.sqlite-*
+*.db
+
 # PlantUML executable
 plantuml*.jar

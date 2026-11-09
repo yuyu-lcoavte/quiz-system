@@ -30,12 +30,12 @@
 
 **Purpose**: Provide shared infrastructure used by every story without implementing role-specific business workflows.
 
-- [ ] T006 Create environment parsing, SQLite connection lifecycle, and migration runner in `apps/server/src/config/env.ts`, `apps/server/src/persistence/database.ts`, and `apps/server/src/persistence/migrate.ts`.
-- [ ] T007 [P] Define shared entity identifiers, enums, DTO shapes, and request/response types from `data-model.md` and the contracts in `packages/contracts/src/domain.ts` and `packages/contracts/src/http.ts`.
-- [ ] T008 [P] Define the shared `ApiError`, error envelope, and server-verified `ActorContext` contract in `packages/contracts/src/errors.ts` and `packages/contracts/src/identity.ts`.
-- [ ] T009 Implement Express router mounting, request validation/error conversion boundaries, and server-side ActorContext injection seam in `apps/server/src/api/router.ts`, `apps/server/src/api/middleware/validate.ts`, `apps/server/src/api/middleware/actor-context.ts`, and `apps/server/src/errors/error-handler.ts`.
-- [ ] T010 Implement Socket.IO server attachment, server-managed session room naming, and event payload validation boundary in `apps/server/src/realtime/socket-server.ts`, `apps/server/src/realtime/session-room.ts`, and `packages/contracts/src/realtime.ts`.
-- [ ] T011 Add isolated temporary SQLite setup and teardown helpers for persistence and integration checks in `tests/helpers/sqlite.ts` and `tests/setup.ts`.
+- [X] T006 Create environment parsing, SQLite connection lifecycle, and migration runner in `apps/server/src/config/env.ts`, `apps/server/src/persistence/database.ts`, and `apps/server/src/persistence/migrate.ts`.
+- [X] T007 [P] Define shared entity identifiers, enums, DTO shapes, and request/response types from `data-model.md` and the contracts in `packages/contracts/src/domain.ts` and `packages/contracts/src/http.ts`.
+- [X] T008 [P] Define the shared `ApiError`, error envelope, and server-verified `ActorContext` contract in `packages/contracts/src/errors.ts` and `packages/contracts/src/identity.ts`.
+- [X] T009 Implement Express router mounting, request validation/error conversion boundaries, and server-side ActorContext injection seam in `apps/server/src/api/router.ts`, `apps/server/src/api/middleware/validate.ts`, `apps/server/src/api/middleware/actor-context.ts`, and `apps/server/src/errors/error-handler.ts`.
+- [X] T010 Implement Socket.IO server attachment, server-managed session room naming, and event payload validation boundary in `apps/server/src/realtime/socket-server.ts`, `apps/server/src/realtime/session-room.ts`, and `packages/contracts/src/realtime.ts`.
+- [X] T011 Add isolated temporary SQLite setup and teardown helpers for persistence and integration checks in `tests/helpers/sqlite.ts` and `tests/setup.ts`.
 
 **Checkpoint**: The workspace, shared contracts, API/error boundary, realtime boundary, and test infrastructure are available. No Teacher or Student business feature is implemented.
 

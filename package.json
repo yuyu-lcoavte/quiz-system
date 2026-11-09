@@ -4,16 +4,16 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/web",
+    "packages/contracts",
     "apps/server",
-    "packages/contracts"
+    "apps/web"
   ],
   "scripts": {
-    "dev": "concurrently -k -n server,web \"npm run dev:server\" \"npm run dev:web\"",
-    "dev:web": "npm run dev --workspace @quiz/web",
-    "dev:server": "npm run dev --workspace @quiz/server",
+    "dev": "npm run build --workspace @quiz/contracts && concurrently -k -n server,web \"npm run dev --workspace @quiz/server\" \"npm run dev --workspace @quiz/web\"",
+    "dev:web": "npm run build --workspace @quiz/contracts && npm run dev --workspace @quiz/web",
+    "dev:server": "npm run build --workspace @quiz/contracts && npm run dev --workspace @quiz/server",
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build --workspace @quiz/contracts && npm run typecheck --workspaces --if-present && tsc -p tests/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm test && npm run build"
@@ -31,5 +31,8 @@
     "supertest": "^7.1.1",
     "typescript": "^5.8.3",
     "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "install": "^0.13.0"
   }
 }
