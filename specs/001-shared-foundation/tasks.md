@@ -49,16 +49,16 @@
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Add route rendering and navigation tests for the homepage and five approved paths in `apps/web/src/app/router.test.tsx`.
-- [ ] T013 [P] [US1] Add tests for role placeholders and unknown-route handling in `apps/web/src/pages/placeholders.test.tsx` and `apps/web/src/pages/not-found.test.tsx`.
+- [X] T012 [P] [US1] Add route rendering and navigation tests for the homepage and five approved paths in `apps/web/src/app/router.test.tsx`.
+- [X] T013 [P] [US1] Add tests for role placeholders and unknown-route handling in `apps/web/src/pages/placeholders.test.tsx` and `apps/web/src/pages/not-found.test.tsx`.
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Configure the shared React Router with `/`, `/teacher/login`, `/teacher/dashboard`, `/student/join`, and `/student/session/:sessionId` in `apps/web/src/app/router.tsx` and `apps/web/src/app/App.tsx`.
-- [ ] T015 [P] [US1] Implement the shared application layout, navigation shell, and accessible role entry links in `apps/web/src/components/AppLayout.tsx`, `apps/web/src/components/RoleNavigation.tsx`, and `apps/web/src/styles/index.css`.
-- [ ] T016 [US1] Implement the shared homepage and role-specific placeholder pages without business actions in `apps/web/src/pages/HomePage.tsx`, `apps/web/src/pages/TeacherLoginPlaceholder.tsx`, `apps/web/src/pages/TeacherDashboardPlaceholder.tsx`, `apps/web/src/pages/StudentJoinPlaceholder.tsx`, and `apps/web/src/pages/StudentSessionPlaceholder.tsx`.
-- [ ] T017 [US1] Implement the common unknown-route page and connect it to the router in `apps/web/src/pages/NotFoundPage.tsx` and `apps/web/src/app/router.tsx`.
-- [ ] T018 [US1] Verify navigation, direct route loading, placeholders, and unknown-route handling in `tests/manual/foundation-routes.md`.
+- [X] T014 [US1] Configure the shared React Router with `/`, `/teacher/login`, `/teacher/dashboard`, `/student/join`, and `/student/session/:sessionId` in `apps/web/src/app/router.tsx` and `apps/web/src/app/App.tsx`.
+- [X] T015 [P] [US1] Implement the shared application layout, navigation shell, and accessible role entry links in `apps/web/src/components/AppLayout.tsx`, `apps/web/src/components/RoleNavigation.tsx`, and `apps/web/src/styles.css`.
+- [X] T016 [US1] Implement the shared homepage and role-specific placeholder pages without business actions in `apps/web/src/pages/HomePage.tsx`, `apps/web/src/pages/TeacherLoginPlaceholder.tsx`, `apps/web/src/pages/TeacherDashboardPlaceholder.tsx`, `apps/web/src/pages/StudentJoinPlaceholder.tsx`, and `apps/web/src/pages/StudentSessionPlaceholder.tsx`.
+- [X] T017 [US1] Implement the common unknown-route page and connect it to the router in `apps/web/src/pages/NotFoundPage.tsx` and `apps/web/src/app/router.tsx`.
+- [X] T018 [US1] Verify navigation, direct route loading, placeholders, and unknown-route handling in `tests/manual/foundation-routes.md`.
 
 **Checkpoint**: US1 can be demonstrated on its own through the shared web app and route test suite.
 
