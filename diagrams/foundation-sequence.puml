@@ -1,0 +1,99 @@
+@startuml
+actor Teacher
+actor Student
+participant "React Web App" as Web
+participant "Express API / Socket.IO Gateway" as Server
+participant "Teacher Feature adapter (future)" as TeacherFeature
+participant "Session Service" as Service
+participant "SQLite Repository" as Repo
+participant "Socket.IO Session Room" as Room
+Teacher -> Web: Open / and choose role route
+Student -> Web: Open / and choose role route
+Web --> Teacher: Render shared layout / route placeholder
+Web --> Student: Render shared layout / route placeholder
+Student -> Web: Resolve activity code before joining
+Web -> Server: GET /api/v1/sessions/by-code/{activityCode} (anonymous, rate limited)
+Server -> Service: Validate/normalize code and resolve minimal summary
+Service -> Repo: Read public activity summary
+Repo --> Service: sessionId, phase
+Server --> Web: Summary or 429 RATE_LIMITED
+Student -> Web: Query state, current-target and results before any Round exists
+Web -> Server: GET state/current-target/results (verified ActorContext)
+Server -> Service: Read Session with no current Round
+Service --> Server: Waiting snapshot; null target; empty results
+Server --> Web: state Waiting/null; current-target {data:null}; results {data:[]}
+Teacher -> TeacherFeature: Choose next target
+TeacherFeature -> Service: selectTarget (trusted, authorized module call)
+Service -> Repo: Transaction: create Round(Waiting), set currentRound, increment version
+Repo --> Service: committed snapshot
+Service --> TeacherFeature: Waiting snapshot
+Service -> Room: Publish session:state:changed after commit
+Room --> Web: Notify connected teacher/student clients
+Teacher -> Web: Preview target in Waiting
+Web -> Server: GET current-target (verified Teacher ActorContext)
+Server -> Service: Authorize teacher preview; read target
+Service -> Repo: Read Question/QuestionGroup and Blanks
+Repo --> Service: CurrentTargetView
+Server --> Web: CurrentTargetView
+Student -> Web: Request current-target in Waiting
+Web -> Server: GET current-target (verified Participant ActorContext)
+Server --> Web: 403 FORBIDDEN; no question content
+Teacher -> TeacherFeature: Start current Round
+TeacherFeature -> Service: startRound (trusted, authorized module call)
+Service -> Repo: Transaction: Waiting -> Active, increment version
+Repo --> Service: committed snapshot
+Service -> Room: Publish session:state:changed after commit
+Room --> Web: Notify connected clients of Active
+Student -> Web: Request current-target in Active
+Web -> Server: GET current-target (verified Participant ActorContext)
+Server -> Service: Authorize Active Participant; read target
+Service -> Repo: Read Question/QuestionGroup and Blanks
+Repo --> Service: CurrentTargetView
+Server --> Web: CurrentTargetView
+Teacher -> TeacherFeature: End current Round
+TeacherFeature -> Service: endRound (winner supplied by owning Feature, if any)
+Service -> Repo: Transaction: Active -> Ended; persist/replace Result if owner supplies winner
+Repo --> Service: committed Ended snapshot and current Result (or no result)
+Service -> Room: Publish session:state:changed after commit
+Room --> Web: Notify connected clients of Ended
+note over Web,Room
+Connected clients show the committed state within 2 seconds.
+end note
+Teacher -> TeacherFeature: Reopen ended target
+TeacherFeature -> Service: selectTarget for same logical target
+Service -> Repo: Transaction: create new Round(Waiting), set currentRound, increment version
+Repo --> Service: committed snapshot
+Service -> Room: Publish session:state:changed after commit
+Room --> Web: Notify connected clients of new Waiting Round
+Teacher -> TeacherFeature: Start reopened Round
+TeacherFeature -> Service: startRound on the new Round
+Service -> Repo: Transaction: Waiting -> Active, increment version
+Service -> Room: Publish session:state:changed after commit
+Room --> Web: Notify connected clients of Active
+Teacher -> TeacherFeature: End reopened Round
+TeacherFeature -> Service: endRound (winner supplied by owning Feature, if any)
+Service -> Repo: Transaction: Active -> Ended; persist/replace Result if owner supplies winner
+Repo --> Service: committed Ended snapshot and current Result (or no result)
+Service -> Room: Publish session:state:changed with Ended snapshot
+Room --> Web: Notify connected clients of Ended
+Student -> Web: View result after Ended
+Web -> Server: GET /api/v1/sessions/{sessionId}/results
+Server --> Web: Existing results response contract
+Student -> Web: Reconnect and watch Session
+Web -> Server: session:watch {sessionId}
+Server -> Service: Read authoritative current snapshot
+Service -> Repo: Read Session + current Round + stateVersion
+Repo --> Service: Latest snapshot
+Server --> Web: session:state snapshot
+note over Service,Repo
+Foundation persists a winner supplied by the owning Feature;
+it does not determine correctness, submission order or winner.
+The Ended state and Result commit before the Ended broadcast.
+State snapshots contain references only, never Question/Blank content.
+end note
+note over TeacherFeature,Service
+Teacher Feature owns authentication, authorization and command entry points.
+These calls are a future trusted module integration; Foundation has no public
+teacher lifecycle command endpoint in Shared Foundation.
+end note
+@enduml

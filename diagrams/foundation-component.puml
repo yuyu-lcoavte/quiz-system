@@ -1,0 +1,58 @@
+@startuml
+left to right direction
+actor Teacher
+actor Student
+package "Single Web Application" {
+  component "React + TypeScript + Vite" as Web
+  component "React Router + Shared Layout" as Router
+  component "Teacher Routes (Foundation placeholder)" as TeacherUI
+  component "Student Routes (Foundation placeholder)" as StudentUI
+  component "HTTP Client" as HttpClient
+  component "Socket.IO Client" as SocketClient
+}
+package "Shared Server" {
+  component "Express API" as Express
+  component "API Routers + Validation" as Api
+  component "ActorContext Middleware" as AuthBoundary
+  component "Session / State Services" as Services
+  component "Socket.IO Gateway (Session Rooms)" as Gateway
+  component "Repositories + Migrations" as Persistence
+}
+package "Shared Contracts" {
+  component "TypeScript DTOs (Errors + Events)" as Contracts
+}
+database "SQLite" as DB
+Teacher --> Web
+Student --> Web
+Web --> Router
+Router --> TeacherUI
+Router --> StudentUI
+TeacherUI --> HttpClient
+StudentUI --> HttpClient
+TeacherUI --> SocketClient
+StudentUI --> SocketClient
+HttpClient --> Express : /api/v1
+SocketClient --> Gateway : session watch/state
+Express --> Api
+Api --> AuthBoundary
+AuthBoundary --> Services
+Services --> Persistence
+Gateway --> AuthBoundary
+Gateway --> Services : snapshot / state version
+Persistence --> DB
+Web ..> Contracts : shared types
+Express ..> Contracts : shared types
+Gateway ..> Contracts : event types
+note bottom of TeacherUI
+Authentication, teacher operation entry points,
+authorization, Excel and teacher UI belong to Teacher Feature.
+Shared state transitions and data transactions belong to Foundation.
+Teacher Feature calls the shared lifecycle service through its trusted server module;
+Foundation does not expose a Teacher command endpoint.
+end note
+note bottom of StudentUI
+Enrollment, team membership, answer editing,
+submission and student UI belong to Student Feature.
+Foundation does not determine correctness, order or winner.
+end note
+@enduml
