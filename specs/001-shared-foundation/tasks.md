@@ -96,17 +96,17 @@
 
 ### Tests for User Story 3
 
-- [ ] T027 [P] [US3] Add HTTP contract tests for anonymous pre-join lookup, minimal summary, configurable throttling/HTTP 429, no-Round response shapes, Waiting Teacher preview, Waiting/Ended Participant denial without content, Active Participant access, validation/error envelopes, protected-request authorization, and rejection of client-supplied actor/team identity in `tests/api/foundation-api.test.ts`.
-- [ ] T028 [P] [US3] Add Socket.IO integration tests for session room isolation, unauthorized watch error/no room membership, snapshots containing no Question/Blank content, same-version broadcasts only after the Ended/Result transaction commits, reconnect snapshots, and the 2-second synchronization criterion in `tests/realtime/session-state.test.ts`.
+- [X] T027 [P] [US3] Add HTTP contract tests for anonymous pre-join lookup, minimal summary, configurable throttling/HTTP 429, no-Round response shapes, Waiting Teacher preview, Waiting/Ended Participant denial without content, Active Participant access, validation/error envelopes, protected-request authorization, and rejection of client-supplied actor/team identity in `tests/api/foundation-api.test.ts`.
+- [X] T028 [P] [US3] Add Socket.IO integration tests for session room isolation, unauthorized watch error/no room membership, snapshots containing no Question/Blank content, same-version broadcasts only after the Ended/Result transaction commits, reconnect snapshots, and the 2-second synchronization criterion in `tests/realtime/session-state.test.ts`.
 
 ### Implementation for User Story 3
 
-- [ ] T029 [US3] Implement Session, state, current-target, and result read services using the repositories/shared DTOs; derive `changedAt` from Session `createdAt` or the current Round's persisted phase timestamp in `apps/server/src/modules/sessions/application/session-query-service.ts` and `apps/server/src/modules/sessions/application/session-state-service.ts`.
-- [ ] T030 [US3] Implement the Foundation HTTP read endpoints and response/error mapping under `/api/v1`, including server validation and configurable rate limiting for the anonymous activity-code lookup, the `{data:null}` no-Round response, and backend ActorContext/phase checks for current-target access in `apps/server/src/modules/sessions/api/session-router.ts`, `apps/server/src/modules/sessions/api/session-controller.ts`, and `apps/server/src/api/middleware/activity-code-rate-limit.ts`.
-- [ ] T031 [US3] Implement lifecycle domain transitions that create a Waiting Round on target selection/reopen, activate that same Round on Start, and use the shared transaction to commit Ended plus any owning-Feature-supplied Result before stateVersion publication in `apps/server/src/modules/sessions/application/session-lifecycle-service.ts`.
-- [ ] T032 [US3] Implement authorized `session:watch`, phase/reference-only snapshots with no question content, post-commit `session:state:changed` broadcasts, and `session:error` handling in `apps/server/src/realtime/session-events.ts` and `apps/server/src/realtime/session-state-publisher.ts`.
-- [ ] T033 [US3] Implement the web-side state snapshot client adapter with stale-version rejection and reconnect reconciliation in `apps/web/src/services/session-state-client.ts` and `packages/contracts/src/realtime.ts`.
-- [ ] T034 [US3] Add manual validation for teacher Waiting preview, student Waiting denial/Active access, post-Ended result reads, no-Round responses, anonymous lookup throttling, 2-second shared-state timing, and unauthorized watches in `tests/manual/foundation-session-sync.md`.
+- [X] T029 [US3] Implement Session, state, current-target, and result read services using the repositories/shared DTOs; derive `changedAt` from Session `createdAt` or the current Round's persisted phase timestamp in `apps/server/src/modules/sessions/application/session-query-service.ts` and `apps/server/src/modules/sessions/application/session-state-service.ts`.
+- [X] T030 [US3] Implement the Foundation HTTP read endpoints and response/error mapping under `/api/v1`, including server validation and configurable rate limiting for the anonymous activity-code lookup, the `{data:null}` no-Round response, and backend ActorContext/phase checks for current-target access in `apps/server/src/modules/sessions/api/session-router.ts`, `apps/server/src/modules/sessions/api/session-controller.ts`, and `apps/server/src/api/middleware/activity-code-rate-limit.ts`.
+- [X] T031 [US3] Implement lifecycle domain transitions that create a Waiting Round on target selection/reopen, activate that same Round on Start, and use the shared transaction to commit Ended plus any owning-Feature-supplied Result before stateVersion publication in `apps/server/src/modules/sessions/application/session-lifecycle-service.ts`.
+- [X] T032 [US3] Implement authorized `session:watch`, phase/reference-only snapshots with no question content, post-commit `session:state:changed` broadcasts, and `session:error` handling in `apps/server/src/realtime/session-events.ts` and `apps/server/src/realtime/session-state-publisher.ts`.
+- [X] T033 [US3] Implement the web-side state snapshot client adapter with stale-version rejection and reconnect reconciliation in `apps/web/src/services/session-state-client.ts` and `packages/contracts/src/realtime.ts`.
+- [X] T034 [US3] Add manual validation for teacher Waiting preview, student Waiting denial/Active access, post-Ended result reads, no-Round responses, anonymous lookup throttling, 2-second shared-state timing, and unauthorized watches in `tests/manual/foundation-session-sync.md`.
 
 **Checkpoint**: US3 provides shared contracts and lifecycle/synchronization primitives only; Teacher command UI, Student enrollment/submission, result determination, and role-specific authorization policy remain for later Features.
 
@@ -116,10 +116,10 @@
 
 **Purpose**: Validate the complete Foundation increment and keep the implementation aligned with the approved design artifacts.
 
-- [ ] T035 Document workspace startup, migrations, test commands, and the five-route walkthrough in `specs/001-shared-foundation/quickstart.md`.
-- [ ] T036 [P] Add a requirement-to-task-to-test traceability checklist for FR-001–FR-019 and SC-001–SC-007 in `specs/001-shared-foundation/checklists/implementation-traceability.md`.
-- [ ] T037 Reconcile the implemented module boundaries, data relationships, lifecycle, and socket event sequence with the three Foundation PlantUML diagrams in `diagrams/foundation-component.puml`, `diagrams/foundation-class.puml`, and `diagrams/foundation-sequence.puml`; regenerate corresponding PNGs with the required PlantUML CLI command if a diagram changes.
-- [ ] T038 Run the root automated test suite, execute the quickstart and manual Foundation checks, and record actual commands, results, and any unverified limitation in `specs/001-shared-foundation/quickstart.md`.
+- [X] T035 Document workspace startup, migrations, test commands, and the five-route walkthrough in `specs/001-shared-foundation/quickstart.md`.
+- [X] T036 [P] Add a requirement-to-task-to-test traceability checklist for FR-001–FR-019 and SC-001–SC-007 in `specs/001-shared-foundation/checklists/implementation-traceability.md`.
+- [X] T037 Reconcile the implemented module boundaries, data relationships, lifecycle, and socket event sequence with the three Foundation PlantUML diagrams in `diagrams/foundation-component.puml`, `diagrams/foundation-class.puml`, and `diagrams/foundation-sequence.puml`; regenerate corresponding PNGs with the required PlantUML CLI command if a diagram changes.
+- [X] T038 Run the root automated test suite, execute the quickstart and manual Foundation checks, and record actual commands, results, and any unverified limitation in `specs/001-shared-foundation/quickstart.md`.
 
 ---
 

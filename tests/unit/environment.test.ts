@@ -29,7 +29,17 @@ describe('environment configuration', () => {
       'C:/quiz-system',
     );
 
-    expect(config).toEqual({ nodeEnv: 'test', port: 4312, sqlitePath: ':memory:' });
+    expect(config).toEqual({ nodeEnv: 'test', port: 4312, sqlitePath: ':memory:', activityCodeLookupMaxRequests: 30, activityCodeLookupWindowMs: 60_000 });
+  });
+
+  it('allows activity-code lookup rate limits to be configured', () => {
+    const config = parseEnvironment({ ACTIVITY_CODE_LOOKUP_MAX_REQUESTS: '5', ACTIVITY_CODE_LOOKUP_WINDOW_MS: '12000' });
+    expect(config.activityCodeLookupMaxRequests).toBe(5);
+    expect(config.activityCodeLookupWindowMs).toBe(12_000);
+  });
+
+  it.each(['0', '-5', 'many', '3600001'])('rejects invalid activity-code rate limit %s', (value) => {
+    expect(() => parseEnvironment({ ACTIVITY_CODE_LOOKUP_WINDOW_MS: value })).toThrow(/ACTIVITY_CODE_LOOKUP_WINDOW_MS/);
   });
 
   it.each(['0', '-1', '70000', 'not-a-port'])('rejects invalid PORT=%s', (port) => {

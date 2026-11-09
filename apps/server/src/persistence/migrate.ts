@@ -1,8 +1,25 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type Database from 'better-sqlite3';
 
-export function runMigrations(database: Database.Database, migrationsDirectory: string): string[] {
+/** Resolves migrations beside the source module, with a source-tree fallback for compiled dist output. */
+export function resolveMigrationsDirectory(moduleUrl: string = import.meta.url): string {
+  const moduleDirectory = dirname(fileURLToPath(moduleUrl));
+  const candidates = [
+    resolve(moduleDirectory, 'migrations'),
+    resolve(moduleDirectory, '../../src/persistence/migrations'),
+  ];
+  const migrationsDirectory = candidates.find((candidate) => {
+    try { return readdirSync(candidate).some((entry) => entry.toLowerCase().endsWith('.sql')); } catch { return false; }
+  });
+  if (!migrationsDirectory) {
+    throw new Error(`Could not locate the Foundation migration directory relative to ${moduleUrl}.`);
+  }
+  return migrationsDirectory;
+}
+
+export function runMigrations(database: Database.Database, migrationsDirectory = resolveMigrationsDirectory()): string[] {
   database.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version TEXT PRIMARY KEY,

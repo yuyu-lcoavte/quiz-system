@@ -10,6 +10,8 @@ After authentication/enrollment middleware, downstream modules receive a server-
 - `teamId?`: server-resolved team for participants
 - `permissions`: server-computed operation capabilities
 
+For the Foundation read/synchronization boundary, the server-computed capability names are `session:read`, `session:watch`, `target:preview`, `target:read`, and `results:read`. A Participant must also have a verified `teamId` belonging to the scoped Session before accessing target or result reads. Teacher Feature remains responsible for establishing Teacher identity and assigning its capabilities; these names do not provide an authentication mechanism.
+
 Clients may submit a session code, route ID or content fields, but cannot set authoritative `actorKind`, `actorId`, `teamId` or permissions. Teacher Feature owns credential verification; Student Feature owns participant identity, group selection and membership lifecycle. Foundation owns the context shape and middleware seam only.
 
 Any test helper that supplies an `ActorContext` MUST be restricted to the test environment and test harness. Production configuration MUST NOT accept a client-supplied or test-generated context as authenticated identity, and MUST fail closed when no trusted feature-owned authentication/enrollment middleware has established the context. Formal teacher authentication and student identity remain owned by their respective Features.

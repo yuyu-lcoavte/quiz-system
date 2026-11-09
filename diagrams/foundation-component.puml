@@ -47,6 +47,8 @@ note bottom of TeacherUI
 Authentication, teacher operation entry points,
 authorization, Excel and teacher UI belong to Teacher Feature.
 Shared state transitions and data transactions belong to Foundation.
+Teacher Feature calls the shared lifecycle service through its trusted server module;
+Foundation does not expose a Teacher command endpoint.
 end note
 note bottom of StudentUI
 Enrollment, team membership, answer editing,

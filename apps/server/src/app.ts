@@ -6,7 +6,11 @@ import { createApiRouter, type ApiRouterOptions } from './api/router.js';
 import { parseEnvironment } from './config/env.js';
 import { errorHandler, notFoundHandler } from './errors/error-handler.js';
 import { DatabaseManager } from './persistence/database.js';
+import { runMigrations } from './persistence/migrate.js';
 import { createSocketServer, type SocketServerOptions } from './realtime/socket-server.js';
+import { SessionStateService } from './modules/sessions/application/session-state-service.js';
+import { SessionLifecycleService } from './modules/sessions/application/session-lifecycle-service.js';
+import { SessionStatePublisher } from './realtime/session-state-publisher.js';
 
 export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {}
 
@@ -21,16 +25,31 @@ export function createApp(options: FoundationServerOptions = {}) {
 export function createHttpServer(options: FoundationServerOptions = {}) {
   const app = createApp(options);
   const httpServer = createServer(app);
-  const socketServer = createSocketServer(httpServer, options);
-  return { app, httpServer, socketServer };
+  const stateService = options.database ? new SessionStateService(options.database) : null;
+  const socketServer = createSocketServer(httpServer, {
+    ...options,
+    getSessionState: options.getSessionState ?? (stateService ? (sessionId) => stateService.getSnapshot(sessionId) : undefined),
+  });
+  const statePublisher = new SessionStatePublisher(socketServer);
+  const sessionLifecycle = options.database
+    ? new SessionLifecycleService(options.database, { publish: (snapshot) => { statePublisher.publish(snapshot); } })
+    : null;
+  return { app, httpServer, socketServer, sessionLifecycle, statePublisher };
 }
 
 export function startServer() {
   const config = parseEnvironment();
   const databaseManager = new DatabaseManager({ sqlitePath: config.sqlitePath });
-  databaseManager.open();
+  const database = databaseManager.open();
+  runMigrations(database);
 
-  const { httpServer } = createHttpServer();
+  const { httpServer } = createHttpServer({
+    database,
+    activityCodeRateLimit: {
+      maxRequests: config.activityCodeLookupMaxRequests,
+      windowMs: config.activityCodeLookupWindowMs,
+    },
+  });
   httpServer.once('close', () => databaseManager.close());
   const port = config.port;
   httpServer.listen(port, '127.0.0.1', () => {

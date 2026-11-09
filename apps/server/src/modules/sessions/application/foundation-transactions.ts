@@ -112,6 +112,17 @@ export function endRoundWithResult(database: Database.Database, input: EndRoundI
         throw new HttpError(400, 'INVALID_INPUT', 'The supplied Result must refer to the Round being ended.');
       }
       repositories.results.replaceForTarget(input.result);
+    } else {
+      // Reopening the logical target must not expose a prior Round's result when this Round has no winner.
+      const target = repositories.rounds.findById(input.roundId);
+      if (!target) throw new Error('Round disappeared during its End transaction.');
+      if (target.questionId) {
+        database.prepare(`DELETE FROM results WHERE round_id IN
+          (SELECT id FROM rounds WHERE session_id = ? AND question_id = ?)`).run(target.sessionId, target.questionId);
+      } else {
+        database.prepare(`DELETE FROM results WHERE round_id IN
+          (SELECT id FROM rounds WHERE session_id = ? AND question_group_id = ?)`).run(target.sessionId, target.questionGroupId);
+      }
     }
 
     const round = repositories.rounds.findById(input.roundId);

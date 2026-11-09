@@ -17,4 +17,9 @@ export class SessionRepository {
     const row = this.database.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | undefined;
     return row ? mapSession(row) : null;
   }
+
+  findByActivityCode(activityCode: string): Session | null {
+    const row = this.database.prepare('SELECT * FROM sessions WHERE activity_code = ? COLLATE NOCASE').get(activityCode) as SessionRow | undefined;
+    return row ? mapSession(row) : null;
+  }
 }

@@ -76,6 +76,10 @@ describe('Socket.IO session watch boundary', () => {
       resolveSocketActorContext: createTestActorContextResolver(actor),
       authorizeWatch: (resolvedActor, requestedSessionId) =>
         resolvedActor.actorKind === 'participant' && resolvedActor.sessionId === requestedSessionId,
+      getSessionState: (requestedSessionId) => ({
+        sessionId: requestedSessionId, phase: 'Waiting', currentRoundId: null, target: null,
+        stateVersion: 0, changedAt: '2026-11-09T01:00:00.000Z',
+      }),
     };
     const { client, io } = await startSocketServer(options);
     const watchError = nextClientEvent(client, 'session:error').then(([payload]) => payload);

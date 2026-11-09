@@ -1,4 +1,3 @@
-import { resolve } from 'node:path';
 import type {
   Blank,
   Participant,
@@ -11,9 +10,9 @@ import type {
   UUID,
 } from '@quiz/contracts/domain';
 import { createFoundationRepositories } from '../../apps/server/src/persistence/repositories/index.js';
+import { resolveMigrationsDirectory } from '../../apps/server/src/persistence/migrate.js';
 import { createTestDatabase } from './sqlite.js';
 
-const MIGRATIONS_DIRECTORY = resolve(process.cwd(), 'apps/server/src/persistence/migrations');
 const TIME = '2026-11-09T01:00:00.000Z';
 
 export const ids = {
@@ -44,7 +43,7 @@ export const ids = {
 
 export function createFoundationTestContext() {
   const database = createTestDatabase();
-  database.runMigrations(MIGRATIONS_DIRECTORY);
+  database.runMigrations(resolveMigrationsDirectory());
   const repositories = createFoundationRepositories(database.database);
   return { ...database, repositories };
 }
