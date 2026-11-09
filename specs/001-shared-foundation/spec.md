@@ -78,7 +78,7 @@
 - **FR-003**: 尚未交付的老師與學生頁面 MUST 僅呈現佔位內容，不執行其所屬業務功能。
 - **FR-004**: 系統 MUST 定義 Session、Round、Question、Blank、QuestionGroup、Team、Participant、Submission 與 Result 的共用語意及關係。
 - **FR-005**: 一個 Question MUST 能關聯零個或多個 Blank；每個 Blank MUST 能獨立區分。
-- **FR-006**: 一個 QuestionGroup MUST 能關聯多個 Question；QuestionGroup 與 Question 的關係 MUST 與單一 Question 的多個 Blank 分開表達。
+- **FR-006**: 一個 QuestionGroup MUST 能關聯零個或多個 Question，以容許尚未完成的題組資料；QuestionGroup 與 Question 的關係 MUST 與單一 Question 的多個 Blank 分開表達。QuestionGroup 只有在至少關聯一個 Question 時，才可作為 Round 的有效目標。
 - **FR-007**: Session MUST 具有內部識別概念；供學生加入使用的 Activity Code MUST 與該內部識別概念分開。
 - **FR-008**: 每個 Round MUST 對應且僅對應一個搶答單位；搶答單位可以是單一 Question 或單一 QuestionGroup。同一題目重新開放搶答 MUST 建立新的 Round。
 - **FR-009**: 系統 MUST 能表達活動等待、搶答進行中及搶答結束可查看結果等階段。老師選擇下一題或重新開啟已結束題目時建立對應 Round 並進入等待；老師按開始時啟用目前 Round。
@@ -87,7 +87,7 @@
 - **FR-012**: Foundation MUST 定義模組責任與共用契約的邊界，不得在本 Feature 實作教師驗證、Excel 處理、學生加入、組長判定、多人編輯、答案提交、順位判定、CSV 匯出或題組操作。
 - **FR-013**: 系統 MUST 以資料關聯表達題目及填空數量，不得依賴寫死的題號、題數、填空數或 Excel 儲存格位置。
 - **FR-014**: 具體資料庫欄位、儲存方式、API 格式及 Socket.IO 事件格式 MUST 留待 Plan 階段依雙方協調結果決定。
-- **FR-015**: 每筆 Submission MUST 對應且僅對應一個 Team 與一個 Round；同一 Team 在同一 Round MUST 至多有一筆有效 Submission。本限制是共用資料不變條件；Foundation 不實作學生正式填答或提交流程。
+- **FR-015**: 每筆 Submission MUST 對應且僅對應一個 Team 與一個 Round；同一 Team 在同一 Round MUST 至多有一筆有效 Submission。Foundation MUST 持久化 `acceptedOrder` 並對同一 Round 強制唯一性；該值 MUST 由 Student Feature 的可信後端提交服務依實際接受順序產生，不得採用學生前端提供的值作為權威資料。Foundation 不實作學生正式填答或提交流程，亦不產生順位或決定勝者。
 - **FR-016**: 同一題目重新開放時建立新 Round；新一輪完成後，新 Result MUST 覆蓋該題原有結果，不要求查詢舊結果版本。
 - **FR-017**: 目前題目內容的存取 MUST 由後端依伺服器驗證的 ActorContext 與 Round 階段授權。具預覽權限的教師可在 Waiting 讀取題目；學生在 Waiting 不得透過 API 取得 Question／Blank 內容，僅在 Active 可讀取目前題目。Socket.IO 狀態快照不得包含題目內容；此規則不得只由前端隱藏實現。
 - **FR-018**: `GET /sessions/by-code/{activityCode}` MUST 是加入前唯一受限制的匿名唯讀查詢，只回傳 `sessionId` 與活動階段；伺服器 MUST 驗證及正規化代碼，套用可設定的請求節流，超限回傳 HTTP 429，且不得建立成員身分或授予其他 API 權限。
@@ -99,10 +99,10 @@
 - **Round**: 一個搶答單位的一次搶答輪次；該單位恰為一個 Question 或一個 QuestionGroup。同一題重新開放時建立新的 Round。
 - **Question**: Guided Notes 中可獨立識別的題目，可包含多個 Blank。
 - **Blank**: 題目中的獨立答案空格，隸屬一個 Question。
-- **QuestionGroup**: 多道 Question 組成的提交單位概念，與一道 Question 內的多個 Blank 不同。
+- **QuestionGroup**: 多道 Question 組成的提交單位概念，與一道 Question 內的多個 Blank 不同；可暫時沒有 Question，只有含至少一道 Question 時才可作為 Round 目標。
 - **Team**: 以組別為單位參與活動的概念。
 - **Participant**: 活動中的學生參與者，與其所屬 Team 關聯。
-- **Submission**: 某組在某輪對應提交單位的提交紀錄；每筆紀錄恰對應一個 Team 與一個 Round，並依後端有效提交到達／登錄順序形成順位。本 Feature 不定義提交操作。
+- **Submission**: 某組在某輪對應提交單位的提交紀錄；每筆紀錄恰對應一個 Team 與一個 Round，並包含由 Student Feature 可信後端提交服務依實際接受順序產生的 acceptedOrder。Foundation 負責欄位持久化與同 Round 唯一性，不產生順位、不接受學生前端提供的 acceptedOrder 作為權威資料，也不判定勝者；本 Feature 不實作提交操作。
 - **Result**: 某輪完成後可供檢視的勝出結果，與 Round 及該輪勝出的 Submission 關聯。同一題重新搶答完成後，新 Result 覆蓋原結果。本 Feature 不做自動批改。
 - **Activity Code**: 學生用來查找或加入活動的代碼，與 Session 內部識別概念分離。
 
@@ -145,4 +145,5 @@
 - 無 Round 時 state 為 Waiting 且 Round／target 為 null；current-target 回 `{ data: null }`；results 回 `{ data: [] }`。
 - 加入前匿名活動代碼查詢只回傳 `sessionId` 與 phase，伺服器驗證／正規化輸入並以可設定節流保護，超限回 HTTP 429；該查詢不授予成員權限。
 - 本專案整合分支採用 `master`；Constitution §III 已依雙方確認及修訂程序同步為 `master`（v2.0.0）。
+- 題組可暫時沒有 Question 作為未完成資料，但空題組不得成為 Round 目標。Student Feature 的可信後端提交服務依實際接受順序產生 acceptedOrder；Foundation 負責其欄位、持久化與同 Round 唯一性，不接受客戶端值作為權威資料，也不產生順位或判定勝者。
 

@@ -66,10 +66,10 @@
 | Round | 一次搶答；隸屬 Session，Question 或 QuestionGroup 二擇一；同一題可有多輪。狀態為 Waiting／Active／Ended。 |
 | Question | 隸屬 Session，可有 0..* Blank；以可空 `questionGroupId` 表達其所屬 0..1 QuestionGroup；可單獨成為 Round 目標，或屬於一個 QuestionGroup。 |
 | Blank | 隸屬一個 Question，以穩定 ID 與順序區分；答案另由 SubmissionAnswer 關聯保存。 |
-| QuestionGroup | 隸屬 Session，包含 1..* Question；代表多題共同提交的目標。 |
+| QuestionGroup | 隸屬 Session，可暫時包含 0..* Question；代表多題共同提交的目標，只有包含至少一道 Question 才可成為 Round 目標。 |
 | Team | 隸屬 Session，可有多個 Participant／Submission。 |
 | Participant | 對應一個 Team；登入／持久身分由 Student Feature 提供。 |
-| Submission | 對應且只對應一個 Team 與 Round；同組同輪唯一；後端登錄順位可排序。 |
+| Submission | 對應且只對應一個 Team 與 Round；同組同輪唯一；保存由 Student Feature 可信後端提交服務依實際接受順序產生的 acceptedOrder，Foundation 只負責欄位、持久化及同 Round 唯一性，不產生順位或判定勝者，且不接受客戶端值為權威。 |
 | Result | 每輪至多一筆，指向該輪勝出 Submission；同一目標的新輪完成後，交易內移除舊 Result 並寫入新 Result。 |
 
 ### API and Realtime Contracts
@@ -135,8 +135,8 @@ specs/001-shared-foundation/
 
 ### Testing Strategy
 
-- **Unit**: domain validators 的正常與異常案例、Question/Blank 0..*、非空 QuestionGroup 提交目標、Round target XOR、錯誤碼映射、ActorContext 驗證。
-- **Persistence integration**: SQLite scoped composite foreign keys、same-Session triggers、unique (teamId, roundId)、Question 零 Blank、空題組目標拒絕、Round 目標二擇一、SubmissionAnswer 目標 Blank、Result winner 同 Round、Ended/Result 同交易原子性。
+- **Unit**: domain validators 的正常與異常案例、Question/Blank 0..*、可保存但不可作為目標的空 QuestionGroup、非空 QuestionGroup Round 目標、Round target XOR、錯誤碼映射、ActorContext 驗證。
+- **Persistence integration**: SQLite scoped composite foreign keys、same-Session triggers、unique (teamId, roundId) 與 (roundId, acceptedOrder)、Question 零 Blank、空題組可保存但不可成為 Round 目標、Round 目標二擇一、SubmissionAnswer 目標 Blank、Result winner 同 Round、同邏輯目標 Result 原子替換。Student Feature 可信後端提交服務產生 acceptedOrder；Foundation 不產生順位。
 - **API integration**: Supertest 驗證 pre-join Activity Code lookup 可在無 Participant ActorContext 時執行、只回必要摘要並超限回 429；受保護 API 的 Unauthorized／Forbidden；Waiting 教師預覽、Waiting/Ended 學生拒絕、Active 學生讀取；no-Round state/current-target/results 行為；以及 response envelope 與偽造身分不可繞過後端授權。
 - **Realtime integration**: 兩個 client 訂閱同 session，start/end/next/reopen 事件均更新；驗證未授權 watch 收到錯誤且未加入 room；量測正常連線下 ≤2 秒；重新連線後取得最新快照，不重播成過時狀態。
 - **Manual**: 五個 Route、placeholder 邊界、視窗重新載入、老師及兩個學生組別對同一狀態的一致呈現。核心業務行為由後續 Feature 驗收。
