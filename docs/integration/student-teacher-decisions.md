@@ -45,7 +45,7 @@
 
 **沿用 Foundation**：End／Result 持久化、Round 狀態、`stateVersion` 與交易後 Socket.IO 通知。
 
-**一致性要求**：Foundation、Student Submission 與 Student winner resolver 使用同一個 `better-sqlite3` Database instance。Foundation 在單一 `BEGIN IMMEDIATE` 交易中呼叫同步 resolver、完成 End／Result／stateVersion 更新，Commit 後才廣播；不可先查勝者、稍後再 End。無 Submission 時不建立 Result，並依 Foundation 既有行為清除同邏輯目標舊結果。
+**一致性要求**：Foundation、Student Submission 與 Student winner resolver 使用同一個 `better-sqlite3` Database instance。Coordinator、Foundation transaction port 與 resolver 均為同步呼叫；Foundation 在單一 `BEGIN IMMEDIATE` 交易中呼叫同步 resolver、完成 End／Result／stateVersion 更新並 Commit。Commit 後才非同步派送狀態通知；不得在交易內等待 Promise 或通知送達，也不可先查勝者、稍後再 End。無 Submission 時不建立 Result，並依 Foundation 既有行為清除同邏輯目標舊結果。
 
 ### 決議 T-03：目前不擴充 Foundation 對外契約
 
@@ -73,7 +73,7 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 
 ### 給老師端組員的一句話
 
-> 目前共同決議已由學生端統一整理：老師端需提供**授權組長轉交 UI**及**教師結束搶答入口**；組長權限與答案接受順序、勝者選取由 Student 後端負責；Round End／Result 儲存與狀態同步沿用 Foundation。實際介接函式與 DTO 會在 Student Plan 定版後補給你，不需要在老師端重做相同服務。
+> 目前共同決議已由學生端統一整理：老師端需提供**授權組長轉交 UI**及**教師結束搶答入口**；組長權限與答案接受順序、勝者選取由 Student 後端負責；Round End／Result 儲存與狀態同步沿用 Foundation。Student Plan 已提出內部介面草案；實際 capability 名稱與服務介接仍依 T004 跨模組審閱結果定案，不需要在老師端重做相同服務。
 
 ---
 

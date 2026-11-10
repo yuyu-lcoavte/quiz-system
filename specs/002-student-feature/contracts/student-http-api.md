@@ -24,7 +24,7 @@ Invalid codes use the common `SESSION_NOT_FOUND`/input errors; limit excess is `
 
 ### `POST /api/v1/student/sessions/{sessionId}/enrollments`
 
-Creates or idempotently restores this browser's Participant membership in the selected existing Team. First-time enrollment is allowed before and after the Session first enters Active; an existing Participant cannot use this route to change Team after that transition. Student enrollment never creates Teams. Requires a valid same-origin `Origin`; rate limits by source and Session. Body:
+Creates or idempotently restores this browser's Participant membership in the selected existing Team. First-time enrollment is allowed before and after the Session first enters Active; an existing Participant cannot use this route to change Team after that transition. Student enrollment never creates Teams. **CSRF bootstrap rule**: the first enrollment that creates this credential's Participant binding for the requested Session is the only Student HTTP bootstrap exception, because the Session-bound CSRF token is issued only after that binding exists. This request MUST pass exact configured `Origin` allowlist validation; missing, `null`, malformed or disallowed Origin is rejected. It is also rate-limited by source and Session and performs normal server-side input, Session, Team and membership validation. It does not trust client-supplied Participant, Team membership or role claims. An idempotent enrollment request for a Participant already bound to this Session is not a bootstrap and MUST include the normal valid session-bound `X-CSRF-Token` as well as a valid Origin. No other protected operation is exempt from CSRF validation. Body:
 
 ```json
 { "teamId": "<uuid>", "displayName": "Student name" }
@@ -40,13 +40,13 @@ Team ID is a selection request, not an authorization claim; the server verifies 
 } }
 ```
 
-The response does not return the bearer cookie value. A repeated request with the same valid browser credential/Session returns the existing Participant; it does not create a second member or leader.
+The response does not return the bearer cookie value. A repeated request with the same valid browser credential/Session returns the existing Participant; it does not create a second member or leader. If the credential is already bound to this Session, the repeat requires a valid session-bound `X-CSRF-Token`; the client may first obtain/refresh that token through the protected no-store CSRF-token read.
 
 ### Credential cookie and recovery
 
 - Cookie name: `student_session`; value is a high-entropy opaque random secret.
 - Store only SHA-256 digest and lifecycle metadata server-side. The cookie does not encode Participant, Team or permission data.
-- Attributes: `HttpOnly`, `SameSite=Lax` (use `Strict` where navigation behavior permits), `Path=/api/v1/student`, `Secure` on HTTPS, no `Domain`; local HTTP development omits `Secure` only under explicit development configuration.
+- Attributes: `HttpOnly`, `SameSite=Lax` for the existing same-origin Vite/API/Socket.IO flow, `Path=/`, `Secure` in production HTTPS, and no `Domain`; local HTTP development omits `Secure` only under explicit development configuration. The Student-specific `student_session` cookie is parsed only by Student HTTP identity middleware and the Student Socket.IO handshake resolver; the broad Path does not grant authorization to other routes.
 - Proposed default absolute lifetime: 24 hours, configurable by server environment. Revoked/expired/missing association returns 401; the UI offers rejoin/recovery and never restores by display name.
 - `GET /api/v1/student/sessions/{sessionId}/me` resolves the cookie's server-side Session-to-Participant association and returns current Team/leader status. It does not mutate identity or membership.
 - `GET /api/v1/student/sessions/{sessionId}/csrf-token` resolves the same protected identity and returns a short-lived HMAC-signed CSRF token bound to credential and Session. Response uses `Cache-Control: no-store`; tokens already held in other tabs remain valid until their own expiry.
@@ -64,7 +64,7 @@ If requester is the source Team leader, `successorParticipantId` must identify a
 
 ## Draft and Submission
 
-All routes below require verified Participant ActorContext with matching Session/Team membership. Mutations require `Origin` allowlist validation and `X-CSRF-Token`; the server verifies its HMAC signature, credential ID, Session scope and expiry using `STUDENT_CSRF_SECRET`. The signing key is server configuration and is never sent to a client.
+All routes below require verified Participant ActorContext with matching Session/Team membership. Every state-changing HTTP request requires exact configured `Origin` allowlist validation and `X-CSRF-Token`; the server verifies its HMAC signature, credential ID, Session scope and expiry using `STUDENT_CSRF_SECRET`. The signing key is server configuration and is never sent to a client. The only exception is the first enrollment bootstrap defined above; it remains Origin-validated and does not grant any other request an exemption. Socket.IO handshakes also validate the exact browser Origin; the server obtains the `student_session` cookie from the browser handshake, resolves Participant/Team from the database, and rejects missing or unauthorized identity. Every state-changing draft socket event requires the session-bound CSRF token.
 
 ### `GET /api/v1/student/sessions/{sessionId}/rounds/{roundId}/draft`
 

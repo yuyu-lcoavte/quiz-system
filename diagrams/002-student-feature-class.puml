@@ -48,13 +48,13 @@ class ActorContext <<Foundation>> {
 }
 
 class StudentTrustedEndCoordinator <<Student service proposal>> {
-  endRound(input, actorContext): Promise<SessionStateSnapshot>
+  endRound(input, actorContext): SessionStateSnapshot
 }
 interface FoundationEndLifecyclePort <<Foundation internal port proposal>> {
-  endRoundWithWinnerResolver(input, resolver): Promise<SessionStateSnapshot>
+  endRoundWithWinnerResolver(input, resolver): SessionStateSnapshot
 }
 interface WinnerResolver <<callback contract proposal>> {
-  resolve(roundId): Result?
+  resolve(roundId): Result | null
 }
 
 class StudentBrowserCredential <<Student>> {
@@ -142,7 +142,8 @@ Student assigns acceptedOrder server-side under BEGIN IMMEDIATE.
 end note
 
 note left of StudentBrowserCredential
-Cookie contains only a high-entropy opaque secret.
+Student-specific HttpOnly cookie contains only a high-entropy opaque secret;
+Path=/ sends it to Student HTTP and same-origin /socket.io.
 Database stores its digest, expiry and revocation state.
 Session mapping selects the canonical Participant;
 no client-provided identity is trusted.
@@ -165,8 +166,10 @@ StudentTrustedEndCoordinator ..> ActorContext : proposed round:end capability
 TeamLeader ..> ActorContext : proposed team:leader:transfer capability
 
 note bottom of FoundationEndLifecyclePort
-The callback receives the same SQLite connection/transaction owned by Foundation.
-Foundation does not import Student; publish occurs only after commit.
+Coordinator, transaction port and WinnerResolver return synchronously;
+the callback receives Foundation's same SQLite connection/transaction.
+Foundation does not import Student. Commit precedes async Socket.IO dispatch;
+notification work is never awaited inside the transaction.
 The capability strings are proposals, not existing Foundation grants.
 end note
 @enduml

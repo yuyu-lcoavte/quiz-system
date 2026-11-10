@@ -17,7 +17,7 @@
 - Q: 同組不同學生編輯同一個答案時，草稿應如何同步、保存與處理同格衝突？ → A: Student Feature 伺服器保存並即時共享同組草稿；同格衝突由伺服器最後接受的修改勝出；重新整理或重新連線後恢復草稿。
 - Q: 單題有多個填空時，何時可以提交，且成功提交後應如何處理共用草稿？ → A: 單題的所有 Blank 都須填入非空白答案；成功提交後，同組共用草稿與欄位轉為唯讀，不得再修改或重送。
 - Q: Round 結束後，學生端應顯示哪些已公布的搶答結果？ → A: 僅顯示勝出組別名稱及該組成功提交的答案，不顯示其他組別的提交內容。
-- Q: Teacher 結束一輪時，應由哪個 Feature 依後端接受順序選出勝者，並提供學生結果頁所需的勝出組別與答案？ → A: Student Feature 依可信伺服器接受順序選出勝出 Submission 並提供 Student 專用結果投影；Teacher 結束操作呼叫 Student 的可信勝者服務，再將結果交給 Foundation 既有原子 End／Result 交易，不變更 Foundation 對外契約。
+- Q: Teacher 結束一輪時，應由哪個 Feature 依後端接受順序選出勝者，並提供學生結果頁所需的勝出組別與答案？ → A: Teacher 的可信後端只呼叫單一 `StudentTrustedEndCoordinator.endRound(...)`。Coordinator 使用 Foundation 交易服務；Student Winner Resolver 在同一 SQLite `BEGIN IMMEDIATE` 交易與連線內同步選取勝者，Foundation 在該交易中持久化 Ended 與 Result，成功 Commit 後才派送既有狀態通知。任何失敗均 Rollback 且不廣播；不得先在交易外查詢勝者再另行 End，不變更 Foundation 對外契約。
 - Q: 活動首次進入 Active 後，尚未加入的學生是否仍可加入？ → A: 可以首次加入已存在的組別；不得因此建立新組別。這是首次加入，不是既有學生轉組；既有學生在活動開始後仍不得轉組，且不新增 Teacher 停止加入設定。
 
 ## User Scenarios & Testing *(mandatory)*
@@ -108,7 +108,7 @@
 - **FR-014**: 系統 MUST 拒絕純空白或僅含空白字元的提交答案，並由後端驗證 Blank 屬於目前 Round 的有效 Question 或 QuestionGroup、目前 Round 為 Active，且 Participant 所屬 Team 與 Round 同一 Session。
 - **FR-015**: 同一 Team 在同一 Round MUST 至多成功建立一筆有效 Submission；成功後再次提交 MUST 被拒絕。單題多個 Blank MUST 全部填入非空白答案才能提交；題組 MUST 完成所有 Question 和其可作答 Blank 後才能提交。成功提交後，伺服器 MUST 將該 Team／Round 共用草稿設為唯讀並拒絕後續修改。
 - **FR-016**: `acceptedOrder` MUST 由 Student Feature 的可信伺服器端提交服務依實際接受順序產生並交由 Foundation 持久化；客戶端不得提供權威值，學生端不得以本機時鐘產生順位。
-- **FR-017**: 學生端 MUST 不執行答案自動批改。Student Feature MUST 依可信伺服器接受順序選出該 Round 的勝出 Submission，並提供受授權的 Student 專用結果投影。Teacher Feature 的 End 操作 MUST 呼叫此可信勝者服務，並將其回傳的勝出 Submission（若無任何有效提交則為無勝者）交給 Foundation 既有原子 End／Result 交易；Foundation 不選勝者，且其對外契約不因本 Feature 改動。
+- **FR-017**: 學生端 MUST 不執行答案自動批改。Student Feature MUST 依可信伺服器接受順序選出該 Round 的勝出 Submission，並提供受授權的 Student 專用結果投影。Teacher 的可信後端 MUST 只呼叫單一 `StudentTrustedEndCoordinator.endRound(...)`；Coordinator MUST 使用 Foundation 交易機制，並由 Student Winner Resolver 在同一 SQLite `BEGIN IMMEDIATE` 交易與連線內同步選取勝者。Foundation MUST 在該交易中持久化 Ended 與 Result，僅於 Commit 成功後派送既有狀態通知；失敗 MUST Rollback 且不得廣播。不得先在交易外查詢勝者再另行 End。Foundation 不選勝者，且其對外契約不因本 Feature 改動。
 - **FR-018**: Student Feature MUST 重用 Foundation 的 Session、Round、Question、Blank、QuestionGroup、Team、Participant、Submission、SubmissionAnswer、Result 與 ActorContext 語意，不得建立不相容的第二套資料模型或另行儲存一份權威副本。
 - **FR-019**: 學生端 MUST 接收共用活動階段快照及後續變更；必須依 `stateVersion` 忽略過期資料，且在重新連線或重新訂閱後取得最新權威快照。狀態快照不得作為取得 Question／Blank 內容的替代品。
 - **FR-020**: 學生端 MUST 於正常連線下在活動狀態變更後 2 秒內顯示新狀態；不得在 Ended 前顯示或提供其他 Team 的答案或作答狀況。

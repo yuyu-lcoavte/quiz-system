@@ -5,11 +5,11 @@ The existing Foundation `session:watch`, `session:state`, `session:state:changed
 ## Connection and Authorization
 
 - Connect to the existing Socket.IO server and same-origin `/socket.io` endpoint.
-- Resolve the same opaque `student_session` cookie used by Student HTTP. The Socket.IO handshake may include `{ auth: { sessionId } }` as a requested resource scope so the server can resolve the matching Session-to-Participant mapping and construct ActorContext. Treat this ID only as a selector and verify membership server-side; never trust actor/team/leader fields in a payload.
-- Reject a browser Origin outside the configured exact-origin allowlist. Credential is HttpOnly and never passed in Socket auth payload.
+- The browser automatically sends the opaque `student_session` cookie to the same-origin `/socket.io` endpoint because the cookie uses `Path=/`. Resolve that cookie through the Student trusted identity resolver during the handshake. The handshake may include `{ auth: { sessionId } }` only as a requested resource scope; resolve the matching Session-to-Participant/Team mapping from the database and construct ActorContext server-side. Treat the ID only as a selector; never trust actor/team/leader fields in a payload.
+- Reject a browser Origin outside the configured exact-origin allowlist before authorizing the socket. The `student_session` cookie is `HttpOnly` and never passed in Socket auth payload. A missing, expired, revoked, unmapped, or unauthorized cookie/scope must fail the handshake or watch authorization and must not join a Room.
 - A socket may join only the server-derived room `student:team:{teamId}:round:{roundId}` after verifying the authenticated Participant belongs to that Team and Session and the requested Round is the current Active Round.
 - Clients supply `sessionId` and `roundId` as lookup targets, never a room name or Team ID. The event Session ID must equal the verified handshake scope. The server derives the Team from ActorContext.
-- Recheck authentication, membership, Round phase, target Blank and draft status for every edit event.
+- Recheck authentication, membership, Round phase, target Blank and draft status for every edit event. Validate exact Origin on connection and require the session-bound CSRF token on every state-changing socket event; read-only watch does not mutate state.
 - Draft edits require the synchronizer CSRF token in the payload. The token is held in memory by the web app, not localStorage.
 
 ## Events

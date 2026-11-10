@@ -81,24 +81,24 @@ interface StudentTrustedEndCoordinator {
   endRound(
     input: EndRoundInput,
     actor: TeacherScopedActorContext,
-  ): SessionStateSnapshot;
+  ): SessionStateSnapshot; // synchronous; transaction work completes before return
 }
 
-type WinnerResolver = (roundId: UUID) => Result | null;
+type WinnerResolver = (roundId: UUID) => Result | null; // synchronous; never return/await a Promise
 
 interface FoundationLifecycleEndPort {
   endRoundWithWinnerResolver(
     input: EndRoundInput,
     resolveWinner: WinnerResolver,
-  ): SessionStateSnapshot;
+  ): SessionStateSnapshot; // synchronous; commits before returning
 }
 
 interface StudentWinnerResolver {
-  resolveWinnerInTransaction(roundId: UUID): Result | null;
+  resolveWinnerInTransaction(roundId: UUID): Result | null; // synchronous database reads only
 }
 ```
 
-`StudentTrustedEndCoordinator` checks `actor.actorKind === 'teacher'`, matching `sessionId`, and the proposed `round:end` capability. It then calls the injected `FoundationLifecycleEndPort` once, passing the Student resolver callback. The Teacher UI sends no winning Submission ID and receives only the committed state snapshot. The callback is synchronous and returns the canonical Foundation `Result` candidate, or `null` when no Submission exists.
+`StudentTrustedEndCoordinator.endRound()` is a synchronous in-process call. It checks `actor.actorKind === 'teacher'`, matching `sessionId`, and the proposed `round:end` capability. It then calls the injected `FoundationLifecycleEndPort` once, passing the Student resolver callback. The Teacher UI sends no winning Submission ID and receives only the committed state snapshot. The callback is synchronous and returns the canonical Foundation `Result` candidate, or `null` when no Submission exists. No function invoked inside the SQLite transaction may return a Promise or await asynchronous work.
 
 ### Transaction connection and concurrency
 
@@ -106,14 +106,14 @@ interface StudentWinnerResolver {
 2. Foundation's `endRoundWithWinnerResolver()` starts one `BEGIN IMMEDIATE` transaction, verifies the Session/current Round/Active phase and expected `stateVersion`, then invokes the callback synchronously. It must not open another connection or await asynchronous work inside the transaction.
 3. Student's resolver queries canonical Submissions on that same connection, ordered by persisted `accepted_order`, and constructs a Result for the first valid Submission, or returns `null`. It does not write Ended/Result or publish events.
 4. Foundation writes Round Ended, increments `stateVersion`, stores/replaces the supplied Result, or—when callback returns `null`—creates no Result and clears any old Result for the same logical target. It commits the transaction.
-5. Only after the outer transaction returns successfully does Foundation publish the existing `session:state:changed` snapshot. No new event is added.
+5. Only after the synchronous transaction has committed and returned successfully does Foundation dispatch the existing `session:state:changed` snapshot. Socket.IO notification/delivery is post-commit asynchronous work; it is never awaited inside the SQLite transaction. No new event is added.
 
 Student submission uses the same SQLite writer serialization and rereads current Active phase inside its `BEGIN IMMEDIATE` transaction:
 
 - If Submission acquires the writer lock first, it commits the Submission and draft lock; End then sees that row and selects it if first by `accepted_order`.
 - If End acquires the lock first, it selects the already committed set, commits Ended/Result and releases the lock; a later Submission rereads Ended and is rejected without writing.
 
-There is no separate winner query followed by End, so no Submission can be accepted in the gap. If winner resolution, state validation, Result persistence or any write throws, SQLite rolls back the whole End transaction and Foundation does not broadcast. SQLite busy/lock-timeout failures likewise produce no state event and must be returned as safe retryable errors.
+There is no separate winner query followed by End, so no Submission can be accepted in the gap. If winner resolution, state validation, Result persistence or any write throws, SQLite rolls back the whole End transaction and Foundation does not dispatch a state event. SQLite busy/lock-timeout failures likewise produce no state event and must be returned as safe retryable errors.
 
 ### Dependency direction; no circular imports
 

@@ -38,6 +38,11 @@ This is not an existing Participant changing Teams; Student never creates Teams.
 end note
 
 == Activity state and target ==
+note over UI,Foundation
+The browser sends the Student-specific HttpOnly `student_session` cookie to both
+the Student HTTP path and same-origin /socket.io because Path=/; server validates
+Socket.IO Origin and resolves Participant/Team from the cookie mapping.
+end note
 UI -> Foundation : existing session:watch
 Foundation -> Foundation : verify cookie-derived ActorContext
 Foundation --> UI : current SessionStateSnapshot
@@ -114,10 +119,12 @@ else End gets SQLite write lock first
   StudentApi --> UI : 409 INVALID_PHASE
 end
 note over EndCoordinator,DB
-Teacher makes one internal End call. Foundation owns the outer transaction;
-Student returns only the winner candidate. Resolver/SQL failure rolls back and skips publish.
+Teacher makes one synchronous internal End call. Foundation owns the synchronous outer transaction;
+the synchronous Student callback returns only the winner candidate. No Promise is awaited inside it.
+Resolver/SQL failure rolls back and skips publish.
 With no Submission, Foundation creates no Result and clears prior logical-target Result.
-All services use the same Database object; no Foundation↔Student import cycle exists.
+All services use the same Database object; Commit precedes async Socket.IO dispatch;
+notification delivery is never awaited inside the transaction. No Foundation↔Student import cycle exists.
 end note
 
 == Student result projection ==

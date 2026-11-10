@@ -2,7 +2,7 @@
 
 > **用途**：提供老師端負責人一份可直接參考的共用架構交接文件。  
 > **文件日期**：2026-11-10  
-> **專案基準**：Shared Foundation `001-shared-foundation` 已完成 T001～T038；Student Feature 正在 `002-student-feature` 的 Clarify → Plan 階段。  
+> **專案基準**：Shared Foundation `001-shared-foundation` 已完成 T001～T038；Student Feature `002-student-feature` 已完成 Specify、Clarify、Plan、Tasks（61 項任務），尚未開始 Implement。
 > **重要**：本文件依目前已確認的 SpecKit 規格與實作回報整理，**不是新 API 的核准規格**。實作時，以倉庫中最新程式碼與 `contracts/` 為準。未建立的老師操作、身分驗證與跨模組介面均有明確標示。
 
 ## 1. 交接摘要
@@ -121,7 +121,7 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 1. 老師於 Teacher UI 發起「結束本輪」。
 2. Teacher 後端只呼叫一個 Student 內部介面：`StudentTrustedEndCoordinator.endRound(input, actorContext)`；前端不得指定勝者。
 3. Student coordinator 驗證 Teacher ActorContext 的 `round:end` capability，再把 Student 的同步 winner resolver callback 交給 Foundation lifecycle transaction。
-4. Foundation 與 Student 使用同一 `better-sqlite3` Database instance；Foundation 在一個 `BEGIN IMMEDIATE` 交易內呼叫 resolver、持久化 `Ended`／`Result`／`stateVersion`，Commit 後才廣播既有 Socket.IO 狀態。
+4. Foundation 與 Student 使用同一 `better-sqlite3` Database instance；Foundation 的 SQLite End 交易與 Student resolver 都同步執行，Foundation 在一個 `BEGIN IMMEDIATE` 交易內呼叫 resolver、持久化 `Ended`／`Result`／`stateVersion`。Commit 後才非同步派送既有 Socket.IO 狀態通知；不得在交易內等待通知，也不得讓交易 callback 回傳／等待 Promise。
 5. Student 結果投影在 Ended 後公開勝出組別名稱與其成功答案，**不公開其他組答案／順位**；沒有 Submission 時不建立 Result。
 
 **權限與介面狀態**：Foundation 目前沒有 `round:end` capability。Student Plan 提議此字串由 Teacher middleware 驗證後加入 ActorContext；Leader transfer 同理提議 `team:leader:transfer`。兩者皆為新 capability 提案，不是假設 Foundation 已有權限。

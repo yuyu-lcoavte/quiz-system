@@ -19,7 +19,7 @@ npm.cmd run check
 npm.cmd run dev
 ```
 
-Open `http://127.0.0.1:5173/student/join`. Vite proxies `/api` and `/socket.io` to the existing Express server at `http://127.0.0.1:3000`; keep the app same-origin in local development so the HttpOnly credential cookie works without credentialed cross-origin CORS.
+Open `http://127.0.0.1:5173/student/join`. Vite proxies `/api` and `/socket.io` to the existing Express server at `http://127.0.0.1:3000`; keep the app same-origin in local development so the Student-specific HttpOnly cookie with `Path=/` reaches both Student HTTP and Socket.IO without credentialed cross-origin CORS.
 
 Expected at completion: one Vite app, one Express/Socket.IO process and the existing SQLite file with Foundation plus additive Student migrations. The Student cookie is never available to frontend JavaScript and is not stored in localStorage.
 
@@ -27,12 +27,17 @@ Expected at completion: one Vite app, one Express/Socket.IO process and the exis
 
 1. Use a seeded test Session with at least two Teams and a valid Activity Code. Seed data must be created by an isolated Vitest fixture or an authorized Teacher workflow; no public seed endpoint is planned.
 2. Open `/student/join`, enter the Activity Code, and verify only activity summary and Team ID/name choices are shown before enrollment.
-3. Join a Team with a display name. In browser developer tools, confirm the response sets an HttpOnly, SameSite cookie and does not return its bearer value in JSON.
+3. Join a Team with a display name. In browser developer tools, confirm the response sets `student_session` with `Path=/`, HttpOnly, SameSite=Lax and no production HTTPS cookie downgrade; confirm the bearer value is absent from JSON and logs.
 4. Confirm the first successfully enrolled Participant in a Team is the only leader. Send parallel enrollment requests in the integration test and verify there is still exactly one leader.
 5. Advance the fixture Session through its first Active transition, then use a fresh browser credential to join a second existing Team. Verify first-time late enrollment succeeds, no new Team is created, and any existing Participant still cannot change Team.
-6. Refresh `/student/session/{sessionId}` and verify the same Participant, Team and leader status are restored from the server mapping.
+6. Briefly disconnect the browser/network, reconnect, and verify the same Participant remains leader and retains submission eligibility; refresh `/student/session/{sessionId}` and verify the same Participant and Team are restored from the server mapping.
 7. Expire/revoke the test credential in a test fixture; verify protected operations return 401 and UI offers recovery/rejoin without restoring by display name.
 8. Submit forged `participantId`, `teamId`, role, leader or `acceptedOrder` fields; verify they are rejected or ignored and never override the server ActorContext.
+9. Open an authorized Student Socket.IO connection from the same browser and verify DevTools shows the browser sent `student_session` to `/socket.io`; verify the server derives Participant/Team from that cookie and the requested Session scope. Repeat with a missing/expired cookie and a disallowed Origin; the handshake/watch must be rejected and no Team/Round room joined.
+
+## SC-001 Join Timing
+
+On the Windows browser with the local app running and a fresh browser context, start a stopwatch when submitting a valid Activity Code. Stop it when the enrolled Student Session page has rendered the selected Team and membership. Repeat for three fresh join runs using the same documented fixture and record each duration, browser, and environment in `tests/manual/student-feature.md`. The SC-001 threshold is 120 seconds per run. This procedure is an acceptance check only; do not mark it passed until the durations have actually been measured.
 
 ## Draft, submission and realtime
 

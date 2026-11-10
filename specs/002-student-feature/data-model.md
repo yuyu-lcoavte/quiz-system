@@ -34,6 +34,8 @@ An opaque browser credential stored as a one-way digest; it contains no Particip
 
 The synchronizer CSRF token is stateless: the server signs a short-lived token bound to credential ID and Session with a server-held HMAC key. Only the signing key is configured; neither the raw token nor a token digest is stored in SQLite. A read-only token refresh is `Cache-Control: no-store` and does not rotate another browser tab's token.
 
+The browser cookie is Student-specific (`student_session`), `HttpOnly`, `SameSite=Lax`, and uses `Path=/` so the browser sends it to both the Student HTTP base path and same-origin `/socket.io`. `Secure` is required over production HTTPS. Only Student HTTP identity middleware and the Student Socket.IO handshake resolver read it; it is not a generic authorization grant. Socket.IO validates exact Origin and derives Participant/Team from the server-side Session mapping. State-changing requests/events validate Origin and the session-bound CSRF token, except the initial enrollment bootstrap for a Session that has no Participant binding/token yet; that request still requires an exact allowed Origin and full server-side validation. Once bound, enrollment retries and all other mutations require the token.
+
 ### `StudentBrowserParticipant`
 
 The association between a browser credential and one canonical Participant within one Session.

@@ -69,12 +69,14 @@ First-time join after first Active is allowed only into an existing Team.
 Student never creates Teams; existing members cannot transfer after first Active.
 Student owns enrollment, opaque identity mapping, leader state, drafts,
 acceptedOrder creation and Student-only result projection.
+The `student_session` HttpOnly cookie uses Path=/ for Student HTTP and /socket.io;
+the server validates handshake Origin and derives identity from the cookie mapping.
 end note
 
 note bottom of Foundation
 Existing public HTTP/DTO/Socket.IO contracts remain unchanged.
-The Foundation callback accepts a generic function; Foundation does not import Student.
-Foundation and Student services use the same SQLite connection; publish follows commit.
+The synchronous Foundation transaction accepts a generic callback; Foundation does not import Student.
+Foundation and Student services use the same SQLite connection; post-commit Socket.IO notification dispatch is not awaited in the transaction.
 end note
 
 note right of TeacherModule
