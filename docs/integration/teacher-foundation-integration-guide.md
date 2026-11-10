@@ -94,7 +94,7 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 
 ## 7. 可信身分與權限
 
-- Foundation 提供**伺服器產生的** `ActorContext` 與驗證邊界，不提供真正的教師帳密登入實作。
+- Foundation 提供共用 `ActorContext` 型別及由可信伺服器解析器注入的 Middleware 邊界；目前 `startServer()` 未配置正式身分解析器。Student Cookie 身分解析由 Student Feature 提供，Teacher 身分解析由 Teacher Feature 提供；未接上可信解析器前，受保護操作必須 fail closed。Foundation 不提供真正的教師帳密登入實作。
 - Teacher Feature 必須建立教師驗證／Session 管理，並在後端驗證是授權老師才能操作管理功能。
 - 不得信任瀏覽器自行提供的 `teacher`、`teamId`、`isLeader` 或 `acceptedOrder`。
 - 既有測試用 ActorContext 注入僅限測試環境，不得用於正式操作。
@@ -102,28 +102,37 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 
 ## 8. 老師端必須預留的兩個跨模組介接
 
-這兩項已由 Student Clarify 確定**職責方向**；**具體函式名稱、API 路徑、請求／回應 DTO 尚未在 Plan 定版**，老師端不要先自行發明公開端點。
+這兩項的**責任方向已定**；Student Plan 已提出內部服務介面及新 capability 名稱供 Teacher／Foundation 審閱，尚未表示雙方已逐項程式驗證。老師端不要另行發明公開端點。
 
 ### 8.1 組長轉交
 
 - 第一位成功加入某組的學生，由 Student 後端**原子**指定為該組唯一組長。
 - 短暫斷線不轉交組長；搶答首次開始前若組長轉組，須先完成明確交接；搶答開始後不可自由換組。
 - 原組長無法恢復身分時，由**已驗證的教師**發起指定新組長操作。
+- Foundation 既有 ActorContext 權限只有 `session:read`、`session:watch`、`target:preview`、`target:read`、`results:read`，不含組長管理權限。Student Plan 提議新增 `team:leader:transfer` capability 字串，由 Teacher 驗證後放入伺服器建立的 ActorContext；此名稱不是 Foundation 已有 grant，待 Teacher 組員審閱。
 - **Teacher Feature 負責**：顯示組員與目前組長、提供「指定新組長」UI，以及可信授權操作入口。
 - **Student Feature 負責**：驗證目標組員資格、保證同組同時最多一位組長、以交易完成轉交並提供最新權限狀態。
-- **待 Plan 確認**：可信 Teacher 呼叫 Student 後端服務的介面、錯誤碼與狀態回饋，以及是否需要即時廣播組長變更。
+- **Student Plan 介面提案，尚待 Teacher 組員審閱**：`specs/002-student-feature/contracts/internal-services.md` 提出可信 Teacher 呼叫 Student 後端服務的介面及錯誤；需雙方確認模組註冊方式、權限名稱與狀態回饋。組長狀態可由 Teacher 重讀服務取得，Student 提案目前不新增即時組長廣播事件。
 
 ### 8.2 結束搶答、勝者選取與 Result 儲存
 
 **已定的職責流程**：
 
 1. 老師於 Teacher UI 發起「結束本輪」。
-2. 可信 Teacher 後端**協調** Student 勝者服務與 Foundation 結束交易；前端不得指定勝者。
-3. Student 勝者服務依伺服器接受的有效 Submission 順序，決定勝出 Submission（或無勝者）。
-4. Foundation 對 `Ended`、`Result` 與 `stateVersion` 進行一致性的交易更新，提交成功後才通知 Socket.IO Client。
-5. Student 結果投影在 Ended 後公開勝出組別名稱與其成功答案，**不公開其他組答案／順位**。
+2. Teacher 後端只呼叫一個 Student 內部介面：`StudentTrustedEndCoordinator.endRound(input, actorContext)`；前端不得指定勝者。
+3. Student coordinator 驗證 Teacher ActorContext 的 `round:end` capability，再把 Student 的同步 winner resolver callback 交給 Foundation lifecycle transaction。
+4. Foundation 與 Student 使用同一 `better-sqlite3` Database instance；Foundation 在一個 `BEGIN IMMEDIATE` 交易內呼叫 resolver、持久化 `Ended`／`Result`／`stateVersion`，Commit 後才廣播既有 Socket.IO 狀態。
+5. Student 結果投影在 Ended 後公開勝出組別名稱與其成功答案，**不公開其他組答案／順位**；沒有 Submission 時不建立 Result。
 
-**必要並行安全條件**：結束本輪與接收提交不可存在未受控的競爭條件。Plan 必須規定「何時停止接受新提交、如何確定候選 Submission、如何一次性完成 End／Result」的交易／鎖定策略。不可把「先查勝者」與「稍後 End」拆成彼此獨立且可被新提交插隊的操作。
+**權限與介面狀態**：Foundation 目前沒有 `round:end` capability。Student Plan 提議此字串由 Teacher middleware 驗證後加入 ActorContext；Leader transfer 同理提議 `team:leader:transfer`。兩者皆為新 capability 提案，不是假設 Foundation 已有權限。
+
+**必要並行安全條件**：不允許「先查勝者」與「稍後 End」之間有新提交插入。Plan 的交易內 callback 為內部介面提案，待 Teacher／Foundation 負責人審閱；它不改 Foundation 公開 HTTP、DTO 或 Socket.IO 契約。
+
+## 8.3 活動開始後的首次加入
+
+- Session 首次進入 Active 後，尚未加入的學生仍可首次加入**已存在**的 Team。
+- 這是首次加入，不是既有學生轉組；已加入 Participant 首次 Active 後不可轉組。
+- Student 不建立 Team，且本專題不新增 Teacher「停止加入」設定。
 
 ## 9. 老師端仍須自行完成（Foundation 沒有提供）
 
@@ -133,6 +142,7 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 - 開始、結束、下一題、重開的教師操作入口與錯誤提示。
 - 組長指定／轉交的教師 UI。
 - 完整 Teacher × Student 整合及實際雙組別 Demo。
+- Teacher admission-stop 設定；目前決議允許晚到學生加入既有 Team。
 
 上述未實作部分**不應視為 Foundation 的缺陷**，而是後續 Feature 的工作範圍。
 

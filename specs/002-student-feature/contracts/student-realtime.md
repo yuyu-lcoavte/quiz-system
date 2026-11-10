@@ -1,0 +1,51 @@
+# Student Draft Realtime Contract (Plan Proposal)
+
+The existing Foundation `session:watch`, `session:state`, `session:state:changed` and `session:error` events remain unchanged and carry activity state references only. Student answer values use the separate Student-owned events below.
+
+## Connection and Authorization
+
+- Connect to the existing Socket.IO server and same-origin `/socket.io` endpoint.
+- Resolve the same opaque `student_session` cookie used by Student HTTP. The Socket.IO handshake may include `{ auth: { sessionId } }` as a requested resource scope so the server can resolve the matching Session-to-Participant mapping and construct ActorContext. Treat this ID only as a selector and verify membership server-side; never trust actor/team/leader fields in a payload.
+- Reject a browser Origin outside the configured exact-origin allowlist. Credential is HttpOnly and never passed in Socket auth payload.
+- A socket may join only the server-derived room `student:team:{teamId}:round:{roundId}` after verifying the authenticated Participant belongs to that Team and Session and the requested Round is the current Active Round.
+- Clients supply `sessionId` and `roundId` as lookup targets, never a room name or Team ID. The event Session ID must equal the verified handshake scope. The server derives the Team from ActorContext.
+- Recheck authentication, membership, Round phase, target Blank and draft status for every edit event.
+- Draft edits require the synchronizer CSRF token in the payload. The token is held in memory by the web app, not localStorage.
+
+## Events
+
+| Direction | Event | Payload / behavior |
+|---|---|---|
+| Client → server | `student:draft:watch` | `{ sessionId, roundId }`; authorized request joins the computed room and receives a full current snapshot. |
+| Server → requesting client | `student:draft:snapshot` | `{ sessionId, roundId, version, status, answers[] }`; generated from persisted Team/Round draft. |
+| Client → server | `student:draft:edit` | `{ sessionId, roundId, blankId, value, baseVersion, clientMutationId, csrfToken }`; persisted via the same application service as HTTP edit. |
+| Server → Team/Round room | `student:draft:changed` | `{ sessionId, roundId, version, answer: { blankId, value, revision }, clientMutationId }`; emitted only after commit. |
+| Server → Team/Round room | `student:draft:locked` | `{ sessionId, roundId, version, status: "locked" }`; emitted only after Submission and draft-lock commit. Contains no winner/other-Team data. |
+| Server → requesting client | `student:draft:error` | `{ code, message, requestId? }`; safe error, no stack or secret. |
+
+`answers` are `{ blankId, value, revision }[]`; the list is dynamic and contains only the authenticated Team's current draft. A version increments per accepted edit. The last edit committed by the server wins for each Blank. `baseVersion` is diagnostic and does not override that rule. `clientMutationId` is idempotent across HTTP/socket retries.
+
+## Reconnect and Ordering
+
+1. On connect/reconnect, resolve the credential and send `student:draft:watch` again for the current Session/Round.
+2. Server revalidates membership and returns the latest persisted snapshot before relying on subsequent events.
+3. Client ignores a snapshot/change whose `version` is lower than or equal to the last accepted version. If it detects a gap or the socket reconnects, it requests a full snapshot or calls the draft GET endpoint.
+4. The server commits the draft value/version before broadcasting. If the process stops after commit but before emit, the next snapshot is authoritative.
+5. After `student:draft:locked`, the UI becomes read-only. Server rejects all subsequent edits even if a client missed the lock event.
+
+## Isolation and Errors
+
+- Team/Round room membership is computed from verified context. A Team cannot watch another Team's draft, and a Session cannot observe another Session's events.
+- A non-member, invalid/ended Round, invalid target Blank, bad CSRF token, or locked draft receives `student:draft:error`; an unauthorized socket never joins the room.
+- Foundation session-state events do not carry draft versions, answer values, leader changes or submission order.
+- No event selects a winner or changes Foundation phase. Teacher lifecycle commands use trusted HTTP/internal services.
+
+## Verification Scenarios
+
+1. Two Participants from one Team watch the same Round and receive identical persisted snapshots and post-commit versioned edits.
+2. Two concurrent edits of the same Blank leave the server's last committed value; stale versions cannot roll back newer state.
+3. Different Teams and Sessions do not receive each other's draft snapshot/change/lock events.
+4. Missing/expired identity, forged Team/actor fields, bad CSRF token, invalid Round/Blank and locked draft are rejected before room broadcast.
+5. Refresh and reconnect recover exactly the latest persisted draft version.
+6. Submission commits the lock before `student:draft:locked`; failed submission does not lock or publish.
+7. Under normal local connection, committed draft edits reach the second authorized client within 2 seconds.

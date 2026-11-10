@@ -1,45 +1,86 @@
 @startuml
-title Student Feature — Component Diagram (Specify)
+title Student Feature — Component Diagram (Plan)
 left to right direction
 skinparam componentStyle rectangle
 
 actor Student
-component "Student Web Experience\nJoin / Activity / Answers / Results" as StudentUI
-component "Student Feature Services\nIdentity · Enrollment · Team Choice\nShared Draft · Submission · Result View" as StudentServices
-component "Shared Foundation\nSession · Round · Target · State" as Foundation
-component "Shared Data Model\nParticipant · Team · Submission\nSubmissionAnswer · Result" as SharedData
-component "Teacher Feature\nActivity / Teams / Targets / Lifecycle" as Teacher
-cloud "Connected clients\nSession state notifications" as Realtime
+actor Teacher
 
-Student --> StudentUI
-StudentUI --> StudentServices : student actions
-StudentServices --> Foundation : verified reads / shared lifecycle data
-StudentServices --> SharedData : student-owned membership and submissions
-Foundation --> SharedData : shared concepts and persistence boundary
-Teacher --> Foundation : provides activity targets and lifecycle
-Foundation --> Realtime : phase snapshots
-Realtime --> StudentUI : current state and changes
-Teacher --> SharedData : prepares activity data
+component "Single React/Vite App\nStudent pages and forms" as Web
+component "Student Web Adapters\nHTTP / draft Socket client" as StudentClient
+component "Shared Foundation Web\nRouter / Layout / SessionStateClient" as FoundationWeb
 
-note bottom of StudentServices
-Participant identity is activity-scoped, passwordless,
-and recoverable in the same browser; credential mechanics
-remain for Plan. Student Feature persists and immediately
-shares team drafts; accepted submission makes the draft
-read-only. Student Feature selects the first accepted submission
-and provides the student result projection. Teacher calls the
-trusted resolver before Foundation's existing End transaction;
-coordinate that internal boundary with Teacher Feature. Do not
-extend Foundation state events or public contracts with answers.
-If the leader cannot return, authorized Teacher transfer
-requires coordination with Teacher Feature.
-Student-supplied role, Team ID and acceptedOrder
-are never authoritative.
+component "Express API Router" as Api
+component "Student Feature Module" as StudentModule {
+  component "Student HTTP API" as StudentApi
+  component "Cookie Identity Resolver\nActorContext adapter" as Identity
+  component "Enrollment / Team Service" as TeamService
+  component "Draft Service" as DraftService
+  component "Submission Service" as SubmissionService
+  component "Winner Resolver / Result Projection" as WinnerService
+  component "StudentTrustedEndCoordinator\nTeacher's single End call" as EndCoordinator
+  component "Student Draft Socket Events" as DraftSocket
+}
+component "Foundation Module" as Foundation {
+  component "Session Query / Current Target" as ReadService
+  component "Lifecycle Transaction Service\nresolver callback + post-commit publish" as Lifecycle
+  component "Foundation session-state events" as StateEvents
+}
+component "Teacher Feature Backend" as TeacherModule
+component "Server Composition Root" as Composition
+interface "Generic WinnerResolver callback\n(roundId) => Result | null" as WinnerPort
+database "Shared SQLite\nFoundation entities + Student tables" as DB
+
+Student --> Web
+Teacher --> TeacherModule
+Web --> FoundationWeb
+Web --> StudentClient
+StudentClient --> Api : same-origin HTTP
+StudentClient --> DraftSocket : student:draft:*
+FoundationWeb --> StateEvents : session:watch / state snapshots
+Api --> StudentApi
+StudentApi --> Identity : resolve verified cookie actor
+StudentApi --> TeamService
+StudentApi --> DraftService
+StudentApi --> SubmissionService
+StudentApi --> WinnerService
+StudentApi --> ReadService : reuse Activity Code / current-target reads
+DraftSocket --> Identity
+DraftSocket --> DraftService : authorized watch/edit
+TeamService --> DB : Participant / TeamLeader / credential mapping
+DraftService --> DB : Team × Round draft / answers
+SubmissionService --> DB : canonical Submission / answers + draft lock
+WinnerService --> DB : accepted order / Result projection reads
+ReadService --> DB
+Lifecycle --> DB : Ended / Result / stateVersion transaction
+TeacherModule --> TeamService : transfer; team:leader:transfer
+TeacherModule --> EndCoordinator : one endRound(input, actorContext) call
+EndCoordinator --> Lifecycle : invoke injected Foundation lifecycle port
+Lifecycle --> WinnerPort : callback inside write transaction
+WinnerService ..|> WinnerPort : Student implementation
+Lifecycle --> StateEvents : publish only after commit
+StateEvents --> Web : existing Foundation state contract
+Composition ..> EndCoordinator : inject ports/services
+Composition ..> Lifecycle
+Composition ..> WinnerService
+
+note bottom of StudentModule
+First-time join after first Active is allowed only into an existing Team.
+Student never creates Teams; existing members cannot transfer after first Active.
+Student owns enrollment, opaque identity mapping, leader state, drafts,
+acceptedOrder creation and Student-only result projection.
 end note
 
 note bottom of Foundation
-Reuse existing shared routes, read contracts,
-ActorContext boundary and Socket.IO state contract.
-Do not change Foundation contracts in Specify.
+Existing public HTTP/DTO/Socket.IO contracts remain unchanged.
+The Foundation callback accepts a generic function; Foundation does not import Student.
+Foundation and Student services use the same SQLite connection; publish follows commit.
+end note
+
+note right of TeacherModule
+Foundation currently grants only read/watch capabilities.
+team:leader:transfer and round:end are new proposed ActorContext strings,
+not existing Foundation permissions; Teacher middleware must issue them after auth.
+Teacher owns login/UI and calls one Student End coordinator; it never selects winners.
 end note
 @enduml

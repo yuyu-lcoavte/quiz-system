@@ -18,12 +18,13 @@
 - Q: 單題有多個填空時，何時可以提交，且成功提交後應如何處理共用草稿？ → A: 單題的所有 Blank 都須填入非空白答案；成功提交後，同組共用草稿與欄位轉為唯讀，不得再修改或重送。
 - Q: Round 結束後，學生端應顯示哪些已公布的搶答結果？ → A: 僅顯示勝出組別名稱及該組成功提交的答案，不顯示其他組別的提交內容。
 - Q: Teacher 結束一輪時，應由哪個 Feature 依後端接受順序選出勝者，並提供學生結果頁所需的勝出組別與答案？ → A: Student Feature 依可信伺服器接受順序選出勝出 Submission 並提供 Student 專用結果投影；Teacher 結束操作呼叫 Student 的可信勝者服務，再將結果交給 Foundation 既有原子 End／Result 交易，不變更 Foundation 對外契約。
+- Q: 活動首次進入 Active 後，尚未加入的學生是否仍可加入？ → A: 可以首次加入已存在的組別；不得因此建立新組別。這是首次加入，不是既有學生轉組；既有學生在活動開始後仍不得轉組，且不新增 Teacher 停止加入設定。
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 加入一場搶答活動 (Priority: P1)
 
-學生輸入活動代號，確認活動存在及目前階段，再選擇組別並加入活動。活動代號查詢只是加入前的有限度唯讀查詢，不會自行建立學生身分或組別成員資格。學生進入活動後，後續操作須由伺服器驗證的參與者身分與組別關係授權。
+學生輸入活動代號，確認活動存在及目前階段，再選擇既有組別並加入活動。即使活動曾進入 Active，尚未加入的學生仍可首次加入既有組別；這不允許建立新組別，也不代表已加入學生可以轉組。活動代號查詢只是加入前的有限度唯讀查詢，不會自行建立學生身分或組別成員資格。學生進入活動後，後續操作須由伺服器驗證的參與者身分與組別關係授權。
 
 **Why this priority**: 若學生無法安全地加入活動並建立可供後續操作驗證的組別關係，就無法作答或提交。
 
@@ -35,6 +36,7 @@
 2. **Given** 學生輸入無效或不存在的活動代號，**When** 查詢活動，**Then** 顯示可理解的錯誤，且不洩漏其他活動或組別資料。
 3. **Given** 活動存在且可供加入，**When** 學生選擇一個組別並完成加入，**Then** 後端建立或確認參與者與該組的關係，之後的活動操作以此可信關係授權。
 4. **Given** 查詢端超過活動代號入口的伺服器限制，**When** 學生繼續查詢，**Then** 系統呈現受限制的回覆，不建立成員身分。
+5. **Given** 活動已首次進入 Active 且 Session 仍可查詢，**When** 尚未加入的學生選擇一個已存在的組別，**Then** 系統允許首次加入該組；不建立新組別，也不改變既有成員的組長或轉組權限。
 
 ### User Story 2 - 以組別共同準備並提交答案 (Priority: P1)
 
@@ -76,6 +78,7 @@
 - 活動代號不存在、格式錯誤、已結束或超出匿名查詢節流限制。
 - 活動尚無 Round；此時顯示等待，不顯示題目或答案欄位。
 - Question 有零個 Blank；不建立空答案提交，並清楚告知目前沒有可作答欄位。
+- 活動首次進入 Active 後，尚未加入的學生首次加入既有 Team；不得建立新 Team，且既有 Participant 不得轉組。
 - QuestionGroup 為空或不屬於目前 Session；Foundation 不允許空題組成為有效 Round 目標，學生端不得呈現可提交的空題組。
 - Participant、Team、Session、Round 或 Blank 不屬於同一活動／目前目標；後端拒絕讀取或提交。
 - 同組多人同時編輯、同時提交，或在一筆 Submission 已成功後仍操作答案；同格編輯依最後由伺服器接受的修改決定，成功提交後草稿唯讀，後端拒絕修改與重複提交。
@@ -90,10 +93,10 @@
 
 - **FR-001**: 學生端 MUST 使用既有共用應用程式的 `/student/join` 與 `/student/session/:sessionId` 路由；不得另建前端應用程式或變更共用路由契約。
 - **FR-002**: 系統 MUST 允許尚未加入活動的學生以 Activity Code 查詢活動是否存在及其必要摘要；查詢 MUST 沿用 Foundation 的匿名唯讀、伺服器驗證與節流邊界，且不得建立 Participant、Team membership 或其他受保護權限。
-- **FR-003**: 系統 MUST 在活動加入流程中呈現可選組別並允許學生選擇；組別及 Participant 的建立／確認 MUST 由伺服器驗證並維持與 Session 的關聯。
+- **FR-003**: 系統 MUST 在活動加入流程中呈現該 Session 已存在的可選組別並允許學生選擇；組別及 Participant 的建立／確認 MUST 由伺服器驗證並維持與 Session 的關聯。Session 首次進入 Active 後，尚未加入者仍 MUST 可首次加入已存在的組別；本 Feature MUST NOT 建立新組別。
 - **FR-004**: 系統 MUST 依 Q02 將後端原子化接受加入的第一位 Participant 設為該組唯一組長；並行加入不得產生多位組長。組長短暫離線或以同一活動身分恢復時保留資格；活動開始前組長轉組須明確交接，若組長無法恢復則只能由授權教師轉交。提交資格 MUST 由可信後端判定，不得由客戶端傳入角色或組長宣告。
 - **FR-025**: 學生 MUST 不需建立可跨活動重用的帳號或密碼；加入活動後由伺服器建立活動內 Participant 身分，並允許同一瀏覽器在重新整理或重新連線後恢復該 Participant。身分憑證的具體傳遞與保存方式留待 Plan，且不可由客戶端自稱 Participant ID 取代伺服器驗證。
-- **FR-005**: 系統 MUST 依 Q03 以 Cookie 記錄相關選組資訊；在搶答尚未開始前允許變更組別，搶答開始後不得變更。Cookie 中的資料 MUST NOT 作為伺服器驗證 Participant、Team 或組長資格的唯一依據。
+- **FR-005**: 系統 MUST 依 Q03 以 Cookie 記錄相關選組資訊；已加入學生只可在活動首次進入 Active 前變更組別，首次 Active 後不得轉組。首次加入一個既有組別的晚到學生不視為轉組。Cookie 中的資料 MUST NOT 作為伺服器驗證 Participant、Team 或組長資格的唯一依據。
 - **FR-006**: 系統 MUST 對缺少、格式錯誤或不存在的 Activity Code 顯示可理解錯誤；錯誤資訊不得洩漏無關 Session、Team、Participant 或答案資料。
 - **FR-007**: 系統 MUST 顯示目前活動階段；尚無 Round 或目前 Round 為 Waiting 時，學生可看見等待狀態，但不得透過任何學生端操作取得 Question 或 Blank 內容。
 - **FR-008**: 系統 MUST 只在目前 Round 為 Active 且 Participant 具備該 Session 成員資格時，取得並顯示該 Round 的目前目標內容；權限及階段必須由後端驗證。
@@ -118,6 +121,7 @@
 
 - **Participant**: 已加入活動的學生身分；由 Student Feature 建立／確認，並由可信後端綁定到 Team。每個活動採不需跨活動帳密的活動內身分，同一瀏覽器可恢復該 Participant；具體身分憑證形式留待 Plan。
 - **Team**: Session 內的組別；組員共同作答，依共同決議由第一位加入的 Participant 擔任組長。
+- **Late Enrollment**: Session 首次 Active 後的首次加入；只可選擇已存在 Team，不建立新 Team，也不變更既有 Participant 的組別。
 - **Activity Code Lookup**: 加入前的有限度活動查詢；與加入後 Participant identity／Team membership 分開。
 - **Round**: 一次搶答輪次及所有學生答案的範圍；重新開題使用新 Round ID。
 - **Question / Blank**: 一道題目及其零個或多個可獨立輸入答案的填空格。
@@ -145,9 +149,10 @@
 - Student Feature 併入既有單一應用程式與共用後端，使用 Foundation 已核准的 Student routes；本 Feature 不新增獨立前端、Teacher 頁面或共用 Foundation 對外契約改版。
 - 老師端已建立 Session、Activity Code、Team、Question、Blank 及 QuestionGroup 資料；學生端消費其處理後的結構化資料，不讀取或解析 Excel。
 - 學生只能在目前 Round 為 Active 時取得題目內容及提交；等待狀態與活動階段資訊可於題目未開放時顯示。
+- 活動首次進入 Active 後仍允許尚未加入的學生首次加入已存在 Team；這不允許新建 Team 或既有 Participant 轉組，也不新增 Teacher 停止加入設定。
 - Q02、Q03、Q07、Q08、Q09、Q10、Q11、Q12、Q18、Q20 的已確認行為依共同需求文件為準；本規格不變更其決議。
 - 沒有可作答 Blank 的題目不接受空答案 Submission。單題有多個 Blank 時各欄位獨立輸入且都必須完成；題組內所有 Question 的可作答 Blank 都必須完成。
-- `Result` 的勝者依 Student Feature 可信後端所記錄的最早有效接受順序選出，不採自動批改或公平輪替；Teacher 的 End 操作將該勝出 Submission 交給 Foundation 既有交易保存，沒有有效 Submission 時不建立 Result。
+- `Result` 的勝者依 Student Feature 可信後端所記錄的最早有效接受順序選出，不採自動批改或公平輪替；Teacher 只呼叫 Student 的單一可信 End coordinator，由 Student resolver 在 Foundation End 交易內選出勝者，Foundation 保存 Ended 與 Result；沒有有效 Submission 時不建立 Result。
 - Group name、Question 顯示編號／提示及 Blank label 以 Teacher Feature 提供的共用資料為準；其匯入辨識與保留原始 `(1)`、`(2)` 等標記由 Teacher Feature 處理及確認。
 - 本地或課堂 Demo 足以驗證本 Feature；不要求公開部署。
 
@@ -159,20 +164,21 @@
 - Q16 是否保留來源 Guided Notes 的 `(1)`、`(2)` 標記，以及匯出時如何回寫，屬 Teacher 匯入／匯出決議；Student 只顯示 Teacher 提供的 Blank 資料，不解析 Excel 或推測標記語意。
 - U10 題組如何從來源檔案辨識、Q13 `.xlsx` 流程是否符合助教要求，屬 Teacher Feature 與課程驗收的待確認項目；Student 僅消費已建立的 QuestionGroup。
 - Q22 共用測試案例的細節待兩組協調；本規格列出學生端驗收行為，但不宣稱已取得逐項共同測試案例審閱。
-- 組長無法恢復時，規則已決定由授權教師轉交；Teacher Feature 組員需確認其操作入口及權限整合方式。此協調不改變「同組唯一組長」及後端授權原則。
-- Teacher Feature 組員需協調 End 操作如何呼叫 Student Feature 的可信勝者服務，再將勝出 Submission 傳入 Foundation 既有原子交易。Student result projection 為 Student-owned；不修改 Foundation 的 `ResultView` 或其他對外契約。
+- 組長無法恢復時，規則已決定由授權教師轉交；Teacher 提供 UI，Student 服務檢查 ActorContext 中的 `team:leader:transfer` capability。此 capability 目前不在 Foundation 已列出的讀取權限中，屬 Teacher Feature 必須提供且雙方需審閱的新增 capability 名稱。
+- Teacher 只呼叫 Student 的單一可信 End coordinator；該 coordinator 使用 `round:end` capability 驗證 ActorContext，將 Student winner resolver callback 傳給 Foundation 內部 lifecycle transaction。此 capability 目前亦非 Foundation 既有能力；Teacher／Student／Foundation 負責人仍需審閱內部介面提案。Student result projection 為 Student-owned；不修改 Foundation 的 `ResultView` 或其他對外契約。
 
 ## Dependencies and Compatibility
 
 - Reuse the Foundation Activity Code lookup, Session/state/current-target/results reads, common success/error envelope, verified `ActorContext`, shared entity semantics, acceptedOrder persistence boundary, lifecycle state and Socket.IO snapshot/event contract.
 - Foundation already enforces no question-content access for Participants while Waiting and allows the authorized Participant to read the target in Active; Student UI must reflect but cannot replace those backend checks.
 - Foundation shared routes are `/student/join` and `/student/session/:sessionId`; this Feature fills those module entry points without changing route names.
-- Foundation's reserved Student responsibilities include enrollment, team selection, draft editing and answer submission. The exact Student-owned mutation and membership operations are not defined by existing Foundation read contracts and remain for a later Plan after clarification.
-- Foundation `ResultView` does not carry the winning Team display name or answer rows. Student Feature provides its own authorized result projection from shared persisted data; Teacher integration calls the Student winner resolver before the existing Foundation transaction. Coordinate the internal service boundary with the Teacher Feature member; no Foundation contract change is required.
+- Foundation's reserved Student responsibilities include enrollment, team selection, draft editing and answer submission. Student-owned mutation contracts are proposed in this Feature Plan; the Teacher-facing internal interfaces and new capability strings require cross-feature review before implementation.
+- Foundation `ResultView` does not carry the winning Team display name or answer rows. Student Feature provides its own authorized result projection from shared persisted data. Teacher calls the single Student trusted End coordinator; Student supplies its winner resolver callback to Foundation's internal End transaction so selection, Ended and Result persistence are serialized together. No Foundation public contract change is required; review the proposed internal seam with the Teacher/Foundation owners before implementation.
 
 ## Out of Scope
 
-- Teacher authentication, Teacher pages, activity creation, session lifecycle commands, team administration, Guided Notes import/export or Excel parsing/writing.
+- Teacher authentication, Teacher pages, activity creation, Teacher-facing lifecycle command UI/endpoints, team administration UI, Guided Notes import/export or Excel parsing/writing. The internal Student-owned trusted End coordinator remains in scope only as the integration seam for Teacher to request End and resolve the winner atomically.
+- A Teacher-configured admission-stop setting or creation of new Teams through Student enrollment.
 - Student account administration outside this course activity, scoring or automatic answer correctness evaluation, fairness rotation, CSV export, and public deployment.
-- Changing Foundation routes, shared DTO/API formats, Socket.IO event names, database schema or Foundation business behavior.
+- Changing Foundation public routes, shared DTO/API formats, Socket.IO event names or database schema. The minimal internal Foundation transaction callback described in Plan is allowed so Student winner selection and End/Result persistence share one transaction.
 - Selecting a specific authentication technology, cookie lifetime, endpoint payload, persistence layout, realtime draft protocol or framework implementation; those belong to Clarify/Plan and must preserve existing contracts.
