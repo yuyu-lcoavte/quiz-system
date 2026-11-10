@@ -75,3 +75,14 @@ The integration fixtures use a dedicated temporary SQLite database and close/cle
 - Foundation has no formal Teacher login/command UI; Teacher integration tests must use a test-only trusted ActorContext fixture and the actual internal service, not a production bypass endpoint.
 - Late first-time enrollment into an existing Team is specified; no Teacher-managed admission-stop setting or Student Team creation is included.
 - Cross-module internal service names, proposed Teacher capabilities and the Foundation transaction callback require Teacher/Foundation owner review. Until agreed, the concurrency test remains a required integration gate.
+# Enrollment infrastructure (T017–T024)
+
+Before running Student enrollment locally, configure the server CSRF signing secret in the same PowerShell terminal. Keep the value stable while testing recovery across tabs/restarts; changing it invalidates existing CSRF tokens, but does not replace the browser identity cookie.
+
+```powershell
+$env:STUDENT_CSRF_SECRET = node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))"
+$env:STUDENT_ALLOWED_ORIGINS = 'http://127.0.0.1:5173,http://localhost:5173'
+npm.cmd run dev
+```
+
+The implemented backend flow is join-options → enrollment → me / csrf-token, with pre-start team-change protected by Origin, identity and CSRF. The existing Student pages remain placeholders until the UI tasks. No browser acceptance is claimed for this batch. Missing security configuration leaves protected enrollment routes unavailable; there is no generated signing-key fallback.

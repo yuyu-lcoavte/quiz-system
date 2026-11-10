@@ -22,6 +22,10 @@ export class TeamRepository {
 export class ParticipantRepository {
   constructor(private readonly database: Database.Database) {}
 
+  moveToTeam(id: UUID, teamId: UUID): void {
+    this.database.prepare('UPDATE participants SET team_id = ? WHERE id = ?').run(teamId, id);
+  }
+
   create(value: Participant): Participant {
     validateParticipant(value);
     this.database.prepare('INSERT INTO participants (id, team_id, display_name, created_at) VALUES (?, ?, ?, ?)')

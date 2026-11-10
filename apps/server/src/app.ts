@@ -11,15 +11,15 @@ import { createSocketServer, type SocketServerOptions } from './realtime/socket-
 import { SessionStateService } from './modules/sessions/application/session-state-service.js';
 import { SessionLifecycleService } from './modules/sessions/application/session-lifecycle-service.js';
 import { SessionStatePublisher } from './realtime/session-state-publisher.js';
-import { createStudentRouter } from './api/student/student-router.js';
+import { createStudentRouter,type StudentSecurityOptions } from './api/student/student-router.js';
 import { createStudentRepositories } from './modules/student/persistence/index.js';
 import { StudentIdentityService } from './modules/student/application/student-identity-service.js';
 
-export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {}
+export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {readonly studentSecurity?:StudentSecurityOptions;}
 
 export function createApp(options: FoundationServerOptions = {}) {
   const app = express();
-  app.use('/api/v1', createApiRouter({ ...options, studentRouter: createStudentRouter() }));
+  app.use('/api/v1', createApiRouter({ ...options, studentRouter: createStudentRouter(options.database,options.studentSecurity,options.activityCodeRateLimit) }));
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;
@@ -49,6 +49,7 @@ export function startServer() {
 
   const { httpServer } = createHttpServer({
     database,
+    studentSecurity:config.studentCsrfSecret?{secret:config.studentCsrfSecret,allowedOrigins:config.studentAllowedOrigins,nodeEnv:config.nodeEnv}:undefined,
     studentSocket: {
       allowedOrigins: config.studentAllowedOrigins,
       resolveIdentity: (cookieHeader, sessionId) => studentIdentity.resolve(cookieHeader, sessionId),
