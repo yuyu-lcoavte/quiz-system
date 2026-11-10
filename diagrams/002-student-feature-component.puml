@@ -73,6 +73,13 @@ The `student_session` HttpOnly cookie uses Path=/ for Student HTTP and /socket.i
 the server validates handshake Origin and derives identity from the cookie mapping.
 end note
 
+note bottom of StudentClient
+Student UI uses acknowledged HTTP edits per Blank;
+DraftClient reconciles HTTP results and versioned Socket notifications.
+Focused and failed local input is preserved until saved/confirmed.
+Identity is restored through the opaque Cookie; no browser token storage.
+end note
+
 note bottom of Foundation
 Existing public HTTP/DTO/Socket.IO contracts remain unchanged.
 The synchronous Foundation transaction accepts a generic callback; Foundation does not import Student.

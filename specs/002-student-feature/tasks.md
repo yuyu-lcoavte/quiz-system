@@ -142,14 +142,14 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 
 **Purpose**: Fill the existing Foundation Student routes and layout after their server contracts are available. Keep UI tasks attached to the corresponding user story; no Teacher UI is included.
 
-- [ ] T047 [P] [US1] Add responsive and accessible interaction tests for join, membership, late enrollment, validation errors, and failed identity recovery in `tests/web/student-join-pages.test.tsx`.
-- [ ] T048 [P] [US2] Add responsive and accessible interaction tests for dynamic Blank/QuestionGroup rendering, collaborative draft state, leader-only submit controls, validation errors, and locked state in `tests/web/student-activity-draft.test.tsx`.
-- [ ] T049 [P] [US3] Add responsive and accessible interaction tests for Waiting/Ended restrictions, reconnect state, winner/no-winner projection, and result privacy in `tests/web/student-result-state.test.tsx`.
-- [ ] T050 [US1] Replace the existing `/student/join` placeholder with Activity Code lookup, restricted join options, validation errors, and existing-Team selection in `apps/web/src/pages/StudentJoinPlaceholder.tsx`.
-- [ ] T051 [US1] Implement Student enrollment/recovery client and membership view (Team, display name, leader status) in `apps/web/src/modules/student/student-identity-client.ts` and `apps/web/src/modules/student/StudentMembershipPanel.tsx`; never expose or persist the opaque cookie in JavaScript storage.
-- [ ] T052 [US2] Implement a data-driven target editor for one Question with multiple Blanks and a QuestionGroup with multiple Questions in `apps/web/src/modules/student/StudentTargetEditor.tsx`; render controls from received Blank data and never parse Excel or hard-code counts.
-- [ ] T053 [US2] Implement shared draft view, leader-only submit control, pending/success/failure feedback, and read-only locked state in `apps/web/src/modules/student/StudentDraftPanel.tsx` and `apps/web/src/modules/student/StudentSubmissionControls.tsx`.
-- [ ] T054 [US3] Replace the existing `/student/session/:sessionId` placeholder with Waiting/Active/Ended panels, Round changes, and connection recovery messaging in `apps/web/src/pages/StudentSessionPlaceholder.tsx`; render the Student result panel only after Ended.
+- [X] T047 [P] [US1] Add responsive and accessible interaction tests for join, membership, late enrollment, validation errors, and failed identity recovery in `tests/web/student-join-pages.test.tsx`.
+- [X] T048 [P] [US2] Add responsive and accessible interaction tests for dynamic Blank/QuestionGroup rendering, collaborative draft state, leader-only submit controls, validation errors, and locked state in `tests/web/student-activity-draft.test.tsx`.
+- [X] T049 [P] [US3] Add responsive and accessible interaction tests for Waiting/Ended restrictions, reconnect state, winner/no-winner projection, and result privacy in `tests/web/student-result-state.test.tsx`.
+- [X] T050 [US1] Replace the existing `/student/join` placeholder with Activity Code lookup, restricted join options, validation errors, and existing-Team selection in `apps/web/src/pages/StudentJoinPlaceholder.tsx`.
+- [X] T051 [US1] Implement Student enrollment/recovery client and membership view (Team, display name, leader status) in `apps/web/src/modules/student/student-identity-client.ts` and `apps/web/src/modules/student/StudentMembershipPanel.tsx`; never expose or persist the opaque cookie in JavaScript storage.
+- [X] T052 [US2] Implement a data-driven target editor for one Question with multiple Blanks and a QuestionGroup with multiple Questions in `apps/web/src/modules/student/StudentTargetEditor.tsx`; render controls from received Blank data and never parse Excel or hard-code counts.
+- [X] T053 [US2] Implement shared draft view, leader-only submit control, pending/success/failure feedback, and read-only locked state in `apps/web/src/modules/student/StudentDraftPanel.tsx` and `apps/web/src/modules/student/StudentSubmissionControls.tsx`.
+- [X] T054 [US3] Replace the existing `/student/session/:sessionId` placeholder with Waiting/Active/Ended panels, Round changes, and connection recovery messaging in `apps/web/src/pages/StudentSessionPlaceholder.tsx`; render the Student result panel only after Ended.
 
 ---
 

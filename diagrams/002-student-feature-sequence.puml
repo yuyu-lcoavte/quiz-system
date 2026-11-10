@@ -62,14 +62,25 @@ DraftSocket -> DB : read/create Team × Round draft
 DB --> DraftSocket : latest persisted version and answers
 DraftSocket --> UI : student:draft:snapshot
 Student -> UI : edit a Blank
+alt Student UI uses acknowledged HTTP edit
+  UI -> StudentApi : PUT draft answer + CSRF + mutation ID
+  StudentApi -> DB : shared DraftService immediate transaction; validate and persist edit/version
+  DB --> StudentApi : committed change
+  StudentApi --> DraftSocket : publish committed change to authorized Team/Round subscribers
+  DraftSocket --> UI : student:draft:changed
+  StudentApi --> UI : accepted change HTTP response
+else supported Socket edit path
 UI -> DraftSocket : student:draft:edit + CSRF token + mutation ID
 DraftSocket -> DB : BEGIN IMMEDIATE; validate actor/target/unlocked draft
 DraftSocket -> DB : upsert Blank; increment version; COMMIT
 DB --> DraftSocket : committed version/value
 DraftSocket --> UI : student:draft:changed to server-derived Team/Round room
+end
 note over UI,DraftSocket
 Same-Blank conflict: last server-accepted edit wins.
 Refresh/reconnect uses persisted snapshot; Foundation state events carry no answers.
+The UI serializes writes per Blank and retains focused/unsaved input.
+Remote differences are indicated; submission waits for saved authoritative values.
 end note
 
 == Submission ==

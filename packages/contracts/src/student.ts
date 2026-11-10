@@ -11,6 +11,7 @@ export interface StudentEnrollmentRequest {
 }
 
 export interface StudentMembershipView {
+  displayName?: string;
   sessionId: UUID;
   participantId: UUID;
   team: { teamId: UUID; name: string };

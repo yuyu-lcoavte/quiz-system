@@ -102,6 +102,7 @@ export function startServer() {
   httpServer.listen(port, '127.0.0.1', () => {
     console.info(`Shared server listening on http://127.0.0.1:${port}`);
     console.info(`SQLite file configured at ${config.sqlitePath}`);
+    console.info(`Runtime: ${config.nodeEnv}; Student origins: ${config.studentAllowedOrigins.join(', ')}; CSRF secret configured: ${config.studentCsrfSecret !== null}`);
   });
   return httpServer;
 }

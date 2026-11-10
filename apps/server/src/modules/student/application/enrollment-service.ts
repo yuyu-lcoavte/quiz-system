@@ -16,7 +16,7 @@ export class EnrollmentService {
   const identity=this.identity.resolve(cookie,sessionId);if(!identity)throw new HttpError(401,'UNAUTHENTICATED','Valid Student identity required.');
   const p=this.foundation.participants.findById(identity.actorContext.actorId as UUID)!;
   const team=this.foundation.teams.listBySession(sessionId).find(t=>t.id===p.teamId)!;
-  return {sessionId,participantId:p.id,team:{teamId:team.id,name:team.name},isLeader:this.student.teamLeaders.findByTeamId(team.id)?.participantId===p.id};
+  return {sessionId,participantId:p.id,displayName:p.displayName??'',team:{teamId:team.id,name:team.name},isLeader:this.student.teamLeaders.findByTeamId(team.id)?.participantId===p.id};
  }
  enroll(sessionId:UUID,input:StudentEnrollmentRequest,cookie:string|undefined,csrfToken?:string){
   return this.database.transaction(()=>{

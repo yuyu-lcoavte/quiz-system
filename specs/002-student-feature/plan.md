@@ -10,6 +10,8 @@ Implement Student as a module in the existing React/Vite application and Express
 
 ## Technical Context
 
+Student UI serializes acknowledged HTTP edits per Blank and feeds their committed changes into the existing DraftClient, alongside Socket snapshots/change/lock notifications. Focused or failed local input is preserved; pending writes or unresolved remote differences block submission. This uses the same DraftService and existing HTTP/Socket contracts.
+
 Submission uses the transaction's persisted draft as answer authority. The unchanged Student request answers are compared to that draft for stale-screen detection. Successful submission advances the draft version and publishes the existing locked event only after Commit.
 
 Draft retry persistence uses additive `003-student-draft-mutations.sql`: receipts are keyed by Team/Round/mutation ID, committed atomically with the draft edit, and reused across HTTP and Socket retries. Foundation entities and external contracts remain unchanged.
