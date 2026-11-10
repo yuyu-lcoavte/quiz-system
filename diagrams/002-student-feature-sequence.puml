@@ -74,10 +74,11 @@ end note
 
 == Submission ==
 Student -> UI : submit complete answers (leader only)
-UI -> StudentApi : POST submission (no Team, role or acceptedOrder)
+UI -> StudentApi : POST submission (answers confirm draft; no Team, role or acceptedOrder)
 StudentApi -> DB : BEGIN IMMEDIATE
 StudentApi -> DB : revalidate leader, Active/current Round, exact target Blanks and no prior Submission
-StudentApi -> DB : assign next acceptedOrder; insert Submission/answers; lock draft
+StudentApi -> DB : load authoritative draft; reject mismatched request confirmation
+StudentApi -> DB : assign next acceptedOrder; insert Submission/draft answers; increment version and lock draft
 DB --> StudentApi : committed Submission + locked draft
 StudentApi --> UI : accepted outcome for this Team
 StudentApi --> DraftSocket : publish student:draft:locked after commit

@@ -84,15 +84,15 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 
 ### Tests for User Story 2 Drafts
 
-- [ ] T027 [P] [US2] Add draft HTTP and Socket.IO tests for browser transmission of the `student_session` cookie to `/socket.io`, authorized handshake identity derived from that cookie, missing/expired/unmapped cookie rejection, wrong-Origin rejection, forged client identity rejection, membership, current Active Round, dynamic Blank ownership, Origin/CSRF, stale versions, idempotent mutation IDs, locked-draft rejection, and committed edit delivery to a second authorized client within 2 seconds under normal local connection in `tests/api/student-draft.test.ts` and `tests/realtime/student-draft.test.ts`.
-- [ ] T028 [P] [US2] Add persistence/transaction tests for one Team×Round draft, one current value per Blank, monotonic version/revision, same-Blank last-server-commit-wins, and no cross-Session relation in `tests/integration/student-draft-persistence.test.ts`.
+- [X] T027 [P] [US2] Add draft HTTP and Socket.IO tests for browser transmission of the `student_session` cookie to `/socket.io`, authorized handshake identity derived from that cookie, missing/expired/unmapped cookie rejection, wrong-Origin rejection, forged client identity rejection, membership, current Active Round, dynamic Blank ownership, Origin/CSRF, stale versions, idempotent mutation IDs, locked-draft rejection, and committed edit delivery to a second authorized client within 2 seconds under normal local connection in `tests/api/student-draft.test.ts` and `tests/realtime/student-draft.test.ts`.
+- [X] T028 [P] [US2] Add persistence/transaction tests for one Team×Round draft, one current value per Blank, monotonic version/revision, same-Blank last-server-commit-wins, and no cross-Session relation in `tests/integration/student-draft-persistence.test.ts`.
 
 ### Implementation for User Story 2 Drafts
 
-- [ ] T029 [US2] Implement the draft application service in `apps/server/src/modules/student/application/draft-service.ts`; derive Team from ActorContext, require the current Active Round and target Blank, commit each edit/version before emitting, and reject Waiting, Ended, stale target, or locked-draft mutations.
-- [ ] T030 [US2] Implement draft snapshot and answer-edit endpoints in `apps/server/src/api/student/draft-controller.ts` and `apps/server/src/api/student/student-router.ts`; reuse the same DraftService as Socket.IO and return the authenticated Team's snapshot only.
-- [ ] T031 [US2] Implement `student:draft:watch`, `student:draft:edit`, `student:draft:snapshot`, `student:draft:changed`, and safe error handling in `apps/server/src/modules/student/realtime/student-draft-socket.ts`; validate handshake Origin, resolve the `student_session` cookie to server-trusted Participant/Team, reject missing or unauthorized identity before room join, join only the server-computed Team/Round room, and publish state changes only after database commit.
-- [ ] T032 [US2] Implement version-aware draft HTTP/Socket client reconciliation and reconnect snapshot recovery in `apps/web/src/modules/student/draft-client.ts`; ignore non-increasing versions and never treat client timestamps or `baseVersion` as authoritative order.
+- [X] T029 [US2] Implement the draft application service in `apps/server/src/modules/student/application/draft-service.ts`; derive Team from ActorContext, require the current Active Round and target Blank, commit each edit/version before emitting, and reject Waiting, Ended, stale target, or locked-draft mutations.
+- [X] T030 [US2] Implement draft snapshot and answer-edit endpoints in `apps/server/src/api/student/draft-controller.ts` and `apps/server/src/api/student/student-router.ts`; reuse the same DraftService as Socket.IO and return the authenticated Team's snapshot only.
+- [X] T031 [US2] Implement `student:draft:watch`, `student:draft:edit`, `student:draft:snapshot`, `student:draft:changed`, and safe error handling in `apps/server/src/modules/student/realtime/student-draft-socket.ts`; validate handshake Origin, resolve the `student_session` cookie to server-trusted Participant/Team, reject missing or unauthorized identity before room join, join only the server-computed Team/Round room, and publish state changes only after database commit.
+- [X] T032 [US2] Implement version-aware draft HTTP/Socket client reconciliation and reconnect snapshot recovery in `apps/web/src/modules/student/draft-client.ts`; ignore non-increasing versions and never treat client timestamps or `baseVersion` as authoritative order.
 
 ---
 
@@ -104,15 +104,15 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 
 ### Tests for User Story 2 Submission
 
-- [ ] T033 [P] [US2] Add submission contract/domain tests for leader-only authorization, Active/current target, exact Blank coverage, non-whitespace values, empty Question/QuestionGroup target, forged fields, and same-Session membership in `tests/api/student-submission.test.ts`.
-- [ ] T034 [P] [US2] Add SQLite transaction tests for unique Team/Round Submission, unique acceptedOrder, concurrent submissions, rollback on insert/lock failure, and Submission+draft lock atomicity in `tests/integration/student-submission-transaction.test.ts`.
+- [X] T033 [P] [US2] Add submission contract/domain tests for leader-only authorization, Active/current target, exact Blank coverage, non-whitespace values, empty Question/QuestionGroup target, forged fields, and same-Session membership in `tests/api/student-submission.test.ts`.
+- [X] T034 [P] [US2] Add SQLite transaction tests for unique Team/Round Submission, unique acceptedOrder, concurrent submissions, rollback on insert/lock failure, and Submission+draft lock atomicity in `tests/integration/student-submission-transaction.test.ts`.
 
 ### Implementation for User Story 2 Submission
 
-- [ ] T035 [US2] Implement target completeness and leader validators in `apps/server/src/modules/student/domain/submission-validation.ts`; derive the required Blank set from the current Question or QuestionGroup and reject any empty/non-whitespace-incomplete target.
-- [ ] T036 [US2] Implement the submission transaction in `apps/server/src/modules/student/application/submission-service.ts`; under `BEGIN IMMEDIATE`, revalidate ActorContext, leader, Session/current Active Round, exact target Blank set and duplicate state, assign `MAX(accepted_order)+1`, write canonical Foundation Submission/SubmissionAnswers, and lock TeamRoundDraft before commit.
-- [ ] T037 [US2] Implement `POST /api/v1/student/sessions/{sessionId}/rounds/{roundId}/submissions` in `apps/server/src/api/student/submission-controller.ts`; reject client-supplied Team, Participant, role, acceptedOrder, Submission ID, or timestamp as authority and return the submitting Team's accepted outcome only.
-- [ ] T038 [US2] Add post-commit `student:draft:locked` publication and tests in `apps/server/src/modules/student/realtime/student-draft-socket.ts` and `tests/integration/student-submission-transaction.test.ts`; failed or rolled-back submission must neither lock nor notify.
+- [X] T035 [US2] Implement target completeness and leader validators in `apps/server/src/modules/student/domain/submission-validation.ts`; derive the required Blank set from the current Question or QuestionGroup and reject any empty/non-whitespace-incomplete target.
+- [X] T036 [US2] Implement the submission transaction in `apps/server/src/modules/student/application/submission-service.ts`; under `BEGIN IMMEDIATE`, revalidate ActorContext, leader, Session/current Active Round, exact target Blank set and duplicate state, assign `MAX(accepted_order)+1`, write canonical Foundation Submission/SubmissionAnswers, and lock TeamRoundDraft before commit.
+- [X] T037 [US2] Implement `POST /api/v1/student/sessions/{sessionId}/rounds/{roundId}/submissions` in `apps/server/src/api/student/submission-controller.ts`; reject client-supplied Team, Participant, role, acceptedOrder, Submission ID, or timestamp as authority and return the submitting Team's accepted outcome only.
+- [X] T038 [US2] Add post-commit `student:draft:locked` publication and tests in `apps/server/src/modules/student/realtime/student-draft-socket.ts` and `tests/integration/student-submission-transaction.test.ts`; failed or rolled-back submission must neither lock nor notify.
 
 ---
 

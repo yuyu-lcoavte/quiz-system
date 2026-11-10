@@ -169,6 +169,8 @@
 
 ## Dependencies and Compatibility
 
+- Submission clarification: the persisted Team/Round draft is authoritative. The existing request answers only confirm the displayed draft; stale or mismatched confirmation is rejected. Under the same immediate transaction the server reads draft values, creates the canonical Submission/Answers, assigns acceptedOrder and advances the draft version while locking it. No client-provided answer or leader claim overrides persisted state.
+
 - Reuse the Foundation Activity Code lookup, Session/state/current-target/results reads, common success/error envelope, verified `ActorContext`, shared entity semantics, acceptedOrder persistence boundary, lifecycle state and Socket.IO snapshot/event contract.
 - Foundation already enforces no question-content access for Participants while Waiting and allows the authorized Participant to read the target in Active; Student UI must reflect but cannot replace those backend checks.
 - Foundation shared routes are `/student/join` and `/student/session/:sessionId`; this Feature fills those module entry points without changing route names.

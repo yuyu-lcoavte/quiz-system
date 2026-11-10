@@ -10,6 +10,10 @@ Implement Student as a module in the existing React/Vite application and Express
 
 ## Technical Context
 
+Submission uses the transaction's persisted draft as answer authority. The unchanged Student request answers are compared to that draft for stale-screen detection. Successful submission advances the draft version and publishes the existing locked event only after Commit.
+
+Draft retry persistence uses additive `003-student-draft-mutations.sql`: receipts are keyed by Team/Round/mutation ID, committed atomically with the draft edit, and reused across HTTP and Socket retries. Foundation entities and external contracts remain unchanged.
+
 **Language/Version**: TypeScript; Node.js 22.12+ as established by Foundation.
 
 **Primary Dependencies**: Existing React 19, React Router 7, Vite 7, Tailwind CSS 4, Express 5, Socket.IO 4, `better-sqlite3`, Vitest, Supertest and `socket.io-client`; add `cookie` as a direct server dependency for consistent Express/Socket.IO cookie parsing and serialization (already present transitively in the lockfile). Use existing `fetch` and state-client patterns.

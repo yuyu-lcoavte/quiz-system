@@ -130,6 +130,8 @@ Application validation remains responsible for authorization and temporal rules 
 
 ### Submission
 
+The submission transaction reads authoritative answers from the persisted Team/Round draft. Request answers are only a complete-match confirmation; mismatches reject with STALE_STATE. The lock advances the draft version once, in the same transaction as canonical Submission and SubmissionAnswer writes.
+
 `BEGIN IMMEDIATE`: resolve actor and Team from trusted context; verify current leader; reload Session/current Round and Active phase; derive expected Blank set from canonical current target; require exactly one non-whitespace answer for every answerable Blank (a zero-Blank target is not submittable); verify values and same-Session links; reject any existing Team/Round Submission; assign `MAX(accepted_order)+1` while holding the SQLite writer lock; insert canonical Submission and SubmissionAnswers; set TeamRoundDraft to locked; commit. Foundation uniqueness remains a final guard. Notify clients only after commit.
 
 ### End and winner
@@ -141,6 +143,8 @@ Foundation's internal lifecycle transaction takes `BEGIN IMMEDIATE`, verifies th
 After Ended, verify the Student belongs to the same Session and query only the Foundation Result's winning Submission, Team name and answer rows. Do not return other submissions, acceptedOrder, or losing Team data. A no-winner End returns an explicit projection with `winner: null`.
 
 ## Validation Rules
+
+Draft retry receipts are persisted in `student_draft_mutations` by `(teamId, roundId, clientMutationId)` and reference the existing draft. Each receipt stores the accepted request fingerprint and original committed change. The receipt, answer and version are written in the same immediate transaction. Replays return the original result without increasing the version or broadcasting again; reuse with different content is rejected. This requires additive migration `003-student-draft-mutations.sql` and no Foundation table replacement.
 
 1. Every Student actor is derived from a valid, unexpired, non-revoked browser credential plus the requested Session's server-side Participant association.
 2. Participant membership is determined from canonical `participants.team_id` and canonical Team/Session relations.

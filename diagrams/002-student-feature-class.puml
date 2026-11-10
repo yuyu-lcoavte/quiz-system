@@ -87,6 +87,15 @@ class TeamRoundDraftAnswer <<Student>> {
   value: string
   revision: integer
 }
+class DraftMutationReceipt <<Student persistence>> {
+  teamId
+  roundId
+  clientMutationId
+  requestFingerprint
+  committedChange
+}
+TeamRoundDraft "1" *-- "0..*" DraftMutationReceipt : idempotent retries
+
 class StudentResultView <<DTO>> {
   roundId: UUID
   winner: WinningTeamView?

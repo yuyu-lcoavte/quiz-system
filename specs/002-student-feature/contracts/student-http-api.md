@@ -99,6 +99,8 @@ Only the verified current Team leader may submit. Body:
 
 No `teamId`, `participantId`, `isLeader`, `acceptedOrder`, `submissionId` or client timestamp is accepted as authority. Server derives identity and Team, validates Active/current target and exact required Blank coverage, assigns the next `acceptedOrder` inside its immediate transaction, inserts canonical Foundation Submission/SubmissionAnswers and locks the Team/Round draft atomically.
 
+The persisted Team/Round draft is the answer authority. The existing request `answers` is a confirmation of what the submitting leader saw: it must exactly match the complete persisted draft, otherwise return `409 STALE_STATE`. Values written to SubmissionAnswer are loaded from that draft inside the same transaction, never copied from request JSON. No automatic grading is performed. Locking increments the draft version so reconnect snapshots and `student:draft:locked` remain monotonic.
+
 Success returns the accepted submission ID and `acceptedOrder` for the submitting Team only, plus draft status `locked`. The result is not a winner announcement. A later same-Team/Round submission returns `409 DUPLICATE_SUBMISSION`.
 
 ## Student Result Projection
