@@ -20,12 +20,22 @@ import { studentDraftRoomName } from './modules/student/realtime/student-draft-r
 import type { StudentEventSocket } from './modules/student/realtime/student-draft-socket.js';
 import { publishStudentDraftLock } from './modules/student/realtime/student-draft-socket.js';
 import { SubmissionService } from './modules/student/application/submission-service.js';
+import { parseUUID } from '@quiz/contracts/domain';
+import { getStudentSocketIdentity } from './modules/student/realtime/student-draft-socket.js';
 
 export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {readonly studentSecurity?:StudentSecurityOptions;readonly studentDraftService?:DraftService;readonly studentSubmissionService?:SubmissionService;}
 
 export function createApp(options: FoundationServerOptions = {}) {
   const app = express();
-  app.use('/api/v1', createApiRouter({ ...options, studentRouter: createStudentRouter(options.database,options.studentSecurity,options.activityCodeRateLimit,options.studentDraftService,options.studentSubmissionService) }));
+  const identity = options.database ? new StudentIdentityService(createStudentRepositories(options.database)) : null;
+  app.use('/api/v1', createApiRouter({ ...options,
+    resolveActorContext: request => {
+      const supplied = options.resolveActorContext?.(request);
+      if (supplied) return supplied;
+      const scope = parseUUID(/^\/sessions\/([^/]+)(?:\/|$)/.exec(request.path)?.[1]);
+      return scope ? identity?.resolve(request.headers.cookie, scope)?.actorContext ?? null : null;
+    },
+    studentRouter: createStudentRouter(options.database,options.studentSecurity,options.activityCodeRateLimit,options.studentDraftService,options.studentSubmissionService) }));
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;
@@ -46,8 +56,18 @@ export function createHttpServer(options: FoundationServerOptions = {}) {
   const app = createApp({...options,studentDraftService:draft,studentSubmissionService:submission});
   const httpServer = createServer(app);
   const stateService = options.database ? new SessionStateService(options.database) : null;
+  const studentActors = new WeakSet<object>();
   socketServer = createSocketServer(httpServer, {
     ...options,
+    resolveSocketActorContext: socket => {
+      const scope = getStudentSocketIdentity(socket)?.sessionId;
+      const resolved = scope ? studentSocket?.resolveIdentity(socket.request.headers.cookie, scope) : null;
+      if (resolved) { studentActors.add(resolved.actorContext); return resolved.actorContext; }
+      return options.resolveSocketActorContext?.(socket) ?? null;
+    },
+    authorizeWatch: (actor, scope) => studentActors.has(actor)
+      ? actor.actorKind === 'participant' && actor.sessionId === scope && actor.permissions.includes('session:watch')
+      : options.authorizeWatch?.(actor, scope) ?? false,
     studentSocket:studentSocket?{...studentSocket,draftService:draft,csrf:options.studentSecurity?createStudentCsrfService({secret:options.studentSecurity.secret}):undefined}:undefined,
     getSessionState: options.getSessionState ?? (stateService ? (sessionId) => stateService.getSnapshot(sessionId) : undefined),
   });

@@ -124,17 +124,17 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 
 ### Tests for User Story 3
 
-- [ ] T039 [P] [US3] Add state-client tests for Session matching, stale `stateVersion`, reconnect/resubscribe authoritative snapshot, no answer data in Foundation events, and displaying a normal-connection state change within 2 seconds in `tests/web/student-session-state.test.ts`.
-- [ ] T040 [P] [US3] Add result projection tests for Ended gating, winner Team/answer allowlist, no loser/acceptedOrder leakage, new Round isolation, and no-winner projection in `tests/api/student-result.test.ts`.
+- [X] T039 [P] [US3] Add state-client tests for Session matching, stale `stateVersion`, reconnect/resubscribe authoritative snapshot, no answer data in Foundation events, and displaying a normal-connection state change within 2 seconds in `tests/web/student-session-state.test.ts`.
+- [X] T040 [P] [US3] Add result projection tests for Ended gating, winner Team/answer allowlist, no loser/acceptedOrder leakage, new Round isolation, and no-winner projection in `tests/api/student-result.test.ts`.
 - [ ] T041 [US3] Add Submit-vs-End transaction race tests for both lock orders, result replacement, no Submission, injected resolver failure, rollback, and post-commit-only broadcast in `tests/integration/student-end-race.test.ts`. **Blocked until T004 review** confirms the same-connection callback contract.
 
 ### Implementation for User Story 3
 
-- [ ] T042 [US3] Integrate the existing Foundation `SessionStateClient` into the Student activity route in `apps/web/src/modules/student/student-session-state.ts`; display authoritative state and Round reference, ignore stale versions, and resubscribe/reconcile on reconnect without duplicating Foundation Socket.IO events.
-- [ ] T043 [US3] Implement the synchronous Student winner resolver over canonical accepted Submissions in `apps/server/src/modules/student/application/winner-resolver.ts`; order by persisted `accepted_order`, construct the canonical Foundation Result candidate, and return `null` when no valid Submission exists without writing Result or publishing state.
+- [X] T042 [US3] Integrate the existing Foundation `SessionStateClient` into the Student activity route in `apps/web/src/modules/student/student-session-state.ts`; display authoritative state and Round reference, ignore stale versions, and resubscribe/reconcile on reconnect without duplicating Foundation Socket.IO events.
+- [X] T043 [US3] Implement the synchronous Student winner resolver over canonical accepted Submissions in `apps/server/src/modules/student/application/winner-resolver.ts`; order by persisted `accepted_order`, construct the canonical Foundation Result candidate, and return `null` when no valid Submission exists without writing Result or publishing state.
 - [ ] T044 [US3] Add the minimal Foundation internal lifecycle port that accepts a synchronous winner callback using the same `Database` connection and `BEGIN IMMEDIATE` transaction in `apps/server/src/modules/sessions/application/foundation-transactions.ts` and `apps/server/src/modules/sessions/application/session-lifecycle-service.ts`; persist Ended/stateVersion/Result atomically, clear the prior logical-target Result on no winner, and publish only after commit. **Blocked until T004 review**; do not change Foundation public HTTP, DTO, or Socket.IO contracts.
 - [ ] T045 [US3] After T043 and T044, implement the single synchronous `StudentTrustedEndCoordinator.endRound(input, actorContext)` in `apps/server/src/modules/student/application/student-trusted-end-coordinator.ts`; validate the reviewed Teacher scope/capability and call the Foundation lifecycle port once with the synchronous Student resolver. **Blocked until T004 review**; Teacher must not call resolver and Foundation End separately.
-- [ ] T046 [US3] Implement the Student-only Ended result projection and route in `apps/server/src/modules/student/application/student-result-service.ts` and `apps/server/src/api/student/result-controller.ts`; require enrolled Participant context and return only winning Team name/answers or `winner: null`.
+- [X] T046 [US3] Implement the Student-only Ended result projection and route in `apps/server/src/modules/student/application/student-result-service.ts` and `apps/server/src/api/student/result-controller.ts`; require enrolled Participant context and return only winning Team name/answers or `winner: null`.
 
 ---
 

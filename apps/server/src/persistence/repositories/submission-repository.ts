@@ -22,6 +22,11 @@ export class SubmissionRepository {
     const row = this.database.prepare('SELECT * FROM submissions WHERE id = ?').get(id) as SubmissionRow | undefined;
     return row ? mapSubmission(row) : null;
   }
+
+  findFirstByRound(roundId: UUID): Submission | null {
+    const row = this.database.prepare('SELECT * FROM submissions WHERE round_id = ? ORDER BY accepted_order ASC LIMIT 1').get(roundId) as SubmissionRow | undefined;
+    return row ? mapSubmission(row) : null;
+  }
 }
 
 export class SubmissionAnswerRepository {

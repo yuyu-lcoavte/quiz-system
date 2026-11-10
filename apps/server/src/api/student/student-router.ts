@@ -15,6 +15,8 @@ import { DraftService } from '../../modules/student/application/draft-service.js
 import { createDraftController } from './draft-controller.js';
 import { SubmissionService } from '../../modules/student/application/submission-service.js';
 import { createSubmissionController } from './submission-controller.js';
+import { StudentResultService } from '../../modules/student/application/student-result-service.js';
+import { createStudentResultController } from './result-controller.js';
 
 export interface StudentSecurityOptions {secret:string;allowedOrigins:readonly string[];nodeEnv?:'development'|'test'|'production';}
 
@@ -26,6 +28,7 @@ export function createStudentRouter(database?:Database.Database,security?:Studen
   const csrf=createStudentCsrfService({secret:security.secret});const service=new EnrollmentService(database,csrf);
   const controller=createEnrollmentController(service,security.nodeEnv??'development');
   const origin=createStudentOriginMiddleware(security.allowedOrigins);const identity=createStudentIdentityMiddleware(service.identity);
+  router.get('/sessions/:sessionId/rounds/:roundId/result',identity,createStudentResultController(new StudentResultService(database)));
   router.post('/sessions/:sessionId/rounds/:roundId/submissions',origin,identity,createStudentCsrfMiddleware(csrf),createSubmissionController(submissionService??new SubmissionService(database)));
   const draft=createDraftController(draftService??new DraftService(database));
   router.get('/sessions/:sessionId/rounds/:roundId/draft',identity,draft.snapshot);
