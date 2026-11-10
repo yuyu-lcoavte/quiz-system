@@ -1,0 +1,45 @@
+@startuml
+title Student Feature — Component Diagram (Specify)
+left to right direction
+skinparam componentStyle rectangle
+
+actor Student
+component "Student Web Experience\nJoin / Activity / Answers / Results" as StudentUI
+component "Student Feature Services\nIdentity · Enrollment · Team Choice\nShared Draft · Submission · Result View" as StudentServices
+component "Shared Foundation\nSession · Round · Target · State" as Foundation
+component "Shared Data Model\nParticipant · Team · Submission\nSubmissionAnswer · Result" as SharedData
+component "Teacher Feature\nActivity / Teams / Targets / Lifecycle" as Teacher
+cloud "Connected clients\nSession state notifications" as Realtime
+
+Student --> StudentUI
+StudentUI --> StudentServices : student actions
+StudentServices --> Foundation : verified reads / shared lifecycle data
+StudentServices --> SharedData : student-owned membership and submissions
+Foundation --> SharedData : shared concepts and persistence boundary
+Teacher --> Foundation : provides activity targets and lifecycle
+Foundation --> Realtime : phase snapshots
+Realtime --> StudentUI : current state and changes
+Teacher --> SharedData : prepares activity data
+
+note bottom of StudentServices
+Participant identity is activity-scoped, passwordless,
+and recoverable in the same browser; credential mechanics
+remain for Plan. Student Feature persists and immediately
+shares team drafts; accepted submission makes the draft
+read-only. Student Feature selects the first accepted submission
+and provides the student result projection. Teacher calls the
+trusted resolver before Foundation's existing End transaction;
+coordinate that internal boundary with Teacher Feature. Do not
+extend Foundation state events or public contracts with answers.
+If the leader cannot return, authorized Teacher transfer
+requires coordination with Teacher Feature.
+Student-supplied role, Team ID and acceptedOrder
+are never authoritative.
+end note
+
+note bottom of Foundation
+Reuse existing shared routes, read contracts,
+ActorContext boundary and Socket.IO state contract.
+Do not change Foundation contracts in Specify.
+end note
+@enduml

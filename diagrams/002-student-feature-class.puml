@@ -1,0 +1,87 @@
+@startuml
+title Student Feature — Class Diagram (Specify)
+hide methods
+skinparam classAttributeIconSize 0
+
+class Session
+class Team
+class Participant {
+  identity: activity-scoped, server-verified
+  recovery: same browser
+}
+class Round {
+  phase: Waiting | Active | Ended
+}
+class Question
+class Blank
+class QuestionGroup
+class Submission {
+  acceptedOrder: server-assigned
+}
+class SubmissionAnswer
+class Result
+class SessionStateSnapshot
+class TeamAnswerDraft {
+  scope: one Team + one Round
+  storage: Student Feature server
+  conflict: last accepted edit wins
+  after submission: read-only
+}
+class DraftAnswer
+
+Session "1" -- "0..*" Team : contains
+Session "1" -- "0..*" Round : has attempts
+Team "1" -- "0..*" Participant : members
+Team "1" -- "0..*" Submission : submits
+Round "1" -- "0..*" Submission : receives
+Round "0..*" --> "1" Question : targets one
+Round "0..*" --> "1" QuestionGroup : or targets one
+Question "1" *-- "0..*" Blank : independent answers
+QuestionGroup "0..1" -- "0..*" Question : groups questions
+Submission "1" *-- "0..*" SubmissionAnswer : stores
+SubmissionAnswer "0..*" --> "1" Blank : answers
+Round "1" -- "0..1" Result : publishes when ended
+Result "0..*" --> "1" Submission : winning submission
+SessionStateSnapshot ..> Session : phase / version / target reference
+TeamAnswerDraft ..> Participant : edited by team members
+Team "1" -- "0..*" TeamAnswerDraft : drafts
+Round "1" -- "0..*" TeamAnswerDraft : drafts
+TeamAnswerDraft "1" *-- "0..*" DraftAnswer : stores current values
+DraftAnswer "0..*" --> "1" Blank : answers
+
+note right of Team
+Only the first joined Participant is the confirmed
+group leader, chosen atomically by the server.
+Transient disconnect preserves leadership. A pre-start
+team change requires explicit handoff; an unrecoverable
+leader requires authorized Teacher transfer.
+end note
+
+note right of Participant
+No reusable student account/password.
+Server creates and restores the activity identity;
+credential mechanics remain for Plan.
+end note
+
+note bottom of QuestionGroup
+QuestionGroup is a multi-Question target.
+It is distinct from one Question with many Blanks.
+Empty groups cannot be Round targets.
+end note
+
+note right of Result
+After Ended, Student sees only the winning Team name
+and its accepted answers. Student Feature selects the
+earliest accepted Submission and supplies a student-only
+result projection. Teacher hands that winner to Foundation's
+existing End transaction; no public contract change.
+end note
+
+note bottom of TeamAnswerDraft
+Student Feature server stores and immediately shares the draft;
+the last server-accepted edit for a Blank is current. Every Blank
+must be complete before submit; after accepted submission the draft
+is read-only. Exact storage and protocol remain for Plan; Foundation
+state events carry no draft answers.
+end note
+@enduml

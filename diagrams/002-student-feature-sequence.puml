@@ -1,0 +1,88 @@
+@startuml
+title Student Feature — Sequence Diagram (Specify)
+autonumber
+
+actor Student
+participant "Student Experience" as UI
+participant "Student Feature" as SF
+participant "Shared Foundation" as Foundation
+participant "Shared Session Data" as Data
+actor Teacher
+
+Student -> UI : enter Activity Code
+UI -> SF : request activity lookup
+SF -> Foundation : restricted anonymous lookup
+Foundation -> Data : resolve code and phase
+Data --> Foundation : activity summary
+Foundation --> SF : limited summary
+SF --> UI : show activity and join choices
+
+Student -> UI : choose Team and join
+UI -> SF : join request
+SF -> SF : establish verified activity-scoped Participant identity\n[passwordless; recoverable in same browser]
+SF -> Data : create or confirm membership
+Data --> SF : membership relation
+SF --> UI : joined activity
+note over SF,Data
+The server atomically assigns the first successful member as leader.
+Transient disconnect preserves that role; pre-start team change needs
+explicit handoff. Permanent loss requires authorized Teacher transfer.
+end note
+
+UI -> Foundation : watch Session
+Foundation -> Foundation : authorize verified ActorContext
+Foundation --> UI : latest SessionStateSnapshot
+Foundation --> UI : session:state:changed on later updates
+
+alt Waiting or no current Round
+  UI -> UI : show waiting; do not request target content
+else Active
+  UI -> Foundation : request current target
+  Foundation -> Foundation : enforce Participant, Team and Active phase
+  Foundation -> Data : read Question / QuestionGroup / Blanks
+  Data --> Foundation : structured target
+  Foundation --> UI : current target
+  Student -> UI : edit one or more answers
+  UI -> SF : update shared Team/Round draft
+  SF -> SF : persist accepted Blank value\n[Student-owned persistence]
+  SF --> UI : share updated draft with team members
+  note over UI,SF
+  Same-Blank conflicts use the last server-accepted edit.
+  Reload/reconnect restores the saved draft. This is Student-owned;
+  Foundation state events do not carry answer drafts.
+  end note
+  opt authorized team leader submits
+    Student -> UI : submit answers
+    UI -> SF : submit current Round and Blank values
+    SF -> SF : verify actor, leader, phase, values and no prior Team/Round submission
+    SF -> Data : persist one Submission and SubmissionAnswers\nwith server-assigned acceptedOrder
+    Data --> SF : accepted Submission or validation/conflict error
+    SF --> UI : submission outcome
+    alt Submission accepted
+      SF -> SF : freeze shared draft as read-only
+      SF --> UI : notify team members that draft is locked
+    else Submission rejected
+      SF --> UI : keep draft editable; show safe error
+    end
+  end
+end
+
+Teacher -> SF : request winner for Round during End
+SF -> Data : select earliest accepted Submission by acceptedOrder
+Data --> SF : winning Submission or no winner
+SF --> Teacher : trusted winner candidate
+Teacher -> Foundation : end Round with supplied winner (or none)
+Foundation -> Data : commit Ended state and supplied Result atomically
+Data --> Foundation : committed state / Result
+Foundation --> UI : session:state:changed (Ended)
+UI -> SF : request student result view after Ended
+SF -> Data : read persisted Result, winning Team and answer rows
+Data --> SF : authorized winning Team and accepted answers
+SF --> UI : winning Team and answers only
+
+note over SF,Data
+No client-supplied Team, role or acceptedOrder is trusted.
+Repeated watch/reconnect reconciles to the latest snapshot.
+No draft-edit Socket.IO event is defined by Foundation.
+end note
+@enduml
