@@ -28,7 +28,7 @@ describe('migration directory resolution', () => {
 
     expect(result.error).toBeUndefined();
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout.trim()).toBe('001-foundation.sql');
+    expect(result.stdout.trim()).toBe('001-foundation.sql,002-student-feature.sql');
   });
 
   it('resolves source and compiled module layouts without depending on process.cwd()', () => {

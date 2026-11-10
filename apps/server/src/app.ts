@@ -11,12 +11,15 @@ import { createSocketServer, type SocketServerOptions } from './realtime/socket-
 import { SessionStateService } from './modules/sessions/application/session-state-service.js';
 import { SessionLifecycleService } from './modules/sessions/application/session-lifecycle-service.js';
 import { SessionStatePublisher } from './realtime/session-state-publisher.js';
+import { createStudentRouter } from './api/student/student-router.js';
+import { createStudentRepositories } from './modules/student/persistence/index.js';
+import { StudentIdentityService } from './modules/student/application/student-identity-service.js';
 
 export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {}
 
 export function createApp(options: FoundationServerOptions = {}) {
   const app = express();
-  app.use('/api/v1', createApiRouter(options));
+  app.use('/api/v1', createApiRouter({ ...options, studentRouter: createStudentRouter() }));
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;
@@ -42,9 +45,14 @@ export function startServer() {
   const databaseManager = new DatabaseManager({ sqlitePath: config.sqlitePath });
   const database = databaseManager.open();
   runMigrations(database);
+  const studentIdentity = new StudentIdentityService(createStudentRepositories(database));
 
   const { httpServer } = createHttpServer({
     database,
+    studentSocket: {
+      allowedOrigins: config.studentAllowedOrigins,
+      resolveIdentity: (cookieHeader, sessionId) => studentIdentity.resolve(cookieHeader, sessionId),
+    },
     activityCodeRateLimit: {
       maxRequests: config.activityCodeLookupMaxRequests,
       windowMs: config.activityCodeLookupWindowMs,

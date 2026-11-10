@@ -29,7 +29,7 @@ describe('environment configuration', () => {
       'C:/quiz-system',
     );
 
-    expect(config).toEqual({ nodeEnv: 'test', port: 4312, sqlitePath: ':memory:', activityCodeLookupMaxRequests: 30, activityCodeLookupWindowMs: 60_000 });
+    expect(config).toEqual({ nodeEnv: 'test', port: 4312, sqlitePath: ':memory:', activityCodeLookupMaxRequests: 30, activityCodeLookupWindowMs: 60_000, studentAllowedOrigins: ['http://127.0.0.1:5173', 'http://localhost:5173'], studentCsrfSecret: null });
   });
 
   it('allows activity-code lookup rate limits to be configured', () => {
@@ -50,6 +50,13 @@ describe('environment configuration', () => {
     expect(() => parseEnvironment({ NODE_ENV: 'staging' }, 'C:/quiz-system')).toThrow(
       /NODE_ENV/,
     );
+  });
+
+  it('validates exact Student Origins and requires a production CSRF secret', () => {
+    expect(parseEnvironment({ STUDENT_ALLOWED_ORIGINS: 'https://quiz.example' }).studentAllowedOrigins).toEqual(['https://quiz.example']);
+    expect(() => parseEnvironment({ STUDENT_ALLOWED_ORIGINS: 'https://quiz.example/path' })).toThrow(/STUDENT_ALLOWED_ORIGINS/);
+    expect(() => parseEnvironment({ NODE_ENV: 'production', STUDENT_ALLOWED_ORIGINS: 'https://quiz.example' })).toThrow(/STUDENT_CSRF_SECRET/);
+    expect(parseEnvironment({ NODE_ENV: 'production', STUDENT_ALLOWED_ORIGINS: 'https://quiz.example', STUDENT_CSRF_SECRET: 's'.repeat(32) }).studentCsrfSecret).toBe('s'.repeat(32));
   });
 });
 

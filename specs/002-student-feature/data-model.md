@@ -108,6 +108,12 @@ The next migration (planned name `002-student-feature.sql`) creates only Student
 - Use Foundation's existing Submission unique constraints and target validation for accepted answer rows. Do not add a second accepted-order table or local counter table.
 - Keep the existing migration runner and enable Foreign Keys on every connection as Foundation already does.
 
+### Database constraints and domain-only checks
+
+SQLite enforces credential digest uniqueness and expiry ordering; credential-to-Participant key uniqueness and same-Session mapping; one leader row per Team with a composite Team/Participant membership foreign key; Team/Round draft keys, same-Session Team/Round references, integer version/status/lock checks; and one answer per Team/Round/Blank. Triggers reject cross-Session Participant mappings, answers outside the Round target, and answer changes after a draft is locked. The migration does not duplicate or alter Foundation's canonical entities.
+
+Application validation remains responsible for authorization and temporal rules that cannot be expressed by these row constraints: credential expiration/revocation at request time; matching the requested Session to the route/Socket scope; current Active Round; membership/leader permissions; whether a Round's target is currently usable; exact Origin/CSRF checks; and submission completeness. Every write rechecks those rules inside the same synchronous transaction as its persistence changes.
+
 ## State and Transaction Rules
 
 ### Enrollment and initial leader

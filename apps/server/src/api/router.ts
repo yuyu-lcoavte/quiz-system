@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import express, { Router, type Router as ExpressRouter } from 'express';
 import { actorContextMiddleware, type ActorContextResolver } from './middleware/actor-context.js';
 import type Database from 'better-sqlite3';
 import { createSessionRouter } from '../modules/sessions/api/session-router.js';
@@ -9,6 +9,7 @@ export interface ApiRouterOptions {
   readonly resolveActorContext?: ActorContextResolver;
   readonly database?: Database.Database;
   readonly activityCodeRateLimit?: ActivityCodeRateLimitOptions;
+  readonly studentRouter?: ExpressRouter;
 }
 
 export function createApiRouter(options: ApiRouterOptions = {}) {
@@ -21,5 +22,6 @@ export function createApiRouter(options: ApiRouterOptions = {}) {
       activityCodeRateLimit: options.activityCodeRateLimit,
     }));
   }
+  router.use('/student', options.studentRouter ?? Router());
   return router;
 }
