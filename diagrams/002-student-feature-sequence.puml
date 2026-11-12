@@ -1,5 +1,5 @@
 @startuml
-title Student Feature — Sequence Diagram (Plan)
+title Student Feature — Sequence Diagram
 autonumber
 
 actor Student
@@ -8,7 +8,7 @@ participant "Student HTTP / Service" as StudentApi
 participant "Student Draft Socket" as DraftSocket
 participant "Foundation Query / State" as Foundation
 participant "Teacher Backend" as Teacher
-participant "StudentTrustedEndCoordinator" as EndCoordinator
+participant "StudentTrustedEndCoordinator\n(T004 proposal)" as EndCoordinator
 participant "Foundation Lifecycle Transaction" as Lifecycle
 participant "Student Winner Resolver" as WinnerResolver
 database "Shared SQLite\n(same Database instance)" as DB
@@ -26,7 +26,7 @@ DB --> StudentApi : selectable existing Teams
 StudentApi --> UI : phase and join choices
 Student -> UI : choose existing Team and display name
 UI -> StudentApi : POST enrollment (same-origin Origin)
-StudentApi -> StudentApi : validate input, Origin, rate limit
+StudentApi -> StudentApi : validate input, Origin and rate limit;\nrequire CSRF for already-bound Session
 StudentApi -> DB : BEGIN IMMEDIATE
 StudentApi -> DB : validate Session/Team; create/reuse credential and Participant mapping
 StudentApi -> DB : insert TeamLeader only if none
@@ -40,8 +40,9 @@ end note
 == Activity state and target ==
 note over UI,Foundation
 The browser sends the Student-specific HttpOnly `student_session` cookie to both
-the Student HTTP path and same-origin /socket.io because Path=/; server validates
-Socket.IO Origin and resolves Participant/Team from the cookie mapping.
+Student HTTP and same-origin /socket.io because Path=/.
+Student uses a WebSocket upgrade through Vite's proxy. The server validates
+handshake Origin and resolves Participant/Team from the cookie mapping.
 end note
 UI -> Foundation : existing session:watch
 Foundation -> Foundation : verify cookie-derived ActorContext
@@ -94,8 +95,12 @@ DB --> StudentApi : committed Submission + locked draft
 StudentApi --> UI : accepted outcome for this Team
 StudentApi --> DraftSocket : publish student:draft:locked after commit
 
-== Submission / End serialization ==
-par Submission gets SQLite write lock first
+== Proposed Submission / End serialization (pending T004) ==
+note over Teacher,Lifecycle
+Teacher authorization, Coordinator and Foundation callback wiring are pending review.
+Student Winner Resolver is implemented and tested independently.
+end note
+alt Submission gets SQLite write lock first
   Student -> StudentApi : concurrent valid submission
   StudentApi -> DB : BEGIN IMMEDIATE; validate Active; persist Submission + lock draft; COMMIT
   Teacher -> EndCoordinator : endRound(input, trusted ActorContext)

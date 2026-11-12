@@ -1,5 +1,5 @@
 @startuml
-title Student Feature — Class Diagram (Plan)
+title Student Feature — Class Diagram
 hide methods
 skinparam classAttributeIconSize 0
 
@@ -55,6 +55,9 @@ interface FoundationEndLifecyclePort <<Foundation internal port proposal>> {
 }
 interface WinnerResolver <<callback contract proposal>> {
   resolve(roundId): Result | null
+}
+class StudentWinnerResolver <<implemented>> {
+  resolveWinnerInTransaction(roundId): Result | null
 }
 
 class StudentBrowserCredential <<Student>> {
@@ -171,6 +174,7 @@ end note
 
 StudentTrustedEndCoordinator ..> FoundationEndLifecyclePort : one internal End call
 FoundationEndLifecyclePort ..> WinnerResolver : invoke within same write transaction
+StudentWinnerResolver ..|> WinnerResolver : synchronous resolver; wiring pending
 StudentTrustedEndCoordinator ..> ActorContext : proposed round:end capability
 TeamLeader ..> ActorContext : proposed team:leader:transfer capability
 
@@ -180,5 +184,6 @@ the callback receives Foundation's same SQLite connection/transaction.
 Foundation does not import Student. Commit precedes async Socket.IO dispatch;
 notification work is never awaited inside the transaction.
 The capability strings are proposals, not existing Foundation grants.
+The Coordinator and Foundation callback port are pending T004.
 end note
 @enduml
