@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createStudentRepositories } from '../../apps/server/src/modules/student/persistence/index.js';
-import { createFoundationTestContext, ids, TIME } from '../helpers/foundation.js';
+import { createFoundationTestContext, ids, participant, session, team, TIME } from '../helpers/foundation.js';
 import type { UUID } from '@quiz/contracts/domain';
 
 const credentialId = '00000000-0000-4000-8000-000000000201' as UUID;
 const participant2Id = '00000000-0000-4000-8000-000000000202' as UUID;
+const participant3Id = '00000000-0000-4000-8000-000000000203' as UUID;
 
 function seedStudentFixture() {
   const context = createFoundationTestContext();
@@ -42,6 +43,41 @@ describe('Student persistence repositories', () => {
     expect(student.teamLeaders.createIfAbsent({ teamId: ids.team1, participantId: ids.participant1, assignedAt: TIME, assignedByKind: 'system', assignedById: null })).toBe(true);
     expect(student.teamLeaders.createIfAbsent({ teamId: ids.team1, participantId: participant2Id, assignedAt: TIME, assignedByKind: 'system', assignedById: null })).toBe(false);
     expect(student.teamLeaders.findByTeamId(ids.team1)?.participantId).toBe(ids.participant1);
+  });
+
+  it('updates one leader row and rejects a competing assignment based on the former leader', () => {
+    const { student, db, repositories } = seedStudentFixture();
+    repositories.participants.create(participant(participant2Id));
+    repositories.participants.create(participant(participant3Id));
+    const original = { participantId: ids.participant1, assignedAt: TIME, assignedByKind: 'participant', assignedById: ids.participant1 } as const;
+    student.teamLeaders.createIfAbsent({ ...original, teamId: ids.team1 });
+
+    const replace = db.transaction((successorId: UUID) =>
+      student.teamLeaders.replaceIfCurrent(ids.team1, original.participantId, { ...original, participantId: successorId }),
+    );
+    expect(replace.immediate(participant2Id)).toBe(true);
+    expect(replace.immediate(participant3Id)).toBe(false);
+    expect(student.teamLeaders.findByTeamId(ids.team1)?.participantId).toBe(participant2Id);
+    expect(db.prepare('SELECT count(*) AS count FROM team_leaders WHERE team_id = ?').get(ids.team1)).toEqual({ count: 1 });
+  });
+
+  it('rejects replacement by a Participant outside the Team, including another Session', () => {
+    const { student, db, repositories } = seedStudentFixture();
+    repositories.sessions.create(session(ids.session2));
+    repositories.teams.create(team(ids.team2));
+    repositories.teams.create(team(ids.teamOtherSession, ids.session2));
+    repositories.participants.create(participant(participant2Id, ids.team2));
+    repositories.participants.create(participant(participant3Id, ids.teamOtherSession));
+    const original = { participantId: ids.participant1, assignedAt: TIME, assignedByKind: 'system', assignedById: null } as const;
+    student.teamLeaders.createIfAbsent({ ...original, teamId: ids.team1 });
+
+    const replace = db.transaction((successorId: UUID) =>
+      student.teamLeaders.replaceIfCurrent(ids.team1, original.participantId, { ...original, participantId: successorId }),
+    );
+    for (const successorId of [participant2Id, participant3Id]) {
+      expect(() => replace.immediate(successorId)).toThrow(expect.objectContaining({ code: 'SQLITE_CONSTRAINT_FOREIGNKEY' }));
+      expect(student.teamLeaders.findByTeamId(ids.team1)).toEqual({ ...original, teamId: ids.team1 });
+    }
   });
 
   it('provides transaction-bound draft create, version, answer, snapshot and lock operations', () => {

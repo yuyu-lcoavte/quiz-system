@@ -126,3 +126,21 @@ No cross-member approval is claimed here. Before T004-dependent implementation, 
 5. No-winner Result handling, rollback/no-broadcast behavior, and composition-root wiring without a circular dependency.
 
 T004 remains unchecked in `specs/002-student-feature/tasks.md`. These are internal integration proposals; no Foundation public API, DTO or Socket.IO contract is being changed by T001–T003.
+
+## Independent preparation before T004
+
+- T025/T026 can reuse `TeamLeaderRepository.replaceIfCurrent` inside the future Student write transaction. Repository tests cover updating one row, a stale expected leader, and rejection of a successor from another Team or Session. The repository receives an expected Participant ID from its caller and does not authenticate that caller. Teacher authentication, expected-state semantics at the service boundary, input/output/error mapping, and the Teacher call remain under review.
+- The current Student submission test suite uses two connections to the same temporary SQLite file. An independent writer holds `BEGIN IMMEDIATE`; the real Student submission observes contention, leaves the draft editable and emits no lock notification. After the writer releases the lock, a new submission succeeds; the synchronous resolver then sees the committed candidate without persisting a Result. This exercises the SQLite and Student prerequisites for T041.
+
+### T041 test design (provisional)
+
+After the callback signature is approved and the actual End path is wired, use two connections to one isolated database. Coordinate transaction order with explicit test barriers, using a separate worker for operations that block synchronously. On the End side the Foundation transaction and Student resolver must share one connection. Observe published snapshots and query committed data from the other connection when a notification is received.
+
+| Scenario | Assertion after integration |
+| --- | --- |
+| Submission obtains the write lock first | End sees the accepted Submission and draft lock after commit. The winner is the earliest by persisted `acceptedOrder`; the published Ended snapshot is already backed by the committed Result. |
+| End obtains the write lock first | Submission rereads Ended and is rejected once the lock is released. No additional Submission, answers or lock notification. |
+| Reopened target has no successful Submission | End creates no Result, clears the prior logical target Result, and Student projects `winner: null`. |
+| Resolver or Result write fails | Round phase, `stateVersion` and the previous Result remain unchanged. No Ended publication; a subsequent valid submission remains possible while Active. |
+
+The test design leaves the Teacher entry point and Foundation callback invocation to the reviewed interfaces. T025, T026, T041, T044 and T045 remain unchecked.

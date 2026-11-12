@@ -9,7 +9,7 @@
 | FR-001 共用路由 | T047、T049–T050、T054 | `router.tsx`、`StudentJoinPlaceholder.tsx`、`StudentSessionPlaceholder.tsx` | `student-join-pages.test.tsx`、`student-result-state.test.tsx` |
 | FR-002 匿名限流查詢 | T017、T021、T050 | `student-identity-client.ts`、`join-options-service.ts`、`session-query-service.ts` | `student-join-options.test.ts`、`foundation-api.test.ts` |
 | FR-003 既有組別／晚到加入 | T018、T021–T023、T047、T050 | `join-options-service.ts`、`enrollment-service.ts`、`StudentJoinPlaceholder.tsx` | `student-enrollment.test.ts`、`student-join-pages.test.tsx`；晚到瀏覽器操作待驗 |
-| FR-004 原子指派及保留組長 | T005–T007、T018–T020、T022、T024–T026 | `002-student-feature.sql`、`team-leader-repository.ts`、`enrollment-service.ts`、`team-change-service.ts` | `student-enrollment.test.ts`、`student-leader-reconnect.test.ts`、`student-team-change.test.ts`；短暫離線瀏覽器驗收及教師轉交待驗，教師轉交受 T004 限制 |
+| FR-004 原子指派及保留組長 | T005–T007、T018–T020、T022、T024–T026 | `002-student-feature.sql`、`team-leader-repository.ts`、`enrollment-service.ts`、`team-change-service.ts` | `student-enrollment.test.ts`、`student-leader-reconnect.test.ts`、`student-team-change.test.ts`、`student-repositories.test.ts`；短暫離線瀏覽器驗收及教師轉交待驗，教師轉交受 T004 限制 |
 | FR-005 Cookie 與轉組時限 | T019–T020、T023–T024、T051 | `student-identity-service.ts`、`enrollment-controller.ts`、`team-change-service.ts` | `student-identity.test.ts`（API）、`student-team-change.test.ts` |
 | FR-006 無效代號及錯誤隱私 | T017、T021、T047、T050 | `join-options-controller.ts`、`StudentJoinPlaceholder.tsx` | `student-join-options.test.ts`、`student-join-pages.test.tsx` |
 | FR-007 Waiting 不揭露題目 | T029、T039、T042、T049、T054 | `session-controller.ts`、`draft-service.ts`、`StudentSessionPlaceholder.tsx` | `foundation-api.test.ts`、`student-draft.test.ts`（API）、`student-result-state.test.tsx` |
@@ -27,18 +27,18 @@
 | FR-019 權威快照及重連 | T039、T042、T049、T054 | `student-session-state.ts`、`session-state-client.ts`、`student-socket.ts` | `student-session-state.test.ts`、`student-vite-proxy.test.ts`；瀏覽器重連待驗 |
 | FR-020 兩秒內同步與資料隔離 | T027、T039–T040、T042、T046、T054、T061 | `student-session-state.ts`、`session-state-client.ts`、`student-result-service.ts` | `student-session-state.test.ts`、`student-result.test.ts`、`session-state.test.ts`；正式 Teacher 觸發的瀏覽器計時待驗 |
 | FR-021 Ended 前禁止讀結果 | T040、T046、T049、T054 | `student-result-service.ts`、`StudentSessionPlaceholder.tsx` | `student-result.test.ts`、`student-result-state.test.tsx` |
-| FR-022 勝出組及答案投影 | T040、T046、T049、T054 | `student-result-service.ts`、`result-controller.ts`、`StudentSessionPlaceholder.tsx` | `student-result.test.ts`、`student-result-state.test.tsx`；Demo 結果頁待驗 |
+| FR-022 勝出組及答案投影 | T040、T046、T049、T054 | `student-result-service.ts`、`result-controller.ts`、`StudentSessionPlaceholder.tsx` | `student-result.test.ts`、`student-result-state.test.tsx`；瀏覽器已驗預載的 Demo 結果，正式 Teacher End 待驗 |
 | FR-023 新 Round 與結果覆蓋 | T039–T042、T044、T049、T054、T061 | `student-session-state.ts`、`StudentSessionPlaceholder.tsx`、Foundation `foundation-transactions.ts` | `student-session-state.test.ts`、`student-result.test.ts`、`submission-result.test.ts`；Teacher 驅動的換輪／重新開題及 End 整合仍待驗 |
 | FR-024 安全且可理解的錯誤 | T009、T013–T015、T017、T027、T033、T047–T054 | `student-router.ts`、`student-identity-client.ts`、`StudentJoinPlaceholder.tsx`、`StudentSessionPlaceholder.tsx`、`StudentSubmissionControls.tsx` | `student-join-options.test.ts`、`student-csrf.test.ts`、`student-submission.test.ts`、三組 Student 頁面測試；手機／桌面操作待驗 |
-| FR-025 無帳密及身分恢復 | T007、T011–T012、T019、T022–T023、T047、T051 | `identity-repository.ts`、`student-identity-service.ts`、`student-identity-client.ts` | `student-identity.test.ts`（API）、`student-leader-reconnect.test.ts`、`student-join-pages.test.tsx`；瀏覽器更新／重連待驗 |
+| FR-025 無帳密及身分恢復 | T007、T011–T012、T019、T022–T023、T047、T051 | `identity-repository.ts`、`student-identity-service.ts`、`student-identity-client.ts` | `student-identity.test.ts`（API）、`student-leader-reconnect.test.ts`、`student-join-pages.test.tsx`；瀏覽器重新整理已驗，短暫離線後身分比對待驗 |
 
 ## Success Criteria
 
 | 準則 | Tasks | 實作 | 自動化證據及人工驗收 |
 | --- | --- | --- | --- |
-| SC-001 加入 ≤120 秒／無效代號不加入 | T017–T018、T021–T023、T047、T050–T051、T055、T061 | `StudentJoinPlaceholder.tsx`、`join-options-service.ts`、`enrollment-service.ts` | `student-join-options.test.ts`、`student-join-pages.test.tsx`；已有一次加入觀察，三次全新瀏覽器計時仍待測 |
+| SC-001 加入 ≤120 秒／無效代號不加入 | T017–T018、T021–T023、T047、T050–T051、T055、T061 | `StudentJoinPlaceholder.tsx`、`join-options-service.ts`、`enrollment-service.ts` | `student-join-options.test.ts`、`student-join-pages.test.tsx`；已觀察到瀏覽器加入成功，三次全新身分的計時仍待測 |
 | SC-002 自稱權限無效 | T011–T016、T027、T033、T037 | `student-identity.ts`、`student-draft-socket.ts`、`submission-controller.ts` | `student-identity-middleware.test.ts`、`student-socket-auth.test.ts`、`student-submission.test.ts`；瀏覽器 Cookie／CSRF 檢查待驗 |
-| SC-003 N 個 Blank 與零 Blank | T033、T035、T048、T052–T053 | `StudentTargetEditor.tsx`、`StudentSubmissionControls.tsx`、`submission-validation.ts` | `student-activity-draft.test.tsx`、`student-submission.test.ts`；瀏覽器題組顯示待驗 |
+| SC-003 N 個 Blank 與零 Blank | T033、T035、T048、T052–T053 | `StudentTargetEditor.tsx`、`StudentSubmissionControls.tsx`、`submission-validation.ts` | `student-activity-draft.test.tsx`、`student-submission.test.ts`；瀏覽器已驗兩題四格的 Demo，零 Blank 由自動化測試覆蓋 |
 | SC-004 每輪一筆及可信順位 | T033–T038 | `submission-service.ts`、Foundation `submission-repository.ts` | `student-submission.test.ts`、`student-submission-transaction.test.ts` |
 | SC-005 兩秒內更新、重連一致 | T039、T042、T054、T055、T061 | `student-session-state.ts`、`session-state-client.ts` | `student-session-state.test.ts`、`session-state.test.ts`、`student-vite-proxy.test.ts`；正式 Teacher 流程的兩個瀏覽器計時與重連待測 |
 | SC-006 結果時機及隱私 | T040、T046、T049、T054、T061 | `student-result-service.ts`、`StudentSessionPlaceholder.tsx` | `student-result.test.ts`、`student-result-state.test.tsx`；正式 Teacher End 後結果驗收待測 |

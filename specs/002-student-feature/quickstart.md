@@ -44,6 +44,7 @@ npm.cmd test -- tests/api/student-join-options.test.ts tests/api/student-csrf.te
 npm.cmd test -- tests/integration/student-vite-proxy.test.ts tests/realtime/student-socket-auth.test.ts tests/realtime/student-draft.test.ts tests/integration/student-draft-persistence.test.ts
 npm.cmd test -- tests/api/student-submission.test.ts tests/integration/student-submission-transaction.test.ts tests/api/student-result.test.ts tests/unit/student-winner-resolver.test.ts
 npm.cmd test -- tests/web/student-join-pages.test.tsx tests/web/student-activity-draft.test.tsx tests/web/student-result-state.test.tsx tests/web/student-session-state.test.ts
+npm.cmd test -- tests/integration/migrations.test.ts tests/integration/migration-location.test.ts tests/persistence/student-migration.test.ts tests/persistence/student-repositories.test.ts tests/integration/student-submission-transaction.test.ts tests/unit/student-winner-resolver.test.ts
 ```
 
 自動化套件透過隔離測試資料或資料庫驗證；需求對應見 [追蹤表](traceability.md)。
@@ -53,7 +54,8 @@ npm.cmd test -- tests/web/student-join-pages.test.tsx tests/web/student-activity
 | 檢查 | 實際結果 |
 | --- | --- |
 | `npm.cmd run check` | Exit 0。Contracts、Server、Web 與測試 TypeScript 檢查通過；三個工作區的 Build 通過，包含 Vite production build。 |
-| Vitest | 44 個測試檔、170 項全部通過。包含 Foundation API、SQLite／Migration、Session Watch／State 與原有路由，以及 Student 測試。 |
+| Vitest | 44 個測試檔、173 項全部通過。包含 Foundation API、SQLite／Migration、Session Watch／State 與原有路由，以及 Student 測試。 |
+| Migration 與交易指定測試 | 6 個測試檔、21 項全部通過。涵蓋 Migration 路徑解析、Student 增量 Schema、組長資料約束、SQLite 寫鎖與同步 Winner Resolver。 |
 | Demo 資料準備 | 已執行 Quickstart 的 fixture 命令，成功在暫存目錄建立三個 Demo Session 的 SQLite 檔。 |
 
-本次結果是目前分支的自動化回歸基準。Phase 8 的 T060 最終檢查依賴已審閱的 Teacher 整合，仍待完成。T061 的三次計時、組長重連與正式 Teacher／Student 瀏覽器驗收仍待記錄。單次 Vite WebSocket Proxy `ECONNABORTED` 發生時學生功能正常，列為待觀察。
+本次結果是目前分支的自動化回歸基準。Phase 8 的 T060 最終檢查依賴已審閱的 Teacher 整合，仍待完成。2026-11-12 已在隔離 Demo 實際操作單用戶端 Waiting／Active／Ended、草稿重新整理、提交及鎖定。測試期間 Vite 再度記錄 `ECONNABORTED`，當次操作均成功，觸發條件仍待查。T061 的三次計時、同一組長身分的短暫離線恢復與正式 Teacher／Student 瀏覽器驗收仍待執行。[Windows 人工驗收紀錄](../../tests/manual/student-feature.md)

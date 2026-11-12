@@ -7,8 +7,21 @@
 | 項目 | 實際觀察 |
 | --- | --- |
 | Windows Chrome，`DEMO-ACTIVE` 加入 | 已觀察到加入成功，頁面取得 Session ID、學生 AAA、Team 與成員資格。 |
-| 初次 Socket.IO 連線 | 當次畫面停留於等待狀態，Chrome Polling 回覆 `UNAUTHORIZED_STUDENT_ORIGIN`。後續修正已由 Vite Proxy 整合測試驗證，修正後完整瀏覽器流程仍待逐項重驗。 |
-| Vite WebSocket Proxy | 曾出現一次 `ECONNABORTED`，當時學生功能正常。列為待觀察。若再發生，記錄時間、是否剛關閉分頁或中斷網路、WS 重連與操作是否受影響。 |
+| 初次 Socket.IO 連線 | 當次畫面停留於等待狀態，Chrome Polling 回覆 `UNAUTHORIZED_STUDENT_ORIGIN`。修正後已通過 Vite Proxy 整合測試及下列瀏覽器單用戶端檢查。 |
+| Vite WebSocket Proxy | 先前曾回報 `ECONNABORTED`，本次單用戶端檢查期間 Vite 終端也再度記錄同一錯誤。已列出的瀏覽器操作均成功，重新整理後可恢復即時連線。觸發條件與雙用戶端影響待查。下次比對終端時間、分頁導覽／關閉與連線狀態。 |
+
+### 2026-11-12 單用戶端瀏覽器檢查
+
+在 Windows 的 Codex 內建瀏覽器，以本機 Vite／Express 和新建的隔離 SQLite 操作。三個代號對應三場獨立的 Session。
+
+| 項目 | 實際結果 |
+| --- | --- |
+| `DEMO-ACTIVE` | 以 `Demo QA` 加入既有「示範一組」，頁面顯示 Active、Round ID、組長資格、即時連線正常與兩題四個 Blank。未填齊時提交按鈕停用。 |
+| 草稿與提交 | 儲存一格後重新整理，仍顯示原值、版本 1 及組長資格。四格填齊後提交成功，草稿版本 5，四個欄位唯讀；再次重新整理仍為唯讀。 |
+| `DEMO-WAIT` | 顯示 Waiting 和「等待老師開始」，無題目輸入欄位。 |
+| `DEMO-ENDED` | 以「示範二組」成員身分看到預先持久化的勝出組別「示範一組」及四筆成功答案。 |
+
+尚待驗證三次全新身分加入計時、Cookie／CSRF 封包檢查、短暫離線後的同一 Participant 驗證、雙用戶端草稿同步／隔離，以及由正式 Teacher 驅動的階段轉換、換輪與結果。瀏覽器本次使用單一設定檔。
 
 以下各項以實際操作結果填寫。記錄日期、Windows／瀏覽器版本、活動代號、組別、預期與實際結果；Cookie、CSRF Token 和其他憑證值須遮蔽。
 
@@ -19,12 +32,12 @@
 | 查詢及加入 | 在 `/student/join` 先查不存在或格式錯誤的代號，確認顯示錯誤且未取得活動身分。改查 `DEMO-ACTIVE`，應只列兩個既有組別。用 A 輸入名稱加入，確認跳至 `/student/session/:sessionId` 並顯示正確 Team 和角色。乾淨資料中該組第一個成功加入者為組長。 | 有首次成功加入紀錄；錯誤與新資料組長資格待驗 |
 | SC-001 計時 | 使用三個全新瀏覽器身分。從送出有效活動代號開始計時，到活動頁顯示 Team 及成員資格停止，逐次填入秒數。每次須 ≤120 秒。 | 第 1 次 __ 秒；第 2 次 __ 秒；第 3 次 __ 秒，均待測 |
 | Cookie／CSRF | 在 Network／Application 檢查 `student_session` 的 `Path=/`、`HttpOnly`、`SameSite=Lax`。本機 HTTP Demo 的 Cookie 無 `Secure`，正式 HTTPS 的 `Secure` 由自動化驗證。確認首次加入請求有允許的 Origin，可無 CSRF；加入後的草稿寫入／提交帶 `X-CSRF-Token`。缺失或無效 Origin、缺失／錯誤 CSRF、已綁定重複加入等拒絕案例可對照自動化套件。 | 待驗 |
-| Waiting 與 Active | 加入 `DEMO-WAIT`，確認只顯示等待、沒有題目欄位。另開 `DEMO-ACTIVE`，確認 WebSocket upgrade 後發出 `session:watch`、收到 `session:state`，而且 `current-target` 成功，畫面顯示兩題、四個 Blank。 | 修正後待重驗 |
+| Waiting 與 Active | 加入 `DEMO-WAIT`，確認只顯示等待、沒有題目欄位。另開 `DEMO-ACTIVE`，確認 WebSocket upgrade 後發出 `session:watch`、收到 `session:state`，而且 `current-target` 成功，畫面顯示兩題、四個 Blank。 | 畫面已驗；瀏覽器 Network 檢查待驗 |
 | 晚到與轉組 | B 在 `DEMO-ACTIVE` 首次加入 A 的既有 Team，應可加入且保留 A 的組長資格。查詢同活動應恢復既有身分；頁面無轉組入口，開始後的後端拒絕由 `student-team-change` 整合測試驗證。 | 待驗 |
 | 同組草稿、隔離 | A、B 在同一 Round 修改不同 Blank，再依序修改同一 Blank。兩頁應顯示最後一筆伺服器接受的值，其他格保留。C 在同 Session 不同 Team，D 在不同 Session，均不應收到 A／B 的草稿。 | 待驗 |
-| 重連與身分恢復 | A 保持原瀏覽器設定檔，記錄 `/me` 的 Participant ID 與組長資格；短暫離線後恢復，再重新整理。確認相同 Participant、Team 與提交資格，草稿回到最新已保存版本。 | 待驗 |
-| 提交與鎖定 | A 先留一格空白，再填完四格並等同步完成。未填齊不可提交，B 無組長提交操作。A 成功提交後，兩頁草稿都應唯讀；重新整理後仍鎖定。 | 待驗 |
-| 已公布結果 | 加入預先存入結果的 `DEMO-ENDED`，確認只顯示勝出組別與四個成功答案。無勝者投影以現有 API／UI 測試驗證。 | 有勝者瀏覽器案例待驗 |
+| 重連與身分恢復 | A 保持原瀏覽器設定檔，記錄 `/me` 的 Participant ID 與組長資格；短暫離線後恢復，再重新整理。確認相同 Participant、Team 與提交資格，草稿回到最新已保存版本。 | 重新整理已驗；短暫離線及 Participant ID 比對待驗 |
+| 提交與鎖定 | A 先留一格空白，再填完四格並等同步完成。未填齊不可提交，B 無組長提交操作。A 成功提交後，兩頁草稿都應唯讀；重新整理後仍鎖定。 | A 已驗；B 與雙頁鎖定待驗 |
+| 已公布結果 | 加入預先存入結果的 `DEMO-ENDED`，確認只顯示勝出組別與四個成功答案。無勝者投影以現有 API／UI 測試驗證。 | 預載有勝者案例已驗；實際 Teacher End 待驗 |
 | 版面與錯誤 | 分別在手機與桌面寬度操作加入、填答及提交，確認欄位可辨識，錯誤及斷線訊息可讀。 | 待驗 |
 
 ## T004 通過後的整合驗收

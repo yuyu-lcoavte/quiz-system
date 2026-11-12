@@ -9,6 +9,42 @@ import { createStudentRepositories } from '../../apps/server/src/modules/student
 import { createHttpServer } from '../../apps/server/src/app.js';
 import { once } from 'node:events';
 import { io } from 'socket.io-client';
+import { DatabaseManager } from '../../apps/server/src/persistence/database.js';
+import { StudentWinnerResolver } from '../../apps/server/src/modules/student/application/winner-resolver.js';
+
+it('preserves the draft when another SQLite connection holds the writer lock, then exposes the committed submission to the resolver', async () => {
+  const f = await draftFixture();
+  expect((await f.edit('one')).status).toBe(200);
+  expect((await f.edit('two', ids.blank2)).status).toBe(200);
+  const student = createStudentRepositories(f.database);
+  const actor = new StudentIdentityService(student).resolve(cookieOf(f.a), ids.session1)!.actorContext;
+  const answers = [{ blankId: ids.blank1, value: 'one' }, { blankId: ids.blank2, value: 'two' }];
+  const writer = new DatabaseManager({ sqlitePath: f.database.name, timeoutMs: 0 });
+  const submitConnection = writer.open();
+  let notifications = 0;
+  const service = new SubmissionService(submitConnection, () => { notifications++; });
+  const resolveWinner = new StudentWinnerResolver(f.database);
+  const readWinner = f.database.transaction(() => resolveWinner.resolveWinnerInTransaction(ids.round1));
+
+  try {
+    f.database.transaction(() => {
+      expect(resolveWinner.resolveWinnerInTransaction(ids.round1)).toBeNull();
+      expect(() => service.submit(actor, ids.session1, ids.round1, answers)).toThrow(expect.objectContaining({ code: 'SQLITE_BUSY' }));
+      expect(student.drafts.find(ids.team1, ids.round1)?.status).toBe('editable');
+    }).immediate();
+    expect(notifications).toBe(0);
+    expect(readWinner.immediate()).toBeNull();
+
+    const committed = service.submit(actor, ids.session1, ids.round1, answers);
+    expect(committed.acceptedOrder).toBe(1);
+    expect(notifications).toBe(1);
+    expect(student.drafts.find(ids.team1, ids.round1)?.status).toBe('locked');
+    expect(readWinner.immediate()?.winningSubmissionId).toBe(committed.submissionId);
+    expect(f.repositories.results.findByRound(ids.round1)).toBeNull();
+  } finally {
+    writer.close();
+  }
+});
 it('serializes two Teams and duplicate requests with unique accepted order',async()=>{
  const f=await draftFixture();await f.edit('one');await f.edit('two',ids.blank2);
  const answers=[{blankId:ids.blank1,value:'one'},{blankId:ids.blank2,value:'two'}];
