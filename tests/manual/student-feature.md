@@ -33,6 +33,9 @@
 | SC-001 計時 | 使用三個全新瀏覽器身分。從送出有效活動代號開始計時，到活動頁顯示 Team 及成員資格停止，逐次填入秒數。每次須 ≤120 秒。 | 第 1 次 __ 秒；第 2 次 __ 秒；第 3 次 __ 秒，均待測 |
 | Cookie／CSRF | 在 Network／Application 檢查 `student_session` 的 `Path=/`、`HttpOnly`、`SameSite=Lax`。本機 HTTP Demo 的 Cookie 無 `Secure`，正式 HTTPS 的 `Secure` 由自動化驗證。確認首次加入請求有允許的 Origin，可無 CSRF；加入後的草稿寫入／提交帶 `X-CSRF-Token`。缺失或無效 Origin、缺失／錯誤 CSRF、已綁定重複加入等拒絕案例可對照自動化套件。 | 待驗 |
 | Waiting 與 Active | 加入 `DEMO-WAIT`，確認只顯示等待、沒有題目欄位。另開 `DEMO-ACTIVE`，確認 WebSocket upgrade 後發出 `session:watch`、收到 `session:state`，而且 `current-target` 成功，畫面顯示兩題、四個 Blank。 | 畫面已驗；瀏覽器 Network 檢查待驗 |
+| 單題 Active | 依 Quickstart 新建隔離資料庫，加入 `DEMO-SINGLE-ACTIVE`，確認只顯示一題兩格。在瀏覽器 Network 確認 `current-target` 的 `target.kind` 為 `question`。用組長身分先填一格確認不可送出，再填完兩格並送出一次，確認草稿轉為唯讀。 | 待瀏覽器驗收 |
+| 題組 Active | 回加入頁並加入 `DEMO-ACTIVE`，確認 `target.kind` 為 `questionGroup`，同一輪顯示兩題四格。確認少填一格仍不可送出，填完後只送出一次。 | 先前已驗題組畫面與提交；本次待重驗 |
+| 同活動切換下一輪 | Teacher 正式介接後，在第一輪留下草稿，結束並切換到下一題。Waiting 時應移除舊題和舊草稿。老師開始新輪後，核對新 Round ID、新題目和本組新草稿。兩個 Demo 代號是不同活動，無法用來操作同一活動的換輪。 | 頁面層自動化已覆蓋，Teacher 驅動的瀏覽器驗收待執行 |
 | 唯一組員換組 | 在新的 `DEMO-WAIT`，讓 AAA 單獨加入一組。在「目前組別」按「更換組別」並確認，無需指定接任者。移入空組時 AAA 成為組長；用另一份資料重試移入已有組長的組，AAA 應為一般組員。用新瀏覽器身分加入 AAA 原組，確認原組仍可選且新加入者成為組長。F5 確認 AAA 保留相同身分和新組別。 | 待驗；已補 UI 與整合測試 |
 | 非空組自動遞補 | A、B、C、D 依序加入同組。讓 B 離線，C、D 在線，A 換組後確認 C 接任。另用新資料讓其他組員都離線再換組，確認 B 暫任；若 C 先上線，確認 C 接任。若 B 先上線，確認保留指派。開題後確認只收到目前組別的草稿。 | 待 Windows 瀏覽器驗收 |
 | 開始後禁止換組 | 使用 `DEMO-ACTIVE` 確認沒有換組入口。由 Teacher 正式操作開下一輪後，即使回到 Waiting 仍應沒有入口；開始前開著的表單若遇到同時開始，應顯示拒絕，不能顯示成功。 | 待驗；後兩項需 Teacher 整合或既有測試資料，後端已有整合測試 |
