@@ -7,10 +7,10 @@ import { recoverStudentIdentity,studentRequest,studentError,type StudentIdentity
 import { StudentMembershipPanel } from '../modules/student/StudentMembershipPanel.js';
 import { StudentDraftPanel } from '../modules/student/StudentDraftPanel.js';
 
-function ActiveRound({sessionId,roundId,identity,connected,onIdentityRefresh}:{sessionId:UUID;roundId:UUID;identity:StudentIdentity;connected:boolean;onIdentityRefresh:()=>void}){
+function ActiveRound({sessionId,roundId,identity,connected,membershipPending,onIdentityRefresh}:{sessionId:UUID;roundId:UUID;identity:StudentIdentity;connected:boolean;membershipPending:boolean;onIdentityRefresh:()=>void}){
  const [target,setTarget]=useState<CurrentTargetView|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  useEffect(()=>{const abort=new AbortController();setTarget(null);setError('');studentRequest<CurrentTargetView>(`/api/v1/sessions/${sessionId}/current-target`,{signal:abort.signal}).then(value=>{if(!abort.signal.aborted&&value?.roundId===roundId)setTarget(value);}).catch(e=>{if(!abort.signal.aborted)setError(studentError(e));});return()=>abort.abort();},[sessionId,roundId,retry]);
- return error?<div role="alert">{error} <button className="min-h-11 underline" onClick={()=>setRetry(n=>n+1)}>重試載入題目</button></div>:target?<StudentDraftPanel key={`${identity.membership.team.teamId}:${roundId}`} sessionId={sessionId} roundId={roundId} target={target} membership={identity.membership} csrfToken={identity.csrfToken} activityConnected={connected} onIdentityRefresh={onIdentityRefresh}/>:<p role="status">正在載入目前題目…</p>;
+ return error?<div role="alert">{error} <button className="min-h-11 underline" onClick={()=>setRetry(n=>n+1)}>重試載入題目</button></div>:target?<StudentDraftPanel key={`${identity.membership.team.teamId}:${roundId}`} sessionId={sessionId} roundId={roundId} target={target} membership={identity.membership} csrfToken={identity.csrfToken} activityConnected={connected} membershipPending={membershipPending} onIdentityRefresh={onIdentityRefresh}/>:<p role="status">正在載入目前題目…</p>;
 }
 function RoundResult({sessionId,roundId}:{sessionId:UUID;roundId:UUID}){
  const [result,setResult]=useState<{winner:null|{teamName:string;answers:{blankId:UUID;label:string|null;value:string}[]}}|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
@@ -20,14 +20,39 @@ function RoundResult({sessionId,roundId}:{sessionId:UUID;roundId:UUID}){
 
 export function StudentSessionPlaceholder() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const id=parseUUID(sessionId);const [identity,setIdentity]=useState<StudentIdentity|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
-  const currentId=useRef(id);currentId.current=id;
-  useEffect(()=>{let alive=true;setIdentity(null);setError('');if(!id){setError('活動識別碼無效，請由加入頁進入。');return;}
-   recoverStudentIdentity(id).then(value=>{if(alive)setIdentity(value);}).catch(e=>{if(alive)setError(studentError(e));});return()=>{alive=false;};
-  },[id,retry]);
-  const {snapshot:state,connected}=useStudentSessionStatus(identity?(id??undefined):undefined);
-  const refreshIdentity=useCallback(()=>{if(id)void recoverStudentIdentity(id).then(value=>{if(currentId.current===id){setIdentity(value);setError('');}}).catch(e=>{if(currentId.current===id)setError(studentError(e));});},[id]);
-  useEffect(()=>{if(connected&&identity)refreshIdentity();},[connected,refreshIdentity]);
+  const id = parseUUID(sessionId);
+  const [restored, setIdentity] = useState<StudentIdentity | null>(null);
+  const [error, setError] = useState('');
+  const [membershipPending, setMembershipPending] = useState(false);
+  const identity = restored?.membership.sessionId === id ? restored : null;
+  const currentId = useRef(id);
+  currentId.current = id;
+  const readVersion = useRef(0);
+
+  const refreshIdentity = useCallback(() => {
+    if (!id) return;
+    const version = ++readVersion.current;
+    const isCurrent = () => currentId.current === id && readVersion.current === version;
+    setMembershipPending(true);
+    void recoverStudentIdentity(id).then(value => {
+      if (!isCurrent()) return;
+      setIdentity(value);
+      setError('');
+      setMembershipPending(false);
+    }).catch(error => {
+      if (isCurrent()) setError(studentError(error));
+    });
+  }, [id]);
+
+  useEffect(() => {
+    setIdentity(null);
+    setError('');
+    if (id) refreshIdentity();
+    else setError('活動識別碼無效，請由加入頁進入。');
+    return () => { readVersion.current++; };
+  }, [id, refreshIdentity]);
+
+  const {snapshot:state,connected}=useStudentSessionStatus(identity ? id ?? undefined : undefined, refreshIdentity);
 
   return (
     <PlaceholderPage
@@ -43,10 +68,12 @@ export function StudentSessionPlaceholder() {
         <dt className="mt-3 text-sm font-medium text-slate-500">目前輪次</dt>
         <dd className="break-all font-mono text-sm">{state?.currentRoundId ?? '尚未取得輪次'}</dd>
       </dl>
-      {error?<div className="mt-4" role="alert"><p>{error}</p><button className="mr-4 min-h-11 underline" onClick={()=>setRetry(n=>n+1)}>重新恢復身分</button><Link className="underline" to="/student/join">返回加入活動</Link></div>:!identity?<p role="status">正在恢復學生身分…</p>:<>
+      {error&&<div className="mt-4" role="alert"><p>{error}</p><button className="mr-4 min-h-11 underline" onClick={refreshIdentity}>重新恢復身分</button><Link className="underline" to="/student/join">返回加入活動</Link></div>}
+      {!identity?(!error&&<p role="status">正在恢復學生身分…</p>):<>
        <StudentMembershipPanel membership={identity.membership}/><button className="min-h-11 underline" onClick={refreshIdentity}>重新載入身分</button>
+       {membershipPending&&!error&&<p role="status">正在更新提交資格…</p>}
        <p role="status" className="my-3">{connected?'活動即時連線正常':'連線中斷或連線中，正在恢復活動狀態。'}</p>
-       {state?.phase==='Waiting'?<h2 className="my-5 text-xl font-semibold">等待老師開始</h2>:state?.phase==='Active'&&id?<ActiveRound key={state.currentRoundId} sessionId={id} roundId={state.currentRoundId} identity={identity} connected={connected} onIdentityRefresh={refreshIdentity}/>:state?.phase==='Ended'&&id?<RoundResult key={state.currentRoundId} sessionId={id} roundId={state.currentRoundId}/>:<p>正在取得伺服器活動狀態…</p>}
+       {state?.phase==='Waiting'?<h2 className="my-5 text-xl font-semibold">等待老師開始</h2>:state?.phase==='Active'&&id?<ActiveRound key={state.currentRoundId} sessionId={id} roundId={state.currentRoundId} identity={identity} connected={connected&&!error} membershipPending={membershipPending} onIdentityRefresh={refreshIdentity}/>:state?.phase==='Ended'&&id?<RoundResult key={state.currentRoundId} sessionId={id} roundId={state.currentRoundId}/>:<p>正在取得伺服器活動狀態…</p>}
       </>}
     </PlaceholderPage>
   );

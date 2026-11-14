@@ -6,7 +6,7 @@ actor Student
 participant "Student Web UI" as UI
 participant "Student HTTP / Service" as StudentApi
 participant "Student Draft Socket" as DraftSocket
-participant "Student Presence / Failover\n(planned)" as Presence
+participant "Student Presence / Failover" as Presence
 participant "Foundation Query / State" as Foundation
 participant "Teacher Backend" as Teacher
 participant "StudentTrustedEndCoordinator\n(T004 proposal)" as EndCoordinator
@@ -85,11 +85,11 @@ The UI serializes writes per Blank and retains focused/unsaved input.
 Remote differences are indicated; submission waits for saved authoritative values.
 end note
 
-== Leader disconnect and role recovery (planned) ==
+== Leader disconnect and role recovery ==
 UI -> Presence : authenticated activity and draft sockets connect
-UI -> Presence : F5 or other transport disconnect
-Presence -> Presence : remove socket ID and check other valid sockets
-alt current leader lost last valid socket
+UI -> Presence : transport disconnect, valid connect or authorized re-subscribe
+Presence -> Presence : inspect live registry and any unresolved offline assignment
+alt last valid socket lost or unresolved leader remains offline
   Presence -> DB : BEGIN IMMEDIATE; recheck leader and scope
   Presence -> DB : select first eligible online teammate by join order
   alt eligible candidate exists

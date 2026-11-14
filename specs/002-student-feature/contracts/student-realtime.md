@@ -33,15 +33,15 @@ The existing Foundation `session:watch`, `session:state`, `session:state:changed
 4. The server commits the draft value/version before broadcasting. If the process stops after commit but before emit, the next snapshot is authoritative.
 5. After `student:draft:locked`, the UI becomes read-only. Server rejects all subsequent edits even if a client missed the lock event.
 
-## Membership invalidation (planned, pending implementation)
+## Membership invalidation
 
 | Direction | Event | Payload |
 | --- | --- | --- |
 | Server → authorized sockets of the affected Team | `student:membership:changed` | `{ sessionId: UUID, teamId: UUID }` |
 
-- No client event is needed to claim presence or to request reassignment. Count all connected Student sockets authenticated for the same Participant and Session, including activity/draft connections and additional tabs. Only server-detected loss of the last valid connection for the current leader triggers evaluation. Apply no extra delay after Socket.IO detects the disconnect.
+- No client event is needed to claim presence or to request reassignment. Count all live authenticated Student sockets for the same Participant and Session, including activity/draft connections and additional tabs. Apply no extra delay after Socket.IO detects the last valid disconnect. A verified connection or authorized re-subscription also rechecks any unresolved offline current leader.
 - Deliver after a committed assignment change only, to verified members of the affected Team and Session in every phase. Derive recipients on the server and recheck membership/credential on publish. Do not use Active-only draft rooms for delivery. The notice carries no Participant identity, role claim, credential or draft content.
-- Treat this event as an invalidation. Re-read `/me` on event, initial load and reconnect. Coalesce duplicate notifications while ensuring another refresh if invalidated during a read. Discard results from an obsolete Session or request, and disable submission until the latest role is resolved. A lost notification is recovered by reading `/me` after reconnect. Foundation events remain unchanged.
+- Treat this event as an invalidation. Re-read `/me` on event, initial load and reconnect. A newer refresh supersedes an in-flight read. Discard results from an obsolete Session or request, and disable submission until the latest role is resolved. A lost notification is recovered by reading `/me` after reconnect. Foundation events remain unchanged.
 
 ## Isolation and Errors
 

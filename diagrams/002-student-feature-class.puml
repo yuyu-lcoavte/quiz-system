@@ -76,15 +76,16 @@ class TeamLeader <<Student>> {
   participantId: UUID
   assignedAt: datetime
 }
-class StudentTeamJoinOrder <<planned SQLite>> {
+class StudentTeamJoinOrder <<Student SQLite>> {
   participantId: UUID
   teamId: UUID
   joinOrder: positive integer
 }
-class StudentSocketPresence <<planned process-local>> {
+class StudentSocketPresence <<process-local>> {
   sessionId: UUID
   participantId: UUID
-  socketIds: Set<SocketId>
+  liveSocketIds: Set<SocketId> (derived)
+  unresolvedOfflineAssignment: optional
 }
 Participant "1" -- "0..1" StudentTeamJoinOrder : current Team order
 Team "1" -- "0..*" StudentTeamJoinOrder : unique order within Team

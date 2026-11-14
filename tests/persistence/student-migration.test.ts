@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { resolveMigrationsDirectory } from '../../apps/server/src/persistence/migrate.js';
 import { createTestDatabase } from '../helpers/sqlite.js';
 import { ids } from '../helpers/foundation.js';
+import { join } from 'node:path';
+import { copyFileSync, mkdirSync } from 'node:fs';
 
 const TIME = '2026-11-10T01:00:00.000Z';
 const extra = {
@@ -42,6 +44,27 @@ function seedFoundation(db: ReturnType<typeof database>['database']) {
 }
 
 describe('Student migration', () => {
+  it('backfills stable join order in existing teams and enforces current membership', () => {
+    const fixture = database();
+    const previous = join(fixture.directory, 'previous-migrations');
+    mkdirSync(previous);
+    for (const name of ['001-foundation.sql', '002-student-feature.sql', '003-student-draft-mutations.sql']) {
+      copyFileSync(join(resolveMigrationsDirectory(), name), join(previous, name));
+    }
+    fixture.runMigrations(previous);
+    const db = fixture.database;
+    seedFoundation(db);
+    db.prepare('UPDATE participants SET team_id = ? WHERE id = ?').run(ids.team1, extra.participant2);
+    db.prepare("INSERT INTO team_leaders VALUES (?, ?, ?, 'system', NULL)").run(ids.team1, extra.participant2, TIME);
+
+    expect(fixture.runMigrations(resolveMigrationsDirectory())).toContain('004-student-team-join-order.sql');
+    expect(db.prepare('SELECT participant_id, join_order FROM student_team_join_order WHERE team_id = ? ORDER BY join_order').all(ids.team1))
+      .toEqual([{ participant_id: ids.participant1, join_order: 1 }, { participant_id: extra.participant2, join_order: 2 }]);
+    expect(db.prepare('SELECT participant_id FROM team_leaders WHERE team_id = ?').get(ids.team1)).toEqual({ participant_id: extra.participant2 });
+    expect(() => db.prepare('UPDATE student_team_join_order SET join_order = 1 WHERE participant_id = ?').run(extra.participant2)).toThrow();
+    expect(() => db.prepare('UPDATE student_team_join_order SET team_id = ?, join_order = 3 WHERE participant_id = ?').run(ids.team1, extra.participantOtherSession)).toThrow();
+    expect(fixture.runMigrations(resolveMigrationsDirectory())).toEqual([]);
+  });
   it('runs additively on an isolated test database without replacing Foundation tables', () => {
     const testDb = database();
     const applied = testDb.runMigrations(resolveMigrationsDirectory());

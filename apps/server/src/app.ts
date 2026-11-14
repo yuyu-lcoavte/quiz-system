@@ -22,8 +22,11 @@ import { publishStudentDraftLock } from './modules/student/realtime/student-draf
 import { SubmissionService } from './modules/student/application/submission-service.js';
 import { parseUUID } from '@quiz/contracts/domain';
 import { getStudentSocketIdentity } from './modules/student/realtime/student-draft-socket.js';
+import { LeaderFailoverService } from './modules/student/application/leader-failover-service.js';
+import { registerStudentMembershipSockets } from './modules/student/realtime/student-membership-sockets.js';
+import type { StudentMembershipChangedPayload } from '@quiz/contracts';
 
-export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {readonly studentSecurity?:StudentSecurityOptions;readonly studentDraftService?:DraftService;readonly studentSubmissionService?:SubmissionService;}
+export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {readonly studentSecurity?:StudentSecurityOptions;readonly studentDraftService?:DraftService;readonly studentSubmissionService?:SubmissionService;readonly publishStudentMembership?: (scope:StudentMembershipChangedPayload)=>void;}
 
 export function createApp(options: FoundationServerOptions = {}) {
   const app = express();
@@ -35,7 +38,7 @@ export function createApp(options: FoundationServerOptions = {}) {
       const scope = parseUUID(/^\/sessions\/([^/]+)(?:\/|$)/.exec(request.path)?.[1]);
       return scope ? identity?.resolve(request.headers.cookie, scope)?.actorContext ?? null : null;
     },
-    studentRouter: createStudentRouter(options.database,options.studentSecurity,options.activityCodeRateLimit,options.studentDraftService,options.studentSubmissionService) }));
+    studentRouter: createStudentRouter(options.database,options.studentSecurity,options.activityCodeRateLimit,options.studentDraftService,options.studentSubmissionService,options.publishStudentMembership) }));
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;
@@ -53,7 +56,8 @@ export function createHttpServer(options: FoundationServerOptions = {}) {
     }
   }):undefined;
   const submission=options.database?new SubmissionService(options.database,(teamId,lock)=>publishStudentDraftLock(socketServer,studentSocket,teamId,lock)):undefined;
-  const app = createApp({...options,studentDraftService:draft,studentSubmissionService:submission});
+  let membership: ReturnType<typeof registerStudentMembershipSockets> | undefined;
+  const app = createApp({...options,studentDraftService:draft,studentSubmissionService:submission,publishStudentMembership:scope=>membership?.publish(scope)});
   const httpServer = createServer(app);
   const stateService = options.database ? new SessionStateService(options.database) : null;
   const studentActors = new WeakSet<object>();
@@ -65,12 +69,19 @@ export function createHttpServer(options: FoundationServerOptions = {}) {
       if (resolved) { studentActors.add(resolved.actorContext); return resolved.actorContext; }
       return options.resolveSocketActorContext?.(socket) ?? null;
     },
-    authorizeWatch: (actor, scope) => studentActors.has(actor)
-      ? actor.actorKind === 'participant' && actor.sessionId === scope && actor.permissions.includes('session:watch')
-      : options.authorizeWatch?.(actor, scope) ?? false,
-    studentSocket:studentSocket?{...studentSocket,draftService:draft,csrf:options.studentSecurity?createStudentCsrfService({secret:options.studentSecurity.secret}):undefined}:undefined,
+    authorizeWatch: (actor, sessionId) => {
+      if (!studentActors.has(actor)) return options.authorizeWatch?.(actor, sessionId) ?? false;
+      if (actor.actorKind !== 'participant' || actor.sessionId !== sessionId || !actor.teamId || !actor.permissions.includes('session:watch')) return false;
+      membership?.reconcile({sessionId,teamId:actor.teamId});
+      return true;
+    },
+    studentSocket:studentSocket?{...studentSocket,draftService:draft,csrf:options.studentSecurity?createStudentCsrfService({secret:options.studentSecurity.secret}):undefined,
+      onAuthorizedDraftWatch:scope=>membership?.reconcile(scope)}:undefined,
     getSessionState: options.getSessionState ?? (stateService ? (sessionId) => stateService.getSnapshot(sessionId) : undefined),
   });
+  if (options.database && studentSocket) {
+    membership = registerStudentMembershipSockets(socketServer, studentSocket, new LeaderFailoverService(options.database));
+  }
   const statePublisher = new SessionStatePublisher(socketServer);
   const sessionLifecycle = options.database
     ? new SessionLifecycleService(options.database, { publish: (snapshot) => { statePublisher.publish(snapshot); } })

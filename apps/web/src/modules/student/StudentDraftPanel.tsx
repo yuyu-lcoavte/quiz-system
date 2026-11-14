@@ -7,7 +7,7 @@ import { StudentTargetEditor } from './StudentTargetEditor.js';
 import { StudentSubmissionControls } from './StudentSubmissionControls.js';
 import { studentRequest,studentError,StudentApiError,targetQuestions } from './student-identity-client.js';
 
-export function StudentDraftPanel({sessionId,roundId,target,membership,csrfToken,activityConnected,onIdentityRefresh}:{sessionId:UUID;roundId:UUID;target:CurrentTargetView;membership:StudentMembershipView;csrfToken:string;activityConnected:boolean;onIdentityRefresh:()=>void}){
+export function StudentDraftPanel({sessionId,roundId,target,membership,csrfToken,activityConnected,membershipPending=false,onIdentityRefresh}:{sessionId:UUID;roundId:UUID;target:CurrentTargetView;membership:StudentMembershipView;csrfToken:string;activityConnected:boolean;membershipPending?:boolean;onIdentityRefresh:()=>void}){
  const [snapshot,setSnapshot]=useState<StudentDraftSnapshotPayload|null>(null),[connected,setConnected]=useState(false),[pending,setPending]=useState(0),[dirty,setDirty]=useState<Record<string,boolean>>({});
  const [error,setError]=useState(''),[submitting,setSubmitting]=useState(false),[submitted,setSubmitted]=useState(false),[phaseBlocked,setPhaseBlocked]=useState(false);
  const client=useRef<DraftClient|null>(null),alive=useRef(false),controller=useRef<AbortController|null>(null),token=useRef(csrfToken),queues=useRef(new Map<string,Promise<void>>()),inFlight=useRef(false);
@@ -38,7 +38,7 @@ export function StudentDraftPanel({sessionId,roundId,target,membership,csrfToken
  const locked=submitted||snapshot?.status==='locked',unsaved=Object.values(dirty).some(Boolean);
  const complete=required.length>0&&required.every(blank=>(values[blank.id]??'').trim().length>0);
  async function submit(){
-  if(inFlight.current||!ready||locked||pending||unsaved||!complete||!membership.isLeader)return;
+  if(inFlight.current||!ready||membershipPending||locked||pending||unsaved||!complete||!membership.isLeader)return;
   inFlight.current=true;setSubmitting(true);setError('');
   try{await studentRequest(`${base}/submissions`,{method:'POST',signal:controller.current!.signal,headers:{'X-CSRF-Token':token.current},body:JSON.stringify({answers:required.map(blank=>({blankId:blank.id,value:values[blank.id]}))})});if(alive.current){setSubmitted(true);void client.current?.refresh();}}
   catch(e){if(alive.current){setError(studentError(e));if(e instanceof StudentApiError){if(e.code==='DUPLICATE_SUBMISSION')setSubmitted(true);if(e.code==='INVALID_PHASE')setPhaseBlocked(true);if(e.status===401||e.status===403)onIdentityRefresh();}void client.current?.refresh();}}
@@ -47,7 +47,7 @@ export function StudentDraftPanel({sessionId,roundId,target,membership,csrfToken
  return <section className="mt-5 space-y-4" aria-label="本組共同草稿"><p role="status">{ready?'即時連線正常':'連線中斷或同步中；暫停作答，輸入會保留。'}{snapshot&&` · 草稿版本 ${snapshot.version}`}</p>
   {error&&<p role="alert" className="text-red-700">{error}</p>}{!snapshot?<p>正在恢復本組草稿…</p>:<>
    <StudentTargetEditor questions={questions} values={values} disabled={!ready||locked||submitting} onEdit={edit} onDirty={onDirty}/>
-   <StudentSubmissionControls isLeader={membership.isLeader} locked={locked} busy={!!pending||submitting} complete={complete} ready={ready&&!unsaved} onSubmit={()=>void submit()}/>
+   <StudentSubmissionControls isLeader={membership.isLeader} locked={locked} busy={!!pending||submitting} complete={complete} ready={ready&&!unsaved&&!membershipPending} onSubmit={()=>void submit()}/>
   </>}
  </section>;
 }

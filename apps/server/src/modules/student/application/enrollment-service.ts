@@ -36,6 +36,7 @@ export class EnrollmentService {
    }else{
     const participantId=randomUUID() as UUID;
     this.foundation.participants.create({id:participantId,teamId:team.id,displayName:input.displayName.trim(),createdAt:now});
+    this.student.teamJoinOrder.append(team.id,participantId);
     this.student.browserParticipants.create({credentialId:credential.id,sessionId,participantId,createdAt:now});
     this.student.teamLeaders.createIfAbsent({teamId:team.id,participantId,assignedAt:now,assignedByKind:'system',assignedById:null});
    }

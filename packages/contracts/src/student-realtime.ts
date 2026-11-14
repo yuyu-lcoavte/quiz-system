@@ -45,6 +45,11 @@ export interface StudentDraftErrorPayload {
   requestId?: string;
 }
 
+export interface StudentMembershipChangedPayload {
+  sessionId: UUID;
+  teamId: UUID;
+}
+
 export interface StudentDraftClientToServerEvents {
   'student:draft:watch': (payload: StudentDraftWatchPayload) => void;
   'student:draft:edit': (payload: StudentDraftEditPayload) => void;
@@ -58,7 +63,9 @@ export interface StudentDraftServerToClientEvents {
 }
 
 export type StudentClientToServerEvents = ClientToServerEvents & StudentDraftClientToServerEvents;
-export type StudentServerToClientEvents = ServerToClientEvents & StudentDraftServerToClientEvents;
+export type StudentServerToClientEvents = ServerToClientEvents & StudentDraftServerToClientEvents & {
+  'student:membership:changed': (payload: StudentMembershipChangedPayload) => void;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -66,6 +73,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
   return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
+export function parseStudentMembershipChangedPayload(value: unknown): StudentMembershipChangedPayload | null {
+  if (!isRecord(value) || !hasExactKeys(value, ['sessionId', 'teamId'])) return null;
+  const sessionId = parseUUID(value.sessionId);
+  const teamId = parseUUID(value.teamId);
+  return sessionId && teamId ? { sessionId, teamId } : null;
 }
 
 function parseDraftScope(value: Record<string, unknown>): { sessionId: UUID; roundId: UUID } | null {

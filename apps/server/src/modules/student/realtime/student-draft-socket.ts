@@ -10,6 +10,7 @@ import {
   type StudentClientToServerEvents,
   type StudentServerToClientEvents,
   type StudentDraftLockedPayload,
+  type StudentMembershipChangedPayload,
 } from '@quiz/contracts';
 import { assertStudentOrigin } from '../../../api/middleware/student-origin.js';
 import { HttpError } from '../../../errors/http-error.js';
@@ -27,6 +28,7 @@ export interface StudentSocketOptions {
   readonly csrf?:StudentCsrfService;
   readonly allowedOrigins: readonly string[];
   readonly resolveIdentity: (cookieHeader: string | undefined, sessionId: UUID) => StudentResolvedIdentity | null;
+  readonly onAuthorizedDraftWatch?: (scope: StudentMembershipChangedPayload) => void;
 }
 
 export interface StudentSocketIdentity extends StudentResolvedIdentity { readonly sessionId: UUID; }
@@ -101,12 +103,13 @@ export function registerStudentDraftSocket(server: StudentFoundationSocketServer
       }
       if(options?.draftService){void(async()=>{try{
         const identity=trusted(payload.sessionId);
-        const snapshot=options.draftService!.snapshot(identity.actorContext,payload.sessionId,payload.roundId);
+        options.draftService!.snapshot(identity.actorContext,payload.sessionId,payload.roundId);
         for(const room of socket.rooms)if(room.startsWith('student:team:'))await socket.leave(room);
         await socket.join(studentDraftRoomName(identity.actorContext,payload.roundId)!);
         const current=trusted(payload.sessionId);
         if(current.actorContext.teamId!==identity.actorContext.teamId)throw new HttpError(403,'FORBIDDEN','Membership changed.');
         socket.emit('student:draft:snapshot',options.draftService!.snapshot(current.actorContext,payload.sessionId,payload.roundId));
+        if (current.actorContext.teamId) options.onAuthorizedDraftWatch?.({sessionId:payload.sessionId,teamId:current.actorContext.teamId});
       }catch(error){for(const room of socket.rooms)if(room.startsWith('student:team:'))await socket.leave(room);fail(error);}})();}
       else handlers.onWatch?.(socket, payload);
     });

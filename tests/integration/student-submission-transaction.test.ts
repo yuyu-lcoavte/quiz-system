@@ -11,6 +11,30 @@ import { once } from 'node:events';
 import { io } from 'socket.io-client';
 import { DatabaseManager } from '../../apps/server/src/persistence/database.js';
 import { StudentWinnerResolver } from '../../apps/server/src/modules/student/application/winner-resolver.js';
+import { LeaderFailoverService } from '../../apps/server/src/modules/student/application/leader-failover-service.js';
+
+it.each([true, false])('serializes submission and failover (submission first: %s)', async (submissionFirst) => {
+  const f = await draftFixture();
+  expect((await f.edit('one')).status).toBe(200);
+  expect((await f.edit('two', ids.blank2)).status).toBe(200);
+  const identity = new StudentIdentityService(createStudentRepositories(f.database));
+  const previous = identity.resolve(cookieOf(f.a), ids.session1)!.actorContext;
+  const successor = identity.resolve(cookieOf(f.b), ids.session1)!.actorContext;
+  const service = new SubmissionService(f.database);
+  const failover = new LeaderFailoverService(f.database);
+  const answers = [{ blankId: ids.blank1, value: 'one' }, { blankId: ids.blank2, value: 'two' }];
+  const submit = (actor: typeof previous) => service.submit(actor, ids.session1, ids.round1, answers);
+  const accepted = submissionFirst ? submit(previous) : null;
+  expect(failover.reconcile({sessionId:ids.session1,teamId:ids.team1}, () => new Set([f.b.body.data.participantId]), f.a.body.data.participantId)).toBe(true);
+  expect(() => submit(previous)).toThrow(expect.objectContaining({code:'FORBIDDEN'}));
+  if (accepted) {
+    expect(() => submit(successor)).toThrow(expect.objectContaining({code:'DUPLICATE_SUBMISSION'}));
+    expect(f.repositories.submissionAnswers.listBySubmission(accepted.submissionId)).toMatchObject(answers);
+  } else {
+    expect(submit(successor)).toMatchObject({acceptedOrder:1,draftStatus:'locked'});
+  }
+  expect(f.database.prepare('SELECT count(*) AS count FROM submissions').get()).toEqual({count:1});
+});
 
 it('preserves the draft when another SQLite connection holds the writer lock, then exposes the committed submission to the resolver', async () => {
   const f = await draftFixture();

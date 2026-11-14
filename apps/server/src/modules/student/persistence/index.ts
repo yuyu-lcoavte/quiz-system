@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { StudentBrowserParticipantRepository, StudentCredentialRepository } from './identity-repository.js';
 import { TeamLeaderRepository } from './team-leader-repository.js';
+import { TeamJoinOrderRepository } from './team-join-order-repository.js';
 import { TeamRoundDraftAnswerRepository, TeamRoundDraftRepository } from './draft-repository.js';
 
 /** Construct Student-owned persistence adapters over Foundation's existing Database instance. */
@@ -9,6 +10,7 @@ export function createStudentRepositories(database: Database.Database) {
     credentials: new StudentCredentialRepository(database),
     browserParticipants: new StudentBrowserParticipantRepository(database),
     teamLeaders: new TeamLeaderRepository(database),
+    teamJoinOrder: new TeamJoinOrderRepository(database),
     drafts: new TeamRoundDraftRepository(database),
     draftAnswers: new TeamRoundDraftAnswerRepository(database),
   };

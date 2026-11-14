@@ -63,7 +63,7 @@ The current single authorized submitter for a canonical Team.
 
 **Relationship**: Each Team has at most one persisted assignment. Its holder may be offline when no other eligible member is online at the last-disconnect check. Use the existing `teamId` primary key and composite Team/Participant foreign key. Automatic assignments use `assignedByKind = system` and `assignedById = null`. History/audit events remain outside this Feature.
 
-### `StudentTeamJoinOrder` (planned additive migration)
+### `StudentTeamJoinOrder` (`004-student-team-join-order.sql`)
 
 | Field | Rule |
 | --- | --- |
@@ -75,7 +75,7 @@ Allocate the next order inside the existing enrollment or pre-start team-change 
 
 ### Student socket presence (process-local)
 
-Index authorized sockets by `(sessionId, participantId)` with unique socket IDs; derive Team from current canonical membership. Presence requires at least one live connection with valid Student credential and current Session/Team scope. Closing one socket removes only that ID. Stale disconnects cannot replace a leader already reassigned. Persist no socket IDs or presence booleans in SQLite.
+Use the server's live socket registry and verified handshake identity to group by Session/Participant; derive Team from current canonical membership. Presence requires at least one live connection with valid Student credential and current Session/Team scope. Closing one socket removes only that ID. Retain an in-process marker for the current assignment observed offline when no handoff has committed, and recheck it on authorized connect/re-subscribe. A stale marker cannot replace a different assignment. Persist no socket IDs or presence booleans in SQLite.
 
 ### `TeamRoundDraft`
 
