@@ -11,25 +11,77 @@ import { createSocketServer, type SocketServerOptions } from './realtime/socket-
 import { SessionStateService } from './modules/sessions/application/session-state-service.js';
 import { SessionLifecycleService } from './modules/sessions/application/session-lifecycle-service.js';
 import { SessionStatePublisher } from './realtime/session-state-publisher.js';
+import { createStudentRouter,type StudentSecurityOptions } from './api/student/student-router.js';
+import { createStudentRepositories } from './modules/student/persistence/index.js';
+import { StudentIdentityService } from './modules/student/application/student-identity-service.js';
+import { DraftService } from './modules/student/application/draft-service.js';
+import { createStudentCsrfService } from './api/middleware/student-csrf.js';
+import { studentDraftRoomName } from './modules/student/realtime/student-draft-room.js';
+import type { StudentEventSocket } from './modules/student/realtime/student-draft-socket.js';
+import { publishStudentDraftLock } from './modules/student/realtime/student-draft-socket.js';
+import { SubmissionService } from './modules/student/application/submission-service.js';
+import { parseUUID, type UUID } from '@quiz/contracts/domain';
+import { getStudentSocketIdentity } from './modules/student/realtime/student-draft-socket.js';
+import { LeaderFailoverService } from './modules/student/application/leader-failover-service.js';
+import { registerStudentMembershipSockets } from './modules/student/realtime/student-membership-sockets.js';
+import type { StudentMembershipChangedPayload } from '@quiz/contracts';
 
-export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {}
+export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {readonly studentSecurity?:StudentSecurityOptions;readonly studentDraftService?:DraftService;readonly studentSubmissionService?:SubmissionService;readonly publishStudentMembership?: (scope:StudentMembershipChangedPayload)=>void;readonly studentOnlineParticipants?: (scope:StudentMembershipChangedPayload)=>ReadonlySet<UUID>;}
 
 export function createApp(options: FoundationServerOptions = {}) {
   const app = express();
-  app.use('/api/v1', createApiRouter(options));
+  const identity = options.database ? new StudentIdentityService(createStudentRepositories(options.database)) : null;
+  app.use('/api/v1', createApiRouter({ ...options,
+    resolveActorContext: request => {
+      const supplied = options.resolveActorContext?.(request);
+      if (supplied) return supplied;
+      const scope = parseUUID(/^\/sessions\/([^/]+)(?:\/|$)/.exec(request.path)?.[1]);
+      return scope ? identity?.resolve(request.headers.cookie, scope)?.actorContext ?? null : null;
+    },
+    studentRouter: createStudentRouter(options.database,options.studentSecurity,options.activityCodeRateLimit,options.studentDraftService,options.studentSubmissionService,options.publishStudentMembership,options.studentOnlineParticipants) }));
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;
 }
 
 export function createHttpServer(options: FoundationServerOptions = {}) {
-  const app = createApp(options);
+  const identity=options.database?new StudentIdentityService(createStudentRepositories(options.database)):null;
+  const studentSocket=options.studentSocket??(identity&&options.studentSecurity?{allowedOrigins:options.studentSecurity.allowedOrigins,resolveIdentity:(cookie:string|undefined,id:import('@quiz/contracts/domain').UUID)=>identity.resolve(cookie,id)}:undefined);
+  let socketServer:ReturnType<typeof createSocketServer>;
+  const draft=options.database?new DraftService(options.database,(teamId,change)=>{
+    for(const socket of socketServer.sockets.sockets.values()){
+      const current=studentSocket?.resolveIdentity(socket.request.headers.cookie,change.sessionId);
+      const room=current?studentDraftRoomName(current.actorContext,change.roundId):null;
+      if(current?.actorContext.teamId===teamId&&room&&socket.rooms.has(room)) (socket as unknown as StudentEventSocket).emit('student:draft:changed',change);
+    }
+  }):undefined;
+  const submission=options.database?new SubmissionService(options.database,(teamId,lock)=>publishStudentDraftLock(socketServer,studentSocket,teamId,lock)):undefined;
+  let membership: ReturnType<typeof registerStudentMembershipSockets> | undefined;
+  const app = createApp({...options,studentDraftService:draft,studentSubmissionService:submission,publishStudentMembership:scope=>membership?.publish(scope),studentOnlineParticipants:scope=>membership?.onlineParticipants(scope) ?? new Set()});
   const httpServer = createServer(app);
   const stateService = options.database ? new SessionStateService(options.database) : null;
-  const socketServer = createSocketServer(httpServer, {
+  const studentActors = new WeakSet<object>();
+  socketServer = createSocketServer(httpServer, {
     ...options,
+    resolveSocketActorContext: socket => {
+      const scope = getStudentSocketIdentity(socket)?.sessionId;
+      const resolved = scope ? studentSocket?.resolveIdentity(socket.request.headers.cookie, scope) : null;
+      if (resolved) { studentActors.add(resolved.actorContext); return resolved.actorContext; }
+      return options.resolveSocketActorContext?.(socket) ?? null;
+    },
+    authorizeWatch: (actor, sessionId) => {
+      if (!studentActors.has(actor)) return options.authorizeWatch?.(actor, sessionId) ?? false;
+      if (actor.actorKind !== 'participant' || actor.sessionId !== sessionId || !actor.teamId || !actor.permissions.includes('session:watch')) return false;
+      membership?.reconcile({sessionId,teamId:actor.teamId});
+      return true;
+    },
+    studentSocket:studentSocket?{...studentSocket,draftService:draft,csrf:options.studentSecurity?createStudentCsrfService({secret:options.studentSecurity.secret}):undefined,
+      onAuthorizedDraftWatch:scope=>membership?.reconcile(scope)}:undefined,
     getSessionState: options.getSessionState ?? (stateService ? (sessionId) => stateService.getSnapshot(sessionId) : undefined),
   });
+  if (options.database && studentSocket) {
+    membership = registerStudentMembershipSockets(socketServer, studentSocket, new LeaderFailoverService(options.database));
+  }
   const statePublisher = new SessionStatePublisher(socketServer);
   const sessionLifecycle = options.database
     ? new SessionLifecycleService(options.database, { publish: (snapshot) => { statePublisher.publish(snapshot); } })
@@ -42,9 +94,15 @@ export function startServer() {
   const databaseManager = new DatabaseManager({ sqlitePath: config.sqlitePath });
   const database = databaseManager.open();
   runMigrations(database);
+  const studentIdentity = new StudentIdentityService(createStudentRepositories(database));
 
   const { httpServer } = createHttpServer({
     database,
+    studentSecurity:config.studentCsrfSecret?{secret:config.studentCsrfSecret,allowedOrigins:config.studentAllowedOrigins,nodeEnv:config.nodeEnv}:undefined,
+    studentSocket: {
+      allowedOrigins: config.studentAllowedOrigins,
+      resolveIdentity: (cookieHeader, sessionId) => studentIdentity.resolve(cookieHeader, sessionId),
+    },
     activityCodeRateLimit: {
       maxRequests: config.activityCodeLookupMaxRequests,
       windowMs: config.activityCodeLookupWindowMs,
@@ -55,6 +113,7 @@ export function startServer() {
   httpServer.listen(port, '127.0.0.1', () => {
     console.info(`Shared server listening on http://127.0.0.1:${port}`);
     console.info(`SQLite file configured at ${config.sqlitePath}`);
+    console.info(`Runtime: ${config.nodeEnv}; Student origins: ${config.studentAllowedOrigins.join(', ')}; CSRF secret configured: ${config.studentCsrfSecret !== null}`);
   });
   return httpServer;
 }

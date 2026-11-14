@@ -1,0 +1,102 @@
+@startuml
+title Student Feature — Component Diagram
+left to right direction
+skinparam componentStyle rectangle
+
+actor Student
+actor Teacher
+
+component "Single React/Vite App\nStudent pages and forms" as Web
+component "Student Web Adapters\nHTTP / draft Socket client" as StudentClient
+component "Shared Foundation Web\nRouter / Layout / SessionStateClient" as FoundationWeb
+
+component "Express API Router" as Api
+component "Student Feature Module" as StudentModule {
+  component "Student HTTP API" as StudentApi
+  component "Cookie Identity Resolver\nActorContext adapter" as Identity
+  component "Enrollment / Team Service" as TeamService
+  component "Draft Service" as DraftService
+  component "Submission Service" as SubmissionService
+  component "Student Winner Resolver" as WinnerService
+  component "Student Result Projection" as ResultProjection
+  component "StudentTrustedEndCoordinator\nStudent adapter, production wiring pending" as EndCoordinator
+  component "Student Draft Socket Events" as DraftSocket
+  component "Student Presence and Failover" as Presence
+}
+component "Foundation Module" as Foundation {
+  component "Session Query / Current Target" as ReadService
+  component "Lifecycle Transaction Service\nexisting End with supplied Result" as Lifecycle
+  component "Foundation session-state events" as StateEvents
+}
+component "Teacher Feature Backend" as TeacherModule
+component "Server Composition Root" as Composition
+interface "Proposed internal callback port\n(roundId) => Result | null" as WinnerPort
+database "Shared SQLite\nFoundation entities + Student tables" as DB
+
+Student --> Web
+Teacher --> TeacherModule
+Web --> FoundationWeb
+Web --> StudentClient
+StudentClient --> Api : same-origin HTTP
+StudentClient --> DraftSocket : student:draft:* via WebSocket
+FoundationWeb --> StateEvents : session:watch / state snapshots\nvia Student-authenticated WebSocket
+Api --> StudentApi
+StudentApi --> Identity : resolve verified cookie actor
+StudentApi --> TeamService
+StudentApi --> DraftService
+StudentApi --> SubmissionService
+StudentApi --> ResultProjection
+StudentApi --> ReadService : reuse Activity Code / current-target reads
+DraftSocket --> Identity
+DraftSocket --> DraftService : authorized watch/edit
+DraftSocket --> Presence : authenticated socket lifecycle\nand authorized re-subscription
+Presence --> DB : read join order / atomically update leader
+Presence --> StudentClient : committed membership invalidation\nverified Team sockets in any phase
+TeamService --> DB : Participant / TeamLeader / credential mapping
+DraftService --> DB : Team × Round draft / answers
+SubmissionService --> DB : canonical Submission / answers + draft lock
+WinnerService --> DB : accepted order in caller transaction
+ResultProjection --> DB : persisted Result / winning answers
+ReadService --> DB
+Lifecycle --> DB
+TeacherModule ..> EndCoordinator : proposed single endRound call
+EndCoordinator ..> Lifecycle : proposed Foundation internal port
+Lifecycle ..> WinnerPort : proposed callback inside write transaction
+WinnerService ..|> WinnerPort : implemented resolver, wiring pending
+Lifecycle --> StateEvents : publish only after commit
+StateEvents --> Web : existing Foundation state contract
+Composition ..> EndCoordinator : proposed injection
+Composition ..> Lifecycle
+Composition ..> WinnerService : proposed End wiring
+
+note bottom of StudentModule
+First-time join after first Active is allowed only into an existing Team.
+Student never creates Teams; existing members cannot transfer after first Active.
+Before first Active, Student moves auto-assign the source leader using trusted presence and join order.
+Student owns enrollment, opaque identity mapping, leader state, drafts,
+acceptedOrder creation and Student-only result projection.
+The `student_session` HttpOnly cookie uses Path=/ for Student HTTP and /socket.io;
+the server validates handshake Origin and derives identity from the cookie mapping.
+end note
+
+note bottom of StudentClient
+Student UI uses acknowledged HTTP edits per Blank;
+DraftClient reconciles HTTP results and versioned Socket notifications.
+Focused and failed local input is preserved until saved/confirmed.
+Identity is restored through the opaque Cookie; no browser token storage.
+end note
+
+note bottom of Foundation
+Existing public HTTP/DTO/Socket.IO contracts remain unchanged.
+Foundation and Student share one SQLite connection.
+The planned internal End callback is gated by T004; Foundation will not import Student.
+State publication is dispatched after commit.
+end note
+
+note right of TeacherModule
+Foundation currently grants only read/watch capabilities.
+Teacher End authorization via round:end is pending T004.
+The proposed Teacher integration calls one Student End coordinator.
+Teacher owns login/UI; Student selects the winner.
+end note
+@enduml

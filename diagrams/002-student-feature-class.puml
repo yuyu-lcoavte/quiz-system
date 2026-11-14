@@ -1,0 +1,209 @@
+@startuml
+title Student Feature — Class Diagram
+hide methods
+skinparam classAttributeIconSize 0
+
+class Session <<Foundation>> {
+  id: UUID
+  activityCode: string
+  currentRoundId: UUID?
+  stateVersion: integer
+}
+class Team <<Foundation>> {
+  id: UUID
+  sessionId: UUID
+  name: string
+}
+class Participant <<Foundation>> {
+  id: UUID
+  teamId: UUID
+  displayName: string?
+}
+class Round <<Foundation>> {
+  id: UUID
+  sessionId: UUID
+  phase: Waiting | Active | Ended
+  target: Question XOR QuestionGroup
+}
+class Question <<Foundation>>
+class Blank <<Foundation>>
+class QuestionGroup <<Foundation>>
+class Submission <<Foundation>> {
+  id: UUID
+  teamId: UUID
+  roundId: UUID
+  acceptedOrder: integer
+}
+class SubmissionAnswer <<Foundation>>
+class Result <<Foundation>> {
+  roundId: UUID
+  winningSubmissionId: UUID
+}
+class ActorContext <<Foundation>> {
+  actorKind: teacher | participant
+  actorId: string
+  sessionId: UUID?
+  teamId: UUID?
+  permissions: string[]
+}
+
+class StudentTrustedEndCoordinator <<Student adapter>> {
+  endRound(input, actorContext): SessionStateSnapshot
+}
+interface FoundationEndLifecyclePort <<Foundation internal port proposal>> {
+  endRoundWithWinnerResolver(input, resolver): SessionStateSnapshot
+}
+interface WinnerResolver <<callback contract proposal>> {
+  resolve(roundId): Result | null
+}
+class StudentWinnerResolver <<implemented>> {
+  resolveWinnerInTransaction(roundId): Result | null
+}
+
+class StudentBrowserCredential <<Student>> {
+  id: UUID
+  tokenHash: digest
+  expiresAt: datetime
+  revokedAt: datetime?
+}
+class StudentBrowserParticipant <<Student>> {
+  credentialId: UUID
+  sessionId: UUID
+  participantId: UUID
+}
+class TeamLeader <<Student>> {
+  teamId: UUID
+  participantId: UUID
+  assignedAt: datetime
+}
+class StudentTeamJoinOrder <<Student SQLite>> {
+  participantId: UUID
+  teamId: UUID
+  joinOrder: positive integer
+}
+class StudentSocketPresence <<process-local>> {
+  sessionId: UUID
+  participantId: UUID
+  liveSocketIds: Set<SocketId> (derived)
+  unresolvedOfflineAssignment: optional
+}
+Participant "1" -- "0..1" StudentTeamJoinOrder : current Team order
+Team "1" -- "0..*" StudentTeamJoinOrder : unique order within Team
+Participant "1" -- "0..1" StudentSocketPresence : all valid sockets
+StudentSocketPresence ..> TeamLeader : last disconnect may replace assignment
+class TeamRoundDraft <<Student>> {
+  teamId: UUID
+  roundId: UUID
+  version: integer
+  status: editable | locked
+  lockedAt: datetime?
+}
+class TeamRoundDraftAnswer <<Student>> {
+  teamId: UUID
+  roundId: UUID
+  blankId: UUID
+  value: string
+  revision: integer
+}
+class DraftMutationReceipt <<Student persistence>> {
+  teamId
+  roundId
+  clientMutationId
+  requestFingerprint
+  committedChange
+}
+TeamRoundDraft "1" *-- "0..*" DraftMutationReceipt : idempotent retries
+
+class StudentResultView <<DTO>> {
+  roundId: UUID
+  winner: WinningTeamView?
+}
+class WinningTeamView <<DTO>> {
+  teamId: UUID
+  teamName: string
+  answers: WinningAnswer[]
+}
+
+Session "1" -- "0..*" Team : contains
+Session "1" -- "0..*" Round : attempts
+Round "0..*" --> "0..1" Question : targets one
+Round "0..*" --> "0..1" QuestionGroup : targets one
+Question "1" -- "0..*" Blank : contains
+QuestionGroup "1" -- "0..*" Question : groups
+Team "1" -- "0..*" Participant : membership
+Team "1" -- "0..1" TeamLeader : current leader
+Participant "1" -- "0..1" TeamLeader : assigned leader
+StudentBrowserCredential "1" -- "0..*" StudentBrowserParticipant : restores
+Session "1" -- "0..*" StudentBrowserParticipant : scopes
+Participant "1" -- "0..1" StudentBrowserParticipant : recovered as
+Team "1" -- "0..*" TeamRoundDraft : owns
+Round "1" -- "0..*" TeamRoundDraft : scopes
+TeamRoundDraft "1" *-- "0..*" TeamRoundDraftAnswer : contains
+Blank "1" -- "0..*" TeamRoundDraftAnswer : current value
+Team "1" -- "0..*" Submission : submits
+Round "1" -- "0..*" Submission : accepts
+Submission "1" *-- "1..*" SubmissionAnswer : contains
+Blank "1" -- "0..*" SubmissionAnswer : answered by
+Round "1" -- "0..1" Result : publishes
+Submission "1" <-- "0..1" Result : winning submission
+Submission "1" ..> StudentResultView : projected only after Ended
+
+note right of TeamLeader
+At most one row per Team.
+First successful enrollment inserts it atomically.
+The leader Participant must belong to that Team.
+On last valid socket disconnect, select earliest eligible online teammate.
+Without a candidate, retain the current assignment.
+Before first Active, a sole member may move and clear the leader row.
+The empty Team remains; its next entrant becomes leader.
+If teammates remain, choose earliest online by join order.
+If all are offline, mark earliest remaining leader for online recheck.
+After first Active, new Participants may join only an existing Team;
+they do not replace its leader. Existing Participants cannot transfer Teams.
+end note
+
+note bottom of TeamRoundDraft
+Unique (teamId, roundId).
+Every accepted edit increments version.
+Successful Submission locks this row in the same transaction.
+end note
+
+note bottom of Submission
+Existing Foundation constraints remain authoritative:
+UNIQUE(teamId, roundId), UNIQUE(roundId, acceptedOrder).
+Student assigns acceptedOrder server-side under BEGIN IMMEDIATE.
+end note
+
+note left of StudentBrowserCredential
+Student-specific HttpOnly cookie contains only a high-entropy opaque secret;
+Path=/ sends it to Student HTTP and same-origin /socket.io.
+Database stores its digest, expiry and revocation state.
+Session mapping selects the canonical Participant;
+no client-provided identity is trusted.
+end note
+
+note right of QuestionGroup
+An empty group may be stored as incomplete data,
+but cannot be a Round target.
+end note
+
+note right of StudentResultView
+Returns winning Team name and its successful answer values,
+or winner=null. No losing submissions or acceptedOrder.
+Foundation ResultView is not expanded.
+end note
+
+StudentTrustedEndCoordinator ..> FoundationEndLifecyclePort : one internal End call
+FoundationEndLifecyclePort ..> WinnerResolver : invoke within same write transaction
+StudentWinnerResolver ..|> WinnerResolver : synchronous resolver; wiring pending
+StudentTrustedEndCoordinator ..> ActorContext : proposed round:end capability
+
+note bottom of FoundationEndLifecyclePort
+Coordinator, transaction port and WinnerResolver return synchronously;
+the callback receives Foundation's same SQLite connection/transaction.
+Foundation does not import Student. Commit precedes async Socket.IO dispatch;
+notification work is never awaited inside the transaction.
+Teacher issuance of round:end is pending T004.
+Coordinator core is implemented. Foundation callback wiring is pending T004.
+end note
+@enduml

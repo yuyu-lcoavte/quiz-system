@@ -1,0 +1,198 @@
+@startuml
+title Student Feature — Sequence Diagram
+autonumber
+
+actor Student
+participant "Student Web UI" as UI
+participant "Student HTTP / Service" as StudentApi
+participant "Student Draft Socket" as DraftSocket
+participant "Student Presence / Failover" as Presence
+participant "Foundation Query / State" as Foundation
+participant "Teacher Backend" as Teacher
+participant "StudentTrustedEndCoordinator\n(production wiring pending)" as EndCoordinator
+participant "Foundation Lifecycle Transaction" as Lifecycle
+participant "Student Winner Resolver" as WinnerResolver
+database "Shared SQLite\n(same Database instance)" as DB
+
+== Activity lookup and enrollment ==
+Student -> UI : enter Activity Code
+UI -> Foundation : GET /sessions/by-code/{code}
+Foundation -> DB : resolve Session summary
+DB --> Foundation : Session ID and phase
+Foundation --> UI : minimal summary
+UI -> StudentApi : GET student/join-options/{code}
+StudentApi -> Foundation : reuse lookup + rate-limit semantics
+StudentApi -> DB : list existing Team IDs/names only
+DB --> StudentApi : selectable existing Teams
+StudentApi --> UI : phase and join choices
+Student -> UI : choose existing Team and display name
+UI -> StudentApi : POST enrollment (same-origin Origin)
+StudentApi -> StudentApi : validate input, Origin and rate limit;\nrequire CSRF for already-bound Session
+StudentApi -> DB : BEGIN IMMEDIATE
+StudentApi -> DB : validate Session/Team; create/reuse credential and Participant mapping
+StudentApi -> DB : insert TeamLeader only if none
+DB --> StudentApi : committed Participant/Team/leader
+StudentApi --> UI : membership + CSRF token; Set-Cookie HttpOnly
+note over Student,StudentApi
+First-time enrollment remains allowed after first Active, into an existing Team only.
+This is not an existing Participant changing Teams; Student never creates Teams.
+end note
+
+== Change Team before first Active ==
+UI -> StudentApi : GET /me (verified Student cookie)
+StudentApi -> DB : read membership and check whether any Round has started
+StudentApi --> UI : eligible destination Teams
+Student -> UI : choose another Team (no successor input)
+UI -> StudentApi : POST team-change (Cookie, Origin, CSRF)
+StudentApi -> DB : BEGIN IMMEDIATE; revalidate history, Team and leadership
+alt eligible
+  StudentApi -> DB : assign earliest online teammate; otherwise flag earliest remaining for recheck; clear if empty
+  StudentApi -> DB : move Participant and assign destination leader if vacant; COMMIT
+  StudentApi --> UI : updated membership; invalidate affected Team memberships
+  UI -> StudentApi : re-read /me and CSRF
+  UI -> Foundation : existing session:watch for latest activity state
+else invalid or Session already started
+  StudentApi --> UI : reject without changing membership
+end
+
+== Activity state and target ==
+note over UI,Foundation
+The browser sends the Student-specific HttpOnly `student_session` cookie to both
+Student HTTP and same-origin /socket.io because Path=/.
+Student uses a WebSocket upgrade through Vite's proxy. The server validates
+handshake Origin and resolves Participant/Team from the cookie mapping.
+end note
+UI -> Foundation : existing session:watch
+Foundation -> Foundation : verify cookie-derived ActorContext
+Foundation --> UI : current SessionStateSnapshot
+Foundation --> UI : later session:state:changed after state commit
+alt Waiting or no Round
+  UI -> UI : show waiting; do not request target content
+else Active
+  UI -> Foundation : GET current-target
+  Foundation -> DB : validate current Round and fetch target/Blanks
+  Foundation --> UI : dynamic Question/QuestionGroup/Blank data
+end
+
+== Shared Team/Round draft ==
+UI -> DraftSocket : student:draft:watch {sessionId, roundId}
+DraftSocket -> DB : resolve credential, Team membership and Active Round
+DraftSocket -> DB : read/create Team × Round draft
+DB --> DraftSocket : latest persisted version and answers
+DraftSocket --> UI : student:draft:snapshot
+Student -> UI : edit a Blank
+alt Student UI uses acknowledged HTTP edit
+  UI -> StudentApi : PUT draft answer + CSRF + mutation ID
+  StudentApi -> DB : shared DraftService immediate transaction; validate and persist edit/version
+  DB --> StudentApi : committed change
+  StudentApi --> DraftSocket : publish committed change to authorized Team/Round subscribers
+  DraftSocket --> UI : student:draft:changed
+  StudentApi --> UI : accepted change HTTP response
+else supported Socket edit path
+UI -> DraftSocket : student:draft:edit + CSRF token + mutation ID
+DraftSocket -> DB : BEGIN IMMEDIATE; validate actor/target/unlocked draft
+DraftSocket -> DB : upsert Blank; increment version; COMMIT
+DB --> DraftSocket : committed version/value
+DraftSocket --> UI : student:draft:changed to server-derived Team/Round room
+end
+note over UI,DraftSocket
+Same-Blank conflict: last server-accepted edit wins.
+Refresh/reconnect uses persisted snapshot; Foundation state events carry no answers.
+The UI serializes writes per Blank and retains focused/unsaved input.
+Remote differences are indicated; submission waits for saved authoritative values.
+end note
+
+== Leader disconnect and role recovery ==
+UI -> Presence : authenticated activity and draft sockets connect
+UI -> Presence : transport disconnect, valid connect or authorized re-subscribe
+Presence -> Presence : inspect live registry and any unresolved offline assignment
+alt last valid socket lost or unresolved leader remains offline
+  Presence -> DB : BEGIN IMMEDIATE; recheck leader and scope
+  Presence -> DB : select first eligible online teammate by join order
+  alt eligible candidate exists
+    Presence -> DB : conditionally replace assignment; COMMIT
+    Presence --> UI : student:membership:changed to affected Team's connected clients
+  else no candidate
+    Presence -> DB : keep assignment; no notification
+  end
+else other valid socket remains or actor is no longer leader
+  Presence -> Presence : no leader change
+end
+UI -> StudentApi : GET /me on reconnect or membership invalidation
+StudentApi -> DB : resolve same Cookie identity and current assignment
+StudentApi --> UI : Participant / Team / current isLeader
+note over UI,Presence
+No application grace period. Reconnection does not reclaim a replaced role.
+Disable submit until current role is resolved; preserve the draft.
+end note
+
+== Submission ==
+Student -> UI : submit complete answers (leader only)
+UI -> StudentApi : POST submission (answers confirm draft; no Team, role or acceptedOrder)
+StudentApi -> DB : BEGIN IMMEDIATE
+StudentApi -> DB : revalidate leader, Active/current Round, exact target Blanks and no prior Submission
+StudentApi -> DB : load authoritative draft; reject mismatched request confirmation
+StudentApi -> DB : assign next acceptedOrder; insert Submission/draft answers; increment version and lock draft
+DB --> StudentApi : committed Submission + locked draft
+StudentApi --> UI : accepted outcome for this Team
+StudentApi --> DraftSocket : publish student:draft:locked after commit
+
+== Proposed Submission / End serialization (pending T004) ==
+note over Teacher,Lifecycle
+Teacher authorization and Foundation callback wiring are pending review.
+Student Winner Resolver is implemented and tested independently.
+end note
+alt Submission gets SQLite write lock first
+  Student -> StudentApi : concurrent valid submission
+  StudentApi -> DB : BEGIN IMMEDIATE; validate Active; persist Submission + lock draft; COMMIT
+  Teacher -> EndCoordinator : endRound(input, trusted ActorContext)
+  EndCoordinator -> EndCoordinator : verify teacher scope + round:end capability
+  EndCoordinator -> Lifecycle : endRoundWithWinnerResolver(input, callback)
+  Lifecycle -> DB : BEGIN IMMEDIATE; recheck Active/current/version
+  Lifecycle -> WinnerResolver : callback(roundId) inside transaction
+  WinnerResolver -> DB : read canonical Round Submissions by acceptedOrder
+  DB --> WinnerResolver : earliest Submission or none
+  WinnerResolver --> Lifecycle : Result candidate or null
+  Lifecycle -> DB : commit Ended + stateVersion + Result/replacement
+  DB --> Lifecycle : committed snapshot/result
+  Lifecycle --> Foundation : publish after commit
+  Foundation --> UI : existing session:state:changed (Ended)
+  EndCoordinator --> Teacher : committed SessionStateSnapshot
+else End gets SQLite write lock first
+  Teacher -> EndCoordinator : endRound(input, trusted ActorContext)
+  EndCoordinator -> EndCoordinator : verify teacher scope + round:end capability
+  EndCoordinator -> Lifecycle : endRoundWithWinnerResolver(input, callback)
+  Lifecycle -> DB : BEGIN IMMEDIATE; recheck Active/current/version
+  Lifecycle -> WinnerResolver : callback(roundId) inside transaction
+  WinnerResolver -> DB : read canonical Round Submissions by acceptedOrder
+  DB --> WinnerResolver : current earliest Submission or none
+  WinnerResolver --> Lifecycle : Result candidate or null
+  Lifecycle -> DB : commit Ended + stateVersion + Result/replacement
+  DB --> Lifecycle : committed snapshot/result
+  Lifecycle --> Foundation : publish after commit
+  Foundation --> UI : existing session:state:changed (Ended)
+  EndCoordinator --> Teacher : committed SessionStateSnapshot
+  Student -> StudentApi : later submission attempt
+  StudentApi -> DB : validate current Round is Active
+  DB --> StudentApi : Round is Ended; reject without write
+  StudentApi --> UI : 409 INVALID_PHASE
+end
+note over EndCoordinator,DB
+Teacher makes one synchronous internal End call. Foundation owns the synchronous outer transaction;
+the synchronous Student callback returns only the winner candidate. No Promise is awaited inside it.
+Resolver/SQL failure rolls back and skips publish.
+With no Submission, Foundation creates no Result and clears prior logical-target Result.
+All services use the same Database object; Commit precedes async Socket.IO dispatch;
+notification delivery is never awaited inside the transaction. No Foundation↔Student import cycle exists.
+end note
+
+== Student result projection ==
+UI -> StudentApi : GET Student result after Ended
+StudentApi -> DB : verify membership; read persisted Result/winning Team/answer rows
+DB --> StudentApi : winner data only or no winner
+StudentApi --> UI : winner Team name + successful answers, or winner=null
+note over StudentApi,UI
+Losing submissions and acceptedOrder are never returned.
+Foundation ResultView and state event payloads are unchanged.
+end note
+@enduml
