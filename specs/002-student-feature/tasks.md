@@ -12,6 +12,8 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 
 **Execution rule**: All tasks start unchecked. Do not implement a task before its listed dependencies and review gates pass. Tests are TDD tasks: write the test first, verify it fails for the expected reason, then implement.
 
+Active task accounting excludes the two Cancelled entries (T025/T026). There are 64 active tasks, 57 complete, 7 open, and 2 Cancelled among 66 retained IDs.
+
 ## Format: `- [ ] [TaskID] [P?] [Story?] Description`
 
 - **[P]**: The task can run in parallel without editing the same files or depending on unfinished work.
@@ -23,11 +25,11 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 **Purpose**: Verify reuse of Foundation and record the architecture decision separately from interface proposals. T004 is a hard gate for all tasks explicitly marked as blocked by review.
 
 - [X] T001 [P] Verify the existing workspace, Node/npm requirements, Vitest/Supertest/Socket.IO Client tools, Express composition root, `ActorContext`, SQLite `DatabaseManager`, Foundation repositories, and Socket.IO server; record actual source paths and reuse boundaries in `docs/integration/student-feature-review-gate.md`.
-- [X] T002 Record the implemented Foundation capabilities (`session:read`, `session:watch`, `target:preview`, `target:read`, `results:read`) and label `team:leader:transfer` and `round:end` as proposed additions, not existing grants, in `docs/integration/student-feature-review-gate.md` after T001 creates the review record.
-- [X] T003 Document and review the proposed `TransferTeamLeaderInput`/service and error mapping, the single `StudentTrustedEndCoordinator.endRound(...)` call, synchronous `WinnerResolver(roundId): Result | null` callback, shared SQLite instance/transaction ownership, no-winner behavior, and rollback/no-broadcast behavior in `docs/integration/student-feature-review-gate.md`.
+- [X] T002 Record the implemented Foundation capabilities (`session:read`, `session:watch`, `target:preview`, `target:read`, `results:read`) and record `round:end` as the proposed End capability, in `docs/integration/student-feature-review-gate.md` after T001 creates the review record.
+- [X] T003 Document and review the single `StudentTrustedEndCoordinator.endRound(...)` call, synchronous `WinnerResolver(roundId): Result | null` callback, shared SQLite instance/transaction ownership, no-winner behavior, and rollback/no-broadcast behavior in `docs/integration/student-feature-review-gate.md`.
 - [ ] T004 Obtain Teacher and Foundation owner review of the interfaces and permission names; record which responsibility directions are already decided, which signatures/capabilities were accepted or changed, and reviewer/date in `docs/integration/student-teacher-decisions.md`. **Gate**: tasks marked “blocked until T004 review” MUST NOT start until this record is approved; rejected proposals return to Plan/Clarify before implementation.
 
-**Gate boundary**: The architecture owner has decided the responsibility direction. T004 review verifies actual cross-module signatures, capability names, and same-transaction wiring; it does not re-open the decided Student/Teacher/Foundation responsibility split. No new Foundation public HTTP, DTO, or Socket.IO contract is authorized here.
+**Gate boundary**: The architecture owner has decided the responsibility direction. T004 review covers the Teacher End entry, `round:end` authorization, and the Foundation same-transaction callback; it does not re-open the decided Student/Teacher/Foundation responsibility split. No new Foundation public HTTP, DTO, or Socket.IO contract is authorized here.
 
 ---
 
@@ -71,8 +73,8 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 - [X] T022 [US1] Implement atomic enrollment and initial leader election in `apps/server/src/modules/student/application/enrollment-service.ts`; validate that the selected Team belongs to the Session, create/reuse canonical Participant and credential mapping, and insert TeamLeader only if absent. Permit a first-time join after first Active only into an existing Team; never create a Team or move an existing Participant through enrollment.
 - [X] T023 [US1] Implement `POST /api/v1/student/sessions/{sessionId}/enrollments`, `GET .../me`, and `GET .../csrf-token` controllers in `apps/server/src/api/student/enrollment-controller.ts` and `apps/server/src/api/student/student-router.ts`; allow the no-token bootstrap only when no Participant binding exists for that credential/Session, strictly require an allowed Origin and full server validation, require CSRF for an already-bound retry, return server-derived membership/leader status, set only the opaque `student_session` cookie with `Path=/`, HttpOnly, SameSite=Lax and Secure on production HTTPS, and preserve existing active-cookie CSRF validity across tabs.
 - [X] T024 [US1] Implement the Student-requested pre-start team-change transaction in `apps/server/src/modules/student/application/team-change-service.ts` and `apps/server/src/api/student/team-change-controller.ts`; require explicit source-Team successor handoff from a current leader and reject changes after first Active.
-- [ ] T025 [US1] Add authorization tests for the Teacher leader-transfer service, including missing ActorContext, wrong Session, absent proposed capability, successor outside Team/Session, concurrent transfer, and at-most-one leader in `tests/integration/student-teacher-leader-transfer.test.ts`. **Blocked until T004 review** confirms the service signature and capability string.
-- [ ] T026 [US1] Implement the trusted Teacher leader-transfer service and transactional repository operation in `apps/server/src/modules/student/application/team-leader-administration-service.ts`; require the reviewed ActorContext permission and verify the successor is a member of the specified Team and Session. **Blocked until T004 review**; do not add Teacher UI or a public test bypass.
+- [ ] T025 [US1] **Cancelled / 不適用** — Team decision removed Teacher-assigned leadership. Excluded from active task counts.
+- [ ] T026 [US1] **Cancelled / 不適用** — Team decision removed Teacher-assigned leadership. Excluded from active task counts.
 
 ---
 
@@ -126,14 +128,14 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 
 - [X] T039 [P] [US3] Add state-client tests for Session matching, stale `stateVersion`, reconnect/resubscribe authoritative snapshot, no answer data in Foundation events, and displaying a normal-connection state change within 2 seconds in `tests/web/student-session-state.test.ts`.
 - [X] T040 [P] [US3] Add result projection tests for Ended gating, winner Team/answer allowlist, no loser/acceptedOrder leakage, new Round isolation, and no-winner projection in `tests/api/student-result.test.ts`.
-- [ ] T041 [US3] Add Submit-vs-End transaction race tests for both lock orders, result replacement, no Submission, injected resolver failure, rollback, and post-commit-only broadcast in `tests/integration/student-end-race.test.ts`. **Blocked until T004 review** confirms the same-connection callback contract.
+- [ ] T041 [US3] Add Submit-vs-End transaction race tests for both lock orders, result replacement, no Submission, injected resolver failure, rollback, and post-commit-only broadcast in `tests/integration/student-end-race.test.ts`. Student-side scenarios can run against a test-only port. Completion requires T004 and validation against the real T044/T045 path.
 
 ### Implementation for User Story 3
 
 - [X] T042 [US3] Integrate the existing Foundation `SessionStateClient` into the Student activity route in `apps/web/src/modules/student/student-session-state.ts`; display authoritative state and Round reference, ignore stale versions, and resubscribe/reconcile on reconnect without duplicating Foundation Socket.IO events.
 - [X] T043 [US3] Implement the synchronous Student winner resolver over canonical accepted Submissions in `apps/server/src/modules/student/application/winner-resolver.ts`; order by persisted `accepted_order`, construct the canonical Foundation Result candidate, and return `null` when no valid Submission exists without writing Result or publishing state.
 - [ ] T044 [US3] Add the minimal Foundation internal lifecycle port that accepts a synchronous winner callback using the same `Database` connection and `BEGIN IMMEDIATE` transaction in `apps/server/src/modules/sessions/application/foundation-transactions.ts` and `apps/server/src/modules/sessions/application/session-lifecycle-service.ts`; persist Ended/stateVersion/Result atomically, clear the prior logical-target Result on no winner, and publish only after commit. **Blocked until T004 review**; do not change Foundation public HTTP, DTO, or Socket.IO contracts.
-- [ ] T045 [US3] After T043 and T044, implement the single synchronous `StudentTrustedEndCoordinator.endRound(input, actorContext)` in `apps/server/src/modules/student/application/student-trusted-end-coordinator.ts`; validate the reviewed Teacher scope/capability and call the Foundation lifecycle port once with the synchronous Student resolver. **Blocked until T004 review**; Teacher must not call resolver and Foundation End separately.
+- [ ] T045 [US3] Complete production wiring after T004, T043 and T044 for the single synchronous `StudentTrustedEndCoordinator.endRound(input, actorContext)` in `apps/server/src/modules/student/application/student-trusted-end-coordinator.ts`; validate the reviewed Teacher scope/capability and call the Foundation lifecycle port once with the synchronous Student resolver. Student-side adapter preparation can proceed with an injected test port. Completion requires the approved Foundation port and production wiring. Teacher calls the coordinator once.
 - [X] T046 [US3] Implement the Student-only Ended result projection and route in `apps/server/src/modules/student/application/student-result-service.ts` and `apps/server/src/api/student/result-controller.ts`; require enrolled Participant context and return only winning Team name/answers or `winner: null`.
 
 ---
@@ -157,17 +159,17 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 
 **Purpose**: Complete traceability and operational evidence without claiming manual tests that have not been run.
 
-- [X] T055 [P] Update the Windows Student Feature validation steps and expected limitations in `tests/manual/student-feature.md`; include cookie/CSRF inspection, two-member shared draft, late join, leader transfer, submission, End race, reconnect, isolation, and authenticated Teacher workflow.
+- [X] T055 [P] Update the Windows Student Feature validation steps and expected limitations in `tests/manual/student-feature.md`; include cookie/CSRF inspection, two-member shared draft, late join, automatic leader succession, submission, End race, reconnect, isolation, and authenticated Teacher workflow.
 - [X] T056 [P] Update Student Feature install/check/run and focused test commands in `specs/002-student-feature/quickstart.md`; distinguish automated tests from browser/manual acceptance.
 - [X] T057 [P] Create the FR/SC → task → implementation → test traceability matrix in `specs/002-student-feature/traceability.md`; include the cross-module gate and identify every manual-only acceptance.
 - [X] T058 Compare the implementation with the three Student PlantUML diagrams; update `diagrams/002-student-feature-component.puml`, `diagrams/002-student-feature-class.puml`, and `diagrams/002-student-feature-sequence.puml` where needed, then regenerate and inspect the matching PNG files in `diagrams/` using the Constitution-required PlantUML CLI command.
-- [ ] T059 After T004, T026, and T043–T045, review the implemented Teacher/Student internal interfaces and additive Student HTTP/Socket contracts against `docs/integration/student-teacher-decisions.md`, `docs/integration/teacher-foundation-integration-guide.md`, and `specs/002-student-feature/contracts/`; record actual review status and any contract differences without changing Foundation public contracts implicitly.
+- [ ] T059 After T004, T041, and T043–T045, review the implemented Teacher/Student internal interfaces and additive Student HTTP/Socket contracts against `docs/integration/student-teacher-decisions.md`, `docs/integration/teacher-foundation-integration-guide.md`, and `specs/002-student-feature/contracts/`; record actual review status and any contract differences without changing Foundation public contracts implicitly.
 - [ ] T060 After T066 and reviewed Teacher integration, run `npm.cmd run check` from the repository root and record TypeScript, Build, Vitest, and any failures in `specs/002-student-feature/quickstart.md`; include Foundation regression results and do not mark manual acceptance complete from automated results.
-- [ ] T061 After T004, T026, T041, T043–T045, T050–T055, T059, and T066, perform the Windows browser acceptance using `tests/manual/student-feature.md` with at least two student clients and an authenticated Teacher workflow. Time three fresh joins from submitting a valid Activity Code to rendering enrolled membership (120 seconds per run). Verify multi-tab disconnect, last-socket handoff, no eligible successor and F5 recovery of the same Participant with the current role. Record actual results and unrun checks.
+- [ ] T061 After T004, T041, T043–T045, T050–T055, T059, and T066, perform the Windows browser acceptance using `tests/manual/student-feature.md` with at least two student clients and an authenticated Teacher workflow. Time three fresh joins from submitting a valid Activity Code to rendering enrolled membership (120 seconds per run). Verify multi-tab disconnect, last-socket handoff, no eligible successor and F5 recovery of the same Participant with the current role. Record actual results and unrun checks.
 
 ## Follow-up: Student leader failover (2026-11-14)
 
-The 52 checked tasks record the previously implemented baseline. The following tasks cover the new behavior. Coordinate FR-004 with OpenSpec/Teacher before common acceptance. The Student-only path has no dependency on the proposed Teacher permission strings or End port. T025/T026 and Teacher publication wiring still require T004.
+The following tasks cover Student automatic succession. Coordinate FR-004 with OpenSpec/Teacher for common acceptance.
 
 - [X] T062 [US1] Add failing backend cases in `tests/integration/student-leader-reconnect.test.ts`, `tests/persistence/student-migration.test.ts` and `tests/integration/student-submission-transaction.test.ts`: ordered eligibility, cross-Team/Session and invalid credentials, multiple sockets, no candidate, repeated disconnect, F5 identity vs role, commit-only invalidation and both failover/submit transaction orders.
 - [X] T063 [US1] After T062, add the Student join-order migration in `apps/server/src/persistence/migrations/` using the next available number; integrate order assignment with `enrollment-service.ts` and `team-change-service.ts`, including existing-data backfill, repeat joins, move ordering and rollback.
@@ -181,9 +183,9 @@ The 52 checked tasks record the previously implemented baseline. The following t
 
 ### Phase Dependencies
 
-- **Phase 1 (T001–T004)**: Read-only Foundation verification and cross-module review record. T004 is a hard gate only for the leader-transfer and End/winner integration tasks; unrelated Student infrastructure may proceed.
+- **Phase 1 (T001–T004)**: Read-only Foundation verification and cross-module review record. T004 is a hard gate only for the End/winner integration tasks; unrelated Student infrastructure may proceed.
 - **Phase 2 (T005–T016)**: Depends on the existing Foundation workspaces. Completes the shared Student persistence, identity, security and module seams before user flows.
-- **US1 (T017–T026)**: Depends on Phase 2. T025–T026 are additionally blocked until T004 passes.
+- **US1 (T017–T024)**: Depends on Phase 2.
 - **US2 Draft (T027–T032)**: Depends on the trusted identity/Team context and draft migration in Phase 2; functional collaboration also depends on a joined Participant from US1.
 - **US2 Submission (T033–T038)**: Depends on US1 membership/leader and US2 draft work. Submission and draft lock are one transaction.
 - **US3 (T039–T046)**: State display can begin after Phase 2; result projection depends on Foundation records and submission behavior. T041, T044 and T045 are blocked until T004 passes.
@@ -192,7 +194,7 @@ The 52 checked tasks record the previously implemented baseline. The following t
 
 ### User Story Dependencies
 
-- **US1 (P1)**: Depends on Phase 2 identity and persistence. Its core join/recovery story can be independently tested; Teacher leader recovery (T025–T026) is specifically gated by T004.
+- **US1 (P1)**: Depends on Phase 2 identity and persistence. Its core join/recovery story can be independently tested.
 - **US2 (P1)**: Depends on verified Participant/Team context from US1. Draft editing and Submission are separate checkpoints, with Submission depending on the draft service and lock state.
 - **US3 (P1)**: Reuses Foundation state sync. End/winner integration depends on the T004 review and successful US2 Submission path; the Student result projection can be tested against controlled persisted fixtures.
 

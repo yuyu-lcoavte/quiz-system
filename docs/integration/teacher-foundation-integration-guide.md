@@ -16,7 +16,7 @@ Foundation 的 38 項任務已完成。驗收回報為 16 個測試檔、84 項�
 | 模組 | 主要職責 | 不應重複實作 |
 | --- | --- | --- |
 | **Foundation（已完成）** | 共用路由、資料表與 Repository、Migration、資料關係驗證、活動狀態服務、Result 交易、讀取 API、Socket.IO session 同步、共用 Contracts | 不負責帳密登入、答案編輯／提交順位或勝者決定 |
-| **Teacher Feature（老師端）** | 老師身分驗證、題目／題組管理與匯入、活動建立及開始／結束操作、組長轉交的老師 UI 與授權入口 | 不應重新建立 Session、Round、Result 的第二套資料模型／儲存服務 |
+| **Teacher Feature（老師端）** | 老師身分驗證、題目／題組管理與匯入、活動建立及開始／結束操作 | 不應重新建立 Session、Round、Result 的第二套資料模型／儲存服務 |
 | **Student Feature（學生端）** | 學生加入及身分恢復、Team／Participant 與組長權限、同組草稿同步、組長提交、後端接受順位、勝者選取、學生結果顯示投影 | 不應重做 Foundation 的生命週期交易、公開 ResultView 契約 |
 
 ## 2. 倉庫與環境
@@ -100,19 +100,9 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 - 既有測試用 ActorContext 注入僅限測試環境，不得用於正式操作。
 - Student Feature 的活動內身分不另設帳密；由後端核發可驗證的憑證並支援同瀏覽器恢復。學生身分及組長資格不是老師登入的替代品。
 
-## 8. 老師端必須預留的兩個跨模組介接
+## 8. 老師端必須預留的End 跨模組介接
 
-這兩項的**責任方向已定**；Student Plan 已提出內部服務介面及新 capability 名稱供 Teacher／Foundation 審閱，尚未表示雙方已逐項程式驗證。老師端不要另行發明公開端點。
-
-### 8.1 組長轉交
-
-- 第一位成功加入某組的學生，由 Student 後端**原子**指定為該組唯一組長。
-- 2026-11-14 Student 新決議，待 OpenSpec／Teacher 同步：最後有效 Socket.IO 連線中斷後立即依加入順序選擇在線合資格組員，無候選就保留原指派。原組長被替換後不因重連取回角色。搶答首次開始前若組長轉組，仍須明確交接；開始後不可自由換組。
-- **已驗證教師**指定新組長的手動操作保留原提案；無教師遞補秒數設定。
-- Foundation 既有 ActorContext 權限只有 `session:read`、`session:watch`、`target:preview`、`target:read`、`results:read`，不含組長管理權限。Student Plan 提議新增 `team:leader:transfer` capability 字串，由 Teacher 驗證後放入伺服器建立的 ActorContext；此名稱不是 Foundation 已有 grant，待 Teacher 組員審閱。
-- **Teacher Feature 負責**：顯示組員與目前組長、提供「指定新組長」UI，以及可信授權操作入口。
-- **Student Feature 負責**：驗證目標組員資格、保證同組同時最多一位組長、以交易完成轉交並提供最新權限狀態。
-- **Student Plan 介面提案，尚待 Teacher 組員審閱**：`specs/002-student-feature/contracts/internal-services.md` 定義可信 Teacher 服務草案；需確認權限名稱、手動轉交與遞補競爭、Teacher 如何重讀組長狀態。規劃中的 `student:membership:changed` 只通知有權限的同組 Student 重讀 `/me`，Teacher 接收介面未定案。
+Teacher、Student 與 Foundation 的 End 介面待 T004 確認。
 
 ### 8.2 結束搶答、勝者選取與 Result 儲存
 
@@ -124,7 +114,7 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 4. Foundation 與 Student 使用同一 `better-sqlite3` Database instance；Foundation 的 SQLite End 交易與 Student resolver 都同步執行，Foundation 在一個 `BEGIN IMMEDIATE` 交易內呼叫 resolver、持久化 `Ended`／`Result`／`stateVersion`。Commit 後才非同步派送既有 Socket.IO 狀態通知；不得在交易內等待通知，也不得讓交易 callback 回傳／等待 Promise。
 5. Student 結果投影在 Ended 後公開勝出組別名稱與其成功答案，**不公開其他組答案／順位**；沒有 Submission 時不建立 Result。
 
-**權限與介面狀態**：Foundation 目前沒有 `round:end` capability。Student Plan 提議此字串由 Teacher middleware 驗證後加入 ActorContext；Leader transfer 同理提議 `team:leader:transfer`。兩者皆為新 capability 提案，不是假設 Foundation 已有權限。
+**權限與介面狀態**：Foundation 目前沒有 `round:end` capability。Student Plan 提議此字串由 Teacher middleware 驗證後加入 ActorContext。
 
 **必要並行安全條件**：不允許「先查勝者」與「稍後 End」之間有新提交插入。Plan 的交易內 callback 為內部介面提案，待 Teacher／Foundation 負責人審閱；它不改 Foundation 公開 HTTP、DTO 或 Socket.IO 契約。
 
@@ -140,7 +130,6 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 - 活動／題目／題組建立及教師操作流程。
 - Guided Notes／題目匯入、回寫與輸出（Google Sheets／Excel 等細節依共同需求由老師端確認）。
 - 開始、結束、下一題、重開的教師操作入口與錯誤提示。
-- 組長指定／轉交的教師 UI。
 - 完整 Teacher × Student 整合及實際雙組別 Demo。
 - Teacher admission-stop 設定；目前決議允許晚到學生加入既有 Team。
 
@@ -161,7 +150,6 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 ### 交接完成判準
 
 - [ ] 老師端理解 Foundation 可重用能力與不能假設已實作的功能。
-- [ ] 老師端納入「教師授權轉交組長」操作與 Student 服務整合點。
 - [ ] 老師端 End 操作使用共同確認的可信後端協調流程，沒有自行指定勝者或拆散交易。
 - [ ] 正式的跨模組函式／DTO／錯誤契約於 Student Plan 定版後雙方核對。
 - [ ] 共同 Demo 時另外驗證真人教師／學生雙端流程。

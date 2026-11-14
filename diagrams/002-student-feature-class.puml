@@ -47,7 +47,7 @@ class ActorContext <<Foundation>> {
   permissions: string[]
 }
 
-class StudentTrustedEndCoordinator <<Student service proposal>> {
+class StudentTrustedEndCoordinator <<Student adapter>> {
   endRound(input, actorContext): SessionStateSnapshot
 }
 interface FoundationEndLifecyclePort <<Foundation internal port proposal>> {
@@ -193,14 +193,13 @@ StudentTrustedEndCoordinator ..> FoundationEndLifecyclePort : one internal End c
 FoundationEndLifecyclePort ..> WinnerResolver : invoke within same write transaction
 StudentWinnerResolver ..|> WinnerResolver : synchronous resolver; wiring pending
 StudentTrustedEndCoordinator ..> ActorContext : proposed round:end capability
-TeamLeader ..> ActorContext : proposed team:leader:transfer capability
 
 note bottom of FoundationEndLifecyclePort
 Coordinator, transaction port and WinnerResolver return synchronously;
 the callback receives Foundation's same SQLite connection/transaction.
 Foundation does not import Student. Commit precedes async Socket.IO dispatch;
 notification work is never awaited inside the transaction.
-The capability strings are proposals, not existing Foundation grants.
-The Coordinator and Foundation callback port are pending T004.
+Teacher issuance of round:end is pending T004.
+Coordinator core is implemented. Foundation callback wiring is pending T004.
 end note
 @enduml

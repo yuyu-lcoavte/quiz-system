@@ -35,7 +35,7 @@ npm.cmd run dev
 | `DEMO-ACTIVE` | Active，兩題、四個 Blank，可用不同學生身分測試同組草稿和提交。 |
 | `DEMO-ENDED` | Ended，含已持久化的勝出組別及四筆答案。 |
 
-每個代號各是一場活動。Fixture 只透過本機命令建立獨立 SQLite 檔，會拒絕覆寫既有檔案。Teacher 控制 Round、老師轉交組長及 Submit／End 競爭須另做整合驗收。操作步驟與已回報的瀏覽器觀察見 [Windows 人工驗收紀錄](../../tests/manual/student-feature.md)。
+每個代號各是一場活動。Fixture 只透過本機命令建立獨立 SQLite 檔，會拒絕覆寫既有檔案。Teacher 控制 Round及 Submit／End 競爭須另做整合驗收。操作步驟與已回報的瀏覽器觀察見 [Windows 人工驗收紀錄](../../tests/manual/student-feature.md)。
 
 ## 指定自動化測試
 
@@ -61,3 +61,5 @@ npm.cmd test -- tests/integration/migrations.test.ts tests/integration/migration
 上述是遞補前基準。2026-11-14 T062～T066 的 `npm.cmd run check` 已通過，TypeScript、Production Build 與 Vitest 均成功，共 44 個檔案、179 項測試。包含既有回歸，以及新 migration 回填、多連線遞補、撤銷憑證、回滾、提交兩種交易順序與過期身分回應。
 
 T066 已以隔離 Demo 實測兩個 Cookie 身分、多分頁、F5、無候選及新組員上線後遞補，另確認新任組長提交後兩端草稿鎖定。Vite 再度記錄 `ECONNABORTED`，本次已驗收操作均完成。T060 最終整合檢查與 T061 正式 Teacher／Student 驗收仍待已審閱的 Teacher 介接。[Windows 人工驗收紀錄](../../tests/manual/student-feature.md)
+
+取消教師組長操作後，Student End 準備階段的 `npm.cmd run check` 通過，包含 TypeScript、45 個測試檔的 187 項 Vitest 測試及 Production Build。新增的 End 測試使用測試專用 port、同一筆外層 SQLite 寫入交易及現有 Foundation 持久化程式，驗證兩種取鎖順序、結果讀取、回滾與通知時機。T041、T045 須在 T044 正式 callback 與 Teacher 接線後完成驗證。

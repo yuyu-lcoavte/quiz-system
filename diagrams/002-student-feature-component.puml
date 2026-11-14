@@ -19,8 +19,7 @@ component "Student Feature Module" as StudentModule {
   component "Submission Service" as SubmissionService
   component "Student Winner Resolver" as WinnerService
   component "Student Result Projection" as ResultProjection
-  component "Teacher Leader Transfer\nT004 integration proposal" as LeaderTransfer
-  component "StudentTrustedEndCoordinator\nT004 integration proposal" as EndCoordinator
+  component "StudentTrustedEndCoordinator\nStudent adapter, production wiring pending" as EndCoordinator
   component "Student Draft Socket Events" as DraftSocket
   component "Student Presence and Failover" as Presence
 }
@@ -53,7 +52,6 @@ DraftSocket --> DraftService : authorized watch/edit
 DraftSocket --> Presence : authenticated socket lifecycle\nand authorized re-subscription
 Presence --> DB : read join order / atomically update leader
 Presence --> StudentClient : committed membership invalidation\nverified Team sockets in any phase
-LeaderTransfer ..> Presence : reuse membership publication after commit
 TeamService --> DB : Participant / TeamLeader / credential mapping
 DraftService --> DB : Team × Round draft / answers
 SubmissionService --> DB : canonical Submission / answers + draft lock
@@ -61,8 +59,6 @@ WinnerService --> DB : accepted order in caller transaction
 ResultProjection --> DB : persisted Result / winning answers
 ReadService --> DB
 Lifecycle --> DB
-TeacherModule ..> LeaderTransfer : proposed transferLeaderByTeacher call
-LeaderTransfer ..> DB : proposed atomic leader reassignment
 TeacherModule ..> EndCoordinator : proposed single endRound call
 EndCoordinator ..> Lifecycle : proposed Foundation internal port
 Lifecycle ..> WinnerPort : proposed callback inside write transaction
@@ -98,8 +94,7 @@ end note
 
 note right of TeacherModule
 Foundation currently grants only read/watch capabilities.
-team:leader:transfer and round:end are new proposed ActorContext strings,
-not existing Foundation permissions; Teacher middleware must issue them after auth.
+Teacher End authorization via round:end is pending T004.
 The proposed Teacher integration calls one Student End coordinator.
 Teacher owns login/UI; Student selects the winner.
 end note

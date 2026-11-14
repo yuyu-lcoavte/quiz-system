@@ -14,8 +14,7 @@
 | 身分恢復 | 同一瀏覽器在有效憑證仍存在時可恢復原 Participant 與 Team；不能只信任 Cookie 中自行宣稱的 Team ID | Student |
 | 組長產生 | 第一位**成功加入** Team 者由後端原子指定為唯一組長 | Student |
 | 組長斷線（Student 新決議，待跨組同步） | 最後有效 Socket.IO 連線中斷後立即依加入順序遞補在線合資格組員。其他連線仍在或無在線候選時維持指派；被替換的組長重連不取回資格。提交權限依伺服器目前指派 | Student |
-| 組長轉組 | 搶答首次開始前，原組長要轉組時必須先明確完成交接；開始後不得自由換組 | Student，Teacher 視需求協助 |
-| 教師手動轉交（原提案） | 由授權教師發起「指定新組長」，Student 後端驗證並原子更新；與自動遞補同時發生時的介接需審閱 | Teacher UI／可信入口 + Student 服務 |
+| 組長轉組 | 搶答首次開始前，原組長要轉組時必須先明確完成交接；開始後不得自由換組 | Student |
 | 共同編輯 | 草稿以 Team × Round 保存，組員即時共享；同一 Blank 的衝突採**伺服器最後接受修改勝出** | Student |
 | 草稿恢復 | 重新整理／重連後恢復伺服器權威草稿 | Student |
 | 填空完整性 | 單題多 Blank 必須全部有非空白答案才可提交；題組依既有共同需求完成所有必填項 | Student |
@@ -29,13 +28,9 @@
 
 ## 二、交給老師端的明確結論
 
-### 決議 T-01：老師端需要「組長轉交」操作
+### 決議 T-01：取消教師組長操作
 
-**請老師端實作**：在可信的教師操作介面顯示組別成員與現任組長，提供「指定新組長」動作，將教師身分與目標組員交給後端進行授權驗證。
-
-**學生端實作**：安全的 Team／Participant／Leader 關係管理、原子轉交、合法性驗證、恢復後的權限結果。Student Plan 提議 capability `team:leader:transfer`；這是新的 Teacher-issued permission string，不在 Foundation 現有讀取權限中，須經 Teacher 組員審閱後由 Teacher middleware 發出。
-
-**禁止**：由教師前端直接修改 SQLite 或以 Client 傳入的 `isLeader=true` 當作授權結果。
+首位成功加入及離線自動遞補已涵蓋組長指派與接任，團隊取消教師手動指定或轉交及其授權提案。T025、T026 保留原編號並列為 Cancelled。學生於活動開始前轉組的交接規則保留。
 
 ### 決議 T-02：老師端 End 須整合 Student 勝者服務
 
@@ -57,7 +52,6 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 
 | 待補事項 | 建議由誰產出初稿 | 驗收重點 |
 | --- | --- | --- |
-| 教師授權組長轉交的後端服務介面／DTO／錯誤碼 | Student Plan 提議 `team:leader:transfer` capability 與內部 service；Teacher 接 UI，待共同審閱 | 不可偽造教師、跨活動、重複組長；權限變更原子且可查；此 capability 不是 Foundation 已有 grant |
 | Teacher 單一 End 呼叫與交易內 Student winner callback | Student Plan 提議 `StudentTrustedEndCoordinator.endRound(...)` 與 Foundation 同連線 callback；Teacher + Foundation 負責人待共同審閱 | 結束與提交並發時結果一致、rollback 不廣播、Commit 後才推播 |
 | Student 專用結果投影 API／DTO | Student Plan 已提出草案 | 只在 Ended 顯示、只提供勝者組名／答案，不外洩其他組 |
 | Student 草稿事件與同步 DTO | Student Plan 已提出草案 | Team／Round 隔離、最後接受修改生效、重連恢復、不與 Foundation 事件衝突 |
@@ -68,12 +62,12 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 ## 四、後續分工與驗證
 
 - **Student**：Plan 文件已提出資料模型、受保護服務、草稿同步、學生結果投影及內部函式契約；Tasks 可先建立明確的跨模組審閱 Gate。Teacher/Foundation 須在相關整合實作開始前審閱新 capability 字串與單一 End transaction callback。
-- **Teacher**：可開始老師登入、題目／活動操作的獨立工作，並為 T-01、T-02 預留介接位置；暫勿自行創造同名的組長／勝者服務。
-- **雙方共同驗證**：首位組員同時加入的競爭、組長斷線／轉交、草稿衝突與恢復、只有組長能提交、結束和提交同時發生、雙 Client 同步、跨 Session／Team 隔離及無勝者結束。
+- **Teacher**：可開始老師登入、題目／活動操作的獨立工作，並為 T-02 預留介接位置；暫勿自行創造同名的勝者服務。
+- **雙方共同驗證**：首位組員同時加入的競爭、組長斷線遞補、草稿衝突與恢復、只有組長能提交、結束和提交同時發生、雙 Client 同步、跨 Session／Team 隔離及無勝者結束。
 
 ### 給老師端組員的一句話
 
-> 目前共同決議已由學生端統一整理：老師端需提供**授權組長轉交 UI**及**教師結束搶答入口**；組長權限與答案接受順序、勝者選取由 Student 後端負責；Round End／Result 儲存與狀態同步沿用 Foundation。Student Plan 已提出內部介面草案；實際 capability 名稱與服務介接仍依 T004 跨模組審閱結果定案，不需要在老師端重做相同服務。
+> 目前共同決議已由學生端統一整理：老師端需提供**教師結束搶答入口**；組長權限與答案接受順序、勝者選取由 Student 後端負責；Round End／Result 儲存與狀態同步沿用 Foundation。Student Plan 已提出內部介面草案；實際 capability 名稱與服務介接仍依 T004 跨模組審閱結果定案，不需要在老師端重做相同服務。
 
 ---
 

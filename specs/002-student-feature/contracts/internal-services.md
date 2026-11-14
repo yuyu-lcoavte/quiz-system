@@ -1,6 +1,6 @@
-# Student Internal Service Contracts (Plan Proposal)
+# Student Internal End Contract
 
-These are trusted in-process server interfaces, not browser APIs. The responsibility direction is decided: Teacher provides operation entry points; Student validates/transfers leaders and selects the winner; Foundation owns the End/Result transaction and post-commit state publication. Exact signatures and the new capability strings below are proposals for review, not existing Foundation permissions or programmatically verified services.
+Teacher provides the trusted End command. Student selects the winner and Foundation owns End/Result persistence and state publication. The production connection and Teacher authorization remain pending T004.
 
 ## Foundation ActorContext Permission Baseline
 
@@ -12,14 +12,7 @@ Foundation currently defines `ActorContext.permissions` as `readonly string[]`. 
 - `target:read`
 - `results:read`
 
-The Foundation contract and server code do **not** currently define or grant Teacher write capabilities for leader transfer or Round End. This Plan proposes two additional capability strings in the same existing ActorContext shape:
-
-| Proposed capability | Used by | Status |
-|---|---|---|
-| `team:leader:transfer` | Student leader-transfer service | New proposal; Teacher auth must issue only to an authorized teacher. |
-| `round:end` | Student's single trusted End coordinator | New proposal; Teacher auth must issue only to an authorized teacher. |
-
-These strings are not assumed to exist. Teacher Feature must add them to its own authorization decision and place them in server-created ActorContext; the Teacher/Student/Foundation owners must confirm the names before implementation. No Foundation `ActorContext` type or public contract change is needed because permissions are already strings.
+The proposed `round:end` capability belongs to a server-created Teacher context scoped to the Session. Production issuance and the internal port require T004 review.
 
 Use the canonical Foundation `ActorContext` directly:
 
@@ -32,42 +25,9 @@ type TeacherScopedActorContext = ActorContext & {
 
 It is produced by trusted Teacher authentication middleware, never request JSON.
 
-## 1. Teacher-Authorized Leader Transfer
+## Single Teacher End Interface with Student Winner Resolver
 
-This proposal remains open. The planned automatic path is a Student socket lifecycle operation and uses no Teacher permission. Both paths serialize updates to the same assignment; T004 must confirm stale-command handling and whether the reviewed manual service reuses Student post-commit invalidation. The existing Teacher input, output and capability proposals are retained.
-
-```ts
-interface TransferTeamLeaderInput {
-  sessionId: UUID;
-  teamId: UUID;
-  successorParticipantId: UUID;
-  requestId: string;
-}
-
-interface TeamLeaderView {
-  sessionId: UUID;
-  teamId: UUID;
-  leaderParticipantId: UUID;
-  changedAt: ISODateTime;
-}
-
-interface StudentTeamAdministrationService {
-  transferLeaderByTeacher(
-    input: TransferTeamLeaderInput,
-    actor: TeacherScopedActorContext,
-  ): TeamLeaderView;
-}
-```
-
-**Authorization**: Student verifies `actor.actorKind === 'teacher'`, `actor.sessionId === input.sessionId`, and `actor.permissions.includes('team:leader:transfer')`. The permission string is proposed above; the service fails closed if Teacher authentication has not assigned it. It then verifies the successor Participant belongs to the specified Team and Session. Client claims, a role field or a Team ID alone never authorize the call.
-
-**Responsibility and transaction**: Teacher owns the UI, authenticated Teacher command handler and decision to request recovery. Student owns membership validation and the atomic `team_leaders` update. In `BEGIN IMMEDIATE`, reread Session, Team, successor and current leader; update exactly one leader row; commit and return the current assignment. Database uniqueness guarantees at most one leader per Team. A target outside the Team/Session or concurrent stale update rolls back.
-
-**Teacher call**: The protected Teacher handler calls this service with its verified ActorContext and translates the result/error for its UI. Teacher does not update SQLite directly. This remains an internal service; no public Teacher or Student route is added for the operation.
-
-**Errors**: `UNAUTHENTICATED` for no trusted context; `FORBIDDEN` for missing capability or Session mismatch; `SESSION_NOT_FOUND`/`TARGET_NOT_FOUND` for missing scope/member; `LEADER_TRANSFER_REJECTED` or `STALE_STATE` for invalid/stale assignment; safe `INTERNAL_ERROR` for unexpected failures. Do not return cookie material.
-
-## 2. Single Teacher End Interface with Student Winner Resolver
+The Student adapter and its scoped authorization checks are implemented in `student-trusted-end-coordinator.ts`. The tests inject a local port that holds an outer immediate transaction while invoking the existing resolver and Foundation persistence primitive. T004 and T044 cover the production port, authorization and wiring.
 
 Teacher calls exactly one trusted internal service. It does not invoke the Foundation lifecycle service and Student resolver as separate operations.
 
@@ -136,7 +96,7 @@ There is no separate winner query followed by End, so no Submission can be accep
 
 ## Items Still Requiring Cross-Feature Review
 
-1. Confirm the proposed capability names `team:leader:transfer` and `round:end` with the Teacher member; neither currently exists in Foundation's read-capability set.
+1. Confirm `round:end` and how the trusted Teacher middleware issues it for a managed Session.
 2. Confirm Teacher calls only `StudentTrustedEndCoordinator.endRound(...)` and receives the committed snapshot.
 3. Confirm Foundation's internal synchronous `endRoundWithWinnerResolver` callback uses the same database connection/outer `BEGIN IMMEDIATE` transaction and retains post-commit-only publishing.
 4. Confirm the application composition root wiring avoids Teacher↔Student↔Foundation circular imports.

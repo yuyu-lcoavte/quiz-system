@@ -58,7 +58,7 @@ The current single authorized submitter for a canonical Team.
 | `teamId` | UUID | Primary key and foreign key to canonical `teams`; guarantees at most one leader per Team. |
 | `participantId` | UUID | Unique foreign key to canonical `participants`; must be a member of `teamId`. |
 | `assignedAt` | ISO datetime | Server UTC time of the current assignment. |
-| `assignedByKind` | `participant | teacher | system` | Server-derived source for current assignment; not accepted from a browser. |
+| `assignedByKind` | `participant | system` | Server-derived source used by current Student flows. The existing schema also accepts the legacy reserved value `teacher`. |
 | `assignedById` | string or null | Trusted actor ID for transfer; no credential material. |
 
 **Relationship**: Each Team has at most one persisted assignment. Its holder may be offline when no other eligible member is online at the last-disconnect check. Use the existing `teamId` primary key and composite Team/Participant foreign key. Automatic assignments use `assignedByKind = system` and `assignedById = null`. History/audit events remain outside this Feature.
@@ -136,9 +136,9 @@ Application validation remains responsible for authorization and temporal rules 
 
 ### Team change and leader handoff
 
-For automatic failover, start `BEGIN IMMEDIATE` on the last valid disconnect. Re-read the current assignment, confirm the disconnected Participant still holds it and has no other valid sockets, and select the first same-Team member by `joinOrder` with current eligible presence. Replace conditionally; a missing candidate leaves the row unchanged. Commit before publishing invalidation. Enrollment, pre-start handoff, future Teacher transfer and submission serialize on the same SQLite writer boundary.
+For automatic failover, start `BEGIN IMMEDIATE` on the last valid disconnect. Re-read the current assignment, confirm the disconnected Participant still holds it and has no other valid sockets, and select the first same-Team member by `joinOrder` with current eligible presence. Replace conditionally; a missing candidate leaves the row unchanged. Commit before publishing invalidation. Enrollment, pre-start handoff and submission serialize on the same SQLite writer boundary.
 
-`BEGIN IMMEDIATE`: resolve requester from ActorContext; verify source membership and that no Round in the Session has ever entered Active; if requester is leader, require a valid existing source-Team successor and update TeamLeader before moving membership; update canonical Participant's `team_id`; if the destination Team has no leader, assign the requester; update credential association; commit. Any failed validation rolls back the entire change. A new Participant may still first join an existing Team after first Active; that is enrollment, not transfer. Teacher recovery transfer invokes the separate trusted service and uses the same membership/unique constraints.
+`BEGIN IMMEDIATE`: resolve requester from ActorContext; verify source membership and that no Round in the Session has ever entered Active; if requester is leader, require a valid existing source-Team successor and update TeamLeader before moving membership; update canonical Participant's `team_id`; if the destination Team has no leader, assign the requester; update credential association; commit. Any failed validation rolls back the entire change. A new Participant may still first join an existing Team after first Active; that is enrollment, not transfer.
 
 ### Draft edit
 

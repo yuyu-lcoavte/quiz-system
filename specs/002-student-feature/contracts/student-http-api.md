@@ -62,7 +62,7 @@ Allows a Student to change Team before the first Round becomes Active. Cookie id
 { "targetTeamId": "<uuid>", "successorParticipantId": "<uuid-or-null>" }
 ```
 
-If requester is the source Team leader, `successorParticipantId` must identify an existing source-Team Participant and explicit handoff is required. Non-leaders use `null`. In one transaction, the server validates Session/phase and membership, transfers leadership if needed, updates the canonical Participant's Team and associates it to the target Team. If the target has no leader, the first successful member becomes its leader. A teacher-only recovery transfer is not exposed through this Student route; it uses the internal service contract.
+If requester is the source Team leader, `successorParticipantId` must identify an existing source-Team Participant and explicit handoff is required. Non-leaders use `null`. In one transaction, the server validates Session/phase and membership, transfers leadership if needed, updates the canonical Participant's Team and associates it to the target Team. If the target has no leader, the first successful member becomes its leader.
 
 ## Draft and Submission
 

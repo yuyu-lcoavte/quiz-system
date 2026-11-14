@@ -47,48 +47,9 @@ The Foundation identity contract defines these existing capability names for its
 | `target:read` | Authorized current-target read (`session-controller.ts`) |
 | `results:read` | Protected Foundation results read (`session-controller.ts`) |
 
-The following are **proposed additions only**, not existing Foundation grants or implemented permissions:
+The proposed Teacher End capability is `round:end`. Teacher middleware must authorize the Session before issuing it in a server-created ActorContext.
 
-| Proposed capability | Intended use | Status |
-|---|---|---|
-| `team:leader:transfer` | Teacher-authorized request to Student's trusted leader-transfer service | Pending T004 Teacher/Foundation review; not currently granted by Foundation |
-| `round:end` | Teacher ActorContext authorization for the single Student End coordinator call | Pending T004 Teacher/Foundation review; not currently granted by Foundation |
-
-The existing `ActorContext.permissions` is a server-computed string list; the type itself does not define these proposed write permissions. Student and Teacher must not treat proposal strings as authorization until the Teacher's trusted middleware issues the reviewed capability after authentication.
-
-## T003 — Internal service proposals and consistency review
-
-The responsibility direction below is decided in the Student Spec and handoff documents. The exact signatures/capability strings remain proposals for T004 review.
-
-### Teacher-authorized leader transfer proposal
-
-```ts
-interface TransferTeamLeaderInput {
-  sessionId: UUID;
-  teamId: UUID;
-  successorParticipantId: UUID;
-  requestId: string;
-}
-
-interface StudentTeamAdministrationService {
-  transferLeaderByTeacher(
-    input: TransferTeamLeaderInput,
-    actor: TeacherScopedActorContext,
-  ): TeamLeaderView; // synchronous proposal
-}
-```
-
-Student verifies a trusted Teacher ActorContext, matching Session scope and the proposed `team:leader:transfer` capability; it then validates the successor's membership in the specified Team and Session and atomically updates the canonical leader assignment. Teacher owns the authenticated operation entry point and UI; Teacher does not write SQLite directly.
-
-Proposed error mapping, from `contracts/internal-services.md`:
-
-| Condition | Proposed error |
-|---|---|
-| Missing trusted context | `401 UNAUTHENTICATED` |
-| Missing proposed capability or Session mismatch | `403 FORBIDDEN` |
-| Missing Session or successor | `404 SESSION_NOT_FOUND` / `TARGET_NOT_FOUND` |
-| Invalid/stale transfer or uniqueness conflict | `409 LEADER_TRANSFER_REJECTED` / `STALE_STATE` |
-| Unexpected failure | Safe `500 INTERNAL_ERROR`; no credential material |
+## T003 — Internal End service proposal
 
 ### Single Teacher End call and synchronous Winner Resolver proposal
 
@@ -119,13 +80,40 @@ The inspected Foundation implementation has `endRoundWithResult()` in `apps/serv
 
 No cross-member approval is claimed here. Before T004-dependent implementation, record the Teacher/Foundation reviewers and their decisions on:
 
-1. Whether `team:leader:transfer` and `round:end` are the accepted capability names and how trusted Teacher middleware supplies them.
-2. Teacher's call to `transferLeaderByTeacher(...)` and the proposed input, result and error mapping.
-3. Teacher's single call to `StudentTrustedEndCoordinator.endRound(...)`.
-4. Synchronous `WinnerResolver(roundId): Result | null` execution in Foundation's existing `BEGIN IMMEDIATE` transaction and shared connection ownership.
-5. No-winner Result handling, rollback/no-broadcast behavior, and composition-root wiring without a circular dependency.
+1. Confirm `round:end` and trusted Teacher middleware issuance for the requested Session.
+2. Teacher's single call to `StudentTrustedEndCoordinator.endRound(...)`.
+3. Synchronous `WinnerResolver(roundId): Result | null` execution in Foundation's existing `BEGIN IMMEDIATE` transaction and shared connection ownership.
+4. No-winner Result handling, rollback/no-broadcast behavior, and composition-root wiring without a circular dependency.
 
 T004 remains unchecked in `specs/002-student-feature/tasks.md`. These are internal integration proposals; no Foundation public API, DTO or Socket.IO contract is being changed by T001–T003.
+
+## T004 technical review preparation
+
+### Confirmed in the repository
+
+- The Student baseline at `f5197bb` has automatic succession, a Team-scoped `student:membership:changed` notification, and a Cookie-authenticated `/me` read. The notification prompts a refresh and carries no leader ID. Student submission rereads the current leader inside its own `BEGIN IMMEDIATE` transaction.
+- `TeamLeaderRepository.replaceIfCurrent`, the one-row-per-Team constraint and the composite Team/Participant foreign key are reusable. Automatic succession rereads the leader and candidate presence under the write lock. Its pending offline assignment is process-local and compared with the current Participant and assignment timestamp.
+- `ActorContext` supports Teacher as an actor kind and a server-populated string list of permissions. The proposed `round:end` has no production issuer in the inspected code. Teacher routes are placeholders. The `origin` branch listing contains `master`, `feature/foundation` and `feature/student`; Teacher or OpenSpec work held elsewhere could not be inspected.
+- `SessionLifecycleService.endRound(sessionId, expectedStateVersion, result?)` and `endRoundWithResult` exist. The latter commits Ended, the incremented version and Result replacement or removal together. `StudentWinnerResolver.resolveWinnerInTransaction(roundId)` exists and selects by persisted `acceptedOrder`, using its injected Database instance. It checks `inTransaction`; the Foundation caller must supply the correct connection and own the immediate transaction.
+- Foundation persists Result and emits `session:state:changed` via its lifecycle publisher after the transaction returns. Failure inside the existing End transaction exits before publication. Student projects the persisted Result for the current Ended Round. Teacher owns authentication, scoped command authorization and UI.
+- Targeted baseline verification passed 25 tests across six files covering Foundation persistence/state notifications and Student succession/submission/winner/result. This run exercises existing code paths and does not verify the proposed Teacher integration.
+
+### Changes needed after review
+
+| Task | Minimum change |
+| --- | --- |
+| T041 | Exercise the real End path with both write-lock orders, stale Round/version, no winner and prior logical-target Result removal, resolver/persistence failure and zero publication on rollback. At publication, assert that another connection can read committed state and Result. |
+| T044 | Add an internal Foundation End entry taking the requested Session, Round, expected state version and synchronous winner callback. Verify scope/current Round/Active/version under the same `BEGIN IMMEDIATE` lock, call the callback once on that connection and reuse existing End/Result persistence. Keep the current internal supplied-Result caller compatible and share the transaction body. The publishing lifecycle entry must own the outer transaction so an inner savepoint cannot be mistaken for Commit. |
+| T045 | Add the trusted Student End coordinator to enforce the reviewed Teacher scope/permission and delegate once to Foundation with the existing bound Student resolver. Compose both with the same Database instance. Teacher receives the committed snapshot; Foundation never imports Student. |
+
+### Copy-ready review checklist
+
+- **Teacher** — Identify the branch or commit, confirm trusted Session authorization, `round:end` issuance, and the single synchronous End signature and error mapping.
+- **Foundation**: Confirm one outer `BEGIN IMMEDIATE`, with Session/current Round/Active/version checked before invoking the synchronous resolver on the same Database instance. Confirm Result replacement and no-winner removal, committed snapshot, post-Commit publication and zero publication on rollback. Confirm composition in the server root and reuse of the existing public state event.
+- **OpenSpec / Teacher**: Align Q02/U02 acceptance on first join, last valid socket, earliest eligible online successor, no candidate, reassessment on later valid arrival/re-subscribe, same identity after F5 and no automatic reclaim of a replaced role. Confirm joint acceptance of server-side submission eligibility.
+- **Gate closeout**: Record each reviewer's name/role, date, branch/commit if available, and the accepted or revised signatures, capabilities and decisions in `student-teacher-decisions.md`. T004 remains pending until the required reviewers confirm. If a proposal is rejected, reconcile the design before implementation.
+
+After T004, run T041 against the T044/T045 production path, then T059, T060 and T061. Student Coordinator and test-only contract verification can be prepared independently.
 
 ## Independent preparation before T004
 
@@ -133,9 +121,7 @@ T004 remains unchecked in `specs/002-student-feature/tasks.md`. These are intern
 
 OpenSpec/Teacher should align Q02/U02 acceptance with the Student decision: initial leader is the first successful join; loss of the last valid socket triggers immediate selection of the earliest eligible online teammate, with no configurable grace. Other sockets preserve presence. With no candidate the assignment stays; a replaced leader recovers identity but not leadership after F5/reconnect. Align how both implementations show role changes and test eligibility at submit time. See [Student Spec](../../specs/002-student-feature/spec.md) and [Realtime Contract](../../specs/002-student-feature/contracts/student-realtime.md).
 
-T004 remains pending. Review the existing Teacher manual transfer proposal, including ordering against automatic failover, stale current-leader behavior, post-commit notice reuse and Teacher membership refresh. The proposed capability strings and End callback remain pending. The automatic Student path does not use either proposed capability.
-
-- T025/T026 can reuse `TeamLeaderRepository.replaceIfCurrent` inside the future Student write transaction. Repository tests cover updating one row, a stale expected leader, and rejection of a successor from another Team or Session. The repository receives an expected Participant ID from its caller and does not authenticate that caller. Teacher authentication, expected-state semantics at the service boundary, input/output/error mapping, and the Teacher call remain under review.
+T004 remains pending for Teacher End authorization, the same-transaction Foundation callback and production wiring.
 - The current Student submission test suite uses two connections to the same temporary SQLite file. An independent writer holds `BEGIN IMMEDIATE`; the real Student submission observes contention, leaves the draft editable and emits no lock notification. After the writer releases the lock, a new submission succeeds; the synchronous resolver then sees the committed candidate without persisting a Result. This exercises the SQLite and Student prerequisites for T041.
 
 ### T041 test design (provisional)
@@ -149,4 +135,4 @@ After the callback signature is approved and the actual End path is wired, use t
 | Reopened target has no successful Submission | End creates no Result, clears the prior logical target Result, and Student projects `winner: null`. |
 | Resolver or Result write fails | Round phase, `stateVersion` and the previous Result remain unchanged. No Ended publication; a subsequent valid submission remains possible while Active. |
 
-The test design leaves the Teacher entry point and Foundation callback invocation to the reviewed interfaces. T025, T026, T041, T044 and T045 remain unchecked.
+The test design leaves the Teacher entry point and Foundation callback invocation to the reviewed interfaces. T041, T044 and T045 remain unchecked.
