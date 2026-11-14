@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type Database from 'better-sqlite3';
+import type { UUID } from '@quiz/contracts/domain';
 import { JoinOptionsService } from '../../modules/student/application/join-options-service.js';
 import { EnrollmentService } from '../../modules/student/application/enrollment-service.js';
 import { TeamChangeService } from '../../modules/student/application/team-change-service.js';
@@ -22,7 +23,7 @@ import type { StudentMembershipChangedPayload } from '@quiz/contracts';
 export interface StudentSecurityOptions {secret:string;allowedOrigins:readonly string[];nodeEnv?:'development'|'test'|'production';}
 
 /** Student-owned HTTP route root. Business endpoints are added by their story tasks. */
-export function createStudentRouter(database?:Database.Database,security?:StudentSecurityOptions,limit:ActivityCodeRateLimitOptions={maxRequests:30,windowMs:60000},draftService?:DraftService,submissionService?:SubmissionService,publishMembership?: (scope:StudentMembershipChangedPayload)=>void) {
+export function createStudentRouter(database?:Database.Database,security?:StudentSecurityOptions,limit:ActivityCodeRateLimitOptions={maxRequests:30,windowMs:60000},draftService?:DraftService,submissionService?:SubmissionService,publishMembership?: (scope:StudentMembershipChangedPayload)=>void,onlineParticipants?: (scope:StudentMembershipChangedPayload)=>ReadonlySet<UUID>) {
   const router=Router();if(!database)return router;
   router.get('/join-options/:activityCode',createActivityCodeRateLimiter(limit),createJoinOptionsController(new JoinOptionsService(database)));
   if(!security)return router;
@@ -42,6 +43,6 @@ export function createStudentRouter(database?:Database.Database,security?:Studen
   },controller.enroll);
   router.get('/sessions/:sessionId/me',controller.me);
   router.get('/sessions/:sessionId/csrf-token',controller.csrf);
-  router.post('/sessions/:sessionId/team-change',origin,identity,createStudentCsrfMiddleware(csrf),createTeamChangeController(new TeamChangeService(service,publishMembership)));
+  router.post('/sessions/:sessionId/team-change',origin,identity,createStudentCsrfMiddleware(csrf),createTeamChangeController(new TeamChangeService(service,publishMembership,onlineParticipants)));
   return router;
 }

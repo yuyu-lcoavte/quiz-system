@@ -15,7 +15,7 @@ export function createEnrollmentController(service:EnrollmentService,nodeEnv:'de
    if(result.newToken)res.setHeader('Set-Cookie',serializeStudentSessionCookie(result.newToken,{nodeEnv,isHttps:req.secure,maxAgeSeconds:86400}));
    res.setHeader('Cache-Control','no-store');return {...result.membership,csrfToken:result.csrfToken};
   }),
-  me:wrap((req,res)=>{res.setHeader('Cache-Control','no-store');return service.membership(req.headers.cookie,studentSessionId(req.params.sessionId));}),
+  me:wrap((req,res)=>{res.setHeader('Cache-Control','no-store');return service.membershipDetails(req.headers.cookie,studentSessionId(req.params.sessionId));}),
   csrf:wrap((req,res)=>{
    const sessionId=studentSessionId(req.params.sessionId);const identity=service.identity.resolve(req.headers.cookie,sessionId);
    if(!identity)throw new HttpError(401,'UNAUTHENTICATED','Valid Student identity required.');

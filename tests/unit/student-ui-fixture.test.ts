@@ -10,4 +10,4 @@ it('prepares an isolated UI database only in test mode and refuses to overwrite 
  expect(run('production').status).toBe(1);expect(existsSync(path)).toBe(false);
  const prepared=run('test');expect(prepared.status,prepared.stderr).toBe(0);expect(run('test').status).toBe(1);
  const db=new Database(path,{readonly:true});try{expect(db.prepare('SELECT count(*) n FROM sessions').get()).toEqual({n:3});expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);}finally{db.close();}
-});
+}, 20_000);

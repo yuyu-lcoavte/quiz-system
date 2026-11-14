@@ -3,9 +3,10 @@ import { Link,useParams } from 'react-router-dom';
 import { PlaceholderPage } from './PlaceholderPage.js';
 import { useStudentSessionStatus } from '../modules/student/student-session-state.js';
 import { parseUUID,type UUID,type CurrentTargetView } from '@quiz/contracts/domain';
-import { recoverStudentIdentity,studentRequest,studentError,type StudentIdentity } from '../modules/student/student-identity-client.js';
+import { changeStudentTeam,recoverStudentIdentity,studentRequest,studentError,studentTeamChangeError,type StudentIdentity } from '../modules/student/student-identity-client.js';
 import { StudentMembershipPanel } from '../modules/student/StudentMembershipPanel.js';
 import { StudentDraftPanel } from '../modules/student/StudentDraftPanel.js';
+import { StudentTeamChangeForm } from '../modules/student/StudentTeamChangeForm.js';
 
 function ActiveRound({sessionId,roundId,identity,connected,membershipPending,onIdentityRefresh}:{sessionId:UUID;roundId:UUID;identity:StudentIdentity;connected:boolean;membershipPending:boolean;onIdentityRefresh:()=>void}){
  const [target,setTarget]=useState<CurrentTargetView|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
@@ -24,13 +25,16 @@ export function StudentSessionPlaceholder() {
   const [restored, setIdentity] = useState<StudentIdentity | null>(null);
   const [error, setError] = useState('');
   const [membershipPending, setMembershipPending] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveNotice, setMoveNotice] = useState<{ok:boolean; message:string} | null>(null);
   const identity = restored?.membership.sessionId === id ? restored : null;
   const currentId = useRef(id);
   currentId.current = id;
   const readVersion = useRef(0);
+  const pendingMove = useRef<symbol | null>(null);
 
   const refreshIdentity = useCallback(() => {
-    if (!id) return;
+    if (!id || pendingMove.current) return;
     const version = ++readVersion.current;
     const isCurrent = () => currentId.current === id && readVersion.current === version;
     setMembershipPending(true);
@@ -47,12 +51,42 @@ export function StudentSessionPlaceholder() {
   useEffect(() => {
     setIdentity(null);
     setError('');
+    setMoving(false);
+    setMoveNotice(null);
     if (id) refreshIdentity();
     else setError('活動識別碼無效，請由加入頁進入。');
-    return () => { readVersion.current++; };
+    return () => { readVersion.current++; pendingMove.current = null; };
   }, [id, refreshIdentity]);
 
-  const {snapshot:state,connected}=useStudentSessionStatus(identity ? id ?? undefined : undefined, refreshIdentity);
+  const {snapshot:state,connected,refreshSnapshot}=useStudentSessionStatus(identity ? id ?? undefined : undefined, refreshIdentity);
+  const stateVersion = state?.stateVersion;
+  useEffect(() => {
+    if (stateVersion !== undefined) refreshIdentity();
+  }, [stateVersion, refreshIdentity]);
+
+  async function moveTeam(teamId: UUID) {
+    if (!id || !identity?.membership.teamChange || state?.phase !== 'Waiting' || membershipPending || pendingMove.current) return;
+    const request = Symbol();
+    pendingMove.current = request;
+    readVersion.current++;
+    setMoving(true);
+    setMoveNotice(null);
+    try {
+      const membership = await changeStudentTeam(id, identity.csrfToken, teamId);
+      if (pendingMove.current !== request) return;
+      setIdentity({ ...identity, membership: { ...membership, teamChange: null } });
+      setMoveNotice({ok:true, message:`已更換至「${membership.team.name}」。`});
+    } catch (error) {
+      if (pendingMove.current === request) setMoveNotice({ok:false, message:studentTeamChangeError(error)});
+    } finally {
+      if (pendingMove.current === request) {
+        pendingMove.current = null;
+        setMoving(false);
+        refreshIdentity();
+        refreshSnapshot?.();
+      }
+    }
+  }
 
   return (
     <PlaceholderPage
@@ -70,10 +104,12 @@ export function StudentSessionPlaceholder() {
       </dl>
       {error&&<div className="mt-4" role="alert"><p>{error}</p><button className="mr-4 min-h-11 underline" onClick={refreshIdentity}>重新恢復身分</button><Link className="underline" to="/student/join">返回加入活動</Link></div>}
       {!identity?(!error&&<p role="status">正在恢復學生身分…</p>):<>
-       <StudentMembershipPanel membership={identity.membership}/><button className="min-h-11 underline" onClick={refreshIdentity}>重新載入身分</button>
+       <StudentMembershipPanel membership={identity.membership} teamChange={state?.phase==='Waiting'&&<StudentTeamChangeForm key={identity.membership.team.teamId} membership={identity.membership} busy={moving} disabled={membershipPending || Boolean(error)} onChange={moveTeam}/>}/>
+       <button className="min-h-11 underline" onClick={refreshIdentity} disabled={moving}>重新載入身分</button>
+       {moveNotice&&<p role={moveNotice.ok?'status':'alert'}>{moveNotice.message}</p>}
        {membershipPending&&!error&&<p role="status">正在更新提交資格…</p>}
        <p role="status" className="my-3">{connected?'活動即時連線正常':'連線中斷或連線中，正在恢復活動狀態。'}</p>
-       {state?.phase==='Waiting'?<h2 className="my-5 text-xl font-semibold">等待老師開始</h2>:state?.phase==='Active'&&id?<ActiveRound key={state.currentRoundId} sessionId={id} roundId={state.currentRoundId} identity={identity} connected={connected&&!error} membershipPending={membershipPending} onIdentityRefresh={refreshIdentity}/>:state?.phase==='Ended'&&id?<RoundResult key={state.currentRoundId} sessionId={id} roundId={state.currentRoundId}/>:<p>正在取得伺服器活動狀態…</p>}
+       {moving?<p role="status">正在更換組別…</p>:state?.phase==='Waiting'?<h2 className="my-5 text-xl font-semibold">等待老師開始</h2>:state?.phase==='Active'&&id?<ActiveRound key={`${identity.membership.team.teamId}:${state.currentRoundId}`} sessionId={id} roundId={state.currentRoundId} identity={identity} connected={connected&&!error} membershipPending={membershipPending} onIdentityRefresh={refreshIdentity}/>:state?.phase==='Ended'&&id?<RoundResult key={state.currentRoundId} sessionId={id} roundId={state.currentRoundId}/>:<p>正在取得伺服器活動狀態…</p>}
       </>}
     </PlaceholderPage>
   );

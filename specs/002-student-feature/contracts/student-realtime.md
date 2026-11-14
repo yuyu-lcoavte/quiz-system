@@ -39,6 +39,8 @@ The existing Foundation `session:watch`, `session:state`, `session:state:changed
 | --- | --- | --- |
 | Server → authorized sockets of the affected Team | `student:membership:changed` | `{ sessionId: UUID, teamId: UUID }` |
 
+A pre-start move invalidates both Teams after commit. The server resolves current membership before notifying; clients re-read `/me`. An all-offline assignment is rechecked on an authorized connection or subscription using the existing verified socket presence. The event carries no successor or role data.
+
 - No client event is needed to claim presence or to request reassignment. Count all live authenticated Student sockets for the same Participant and Session, including activity/draft connections and additional tabs. Apply no extra delay after Socket.IO detects the last valid disconnect. A verified connection or authorized re-subscription also rechecks any unresolved offline current leader.
 - Deliver after a committed assignment change only, to verified members of the affected Team and Session in every phase. Derive recipients on the server and recheck membership/credential on publish. Do not use Active-only draft rooms for delivery. The notice carries no Participant identity, role claim, credential or draft content.
 - Treat this event as an invalidation. Re-read `/me` on event, initial load and reconnect. A newer refresh supersedes an in-flight read. Discard results from an obsolete Session or request, and disable submission until the latest role is resolved. A lost notification is recovered by reading `/me` after reconnect. Foundation events remain unchanged.

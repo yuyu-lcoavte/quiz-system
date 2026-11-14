@@ -18,6 +18,13 @@ export interface StudentMembershipView {
   isLeader: boolean;
 }
 
+/** An authenticated /me projection. Null means the Session has already started. */
+export interface StudentMembershipDetails extends StudentMembershipView {
+  teamChange: null | {
+    teams: StudentMembershipView['team'][];
+  };
+}
+
 export interface StudentEnrollmentResponse extends StudentMembershipView {
   csrfToken: string;
 }

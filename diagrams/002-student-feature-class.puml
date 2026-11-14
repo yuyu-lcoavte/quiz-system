@@ -154,6 +154,10 @@ First successful enrollment inserts it atomically.
 The leader Participant must belong to that Team.
 On last valid socket disconnect, select earliest eligible online teammate.
 Without a candidate, retain the current assignment.
+Before first Active, a sole member may move and clear the leader row.
+The empty Team remains; its next entrant becomes leader.
+If teammates remain, choose earliest online by join order.
+If all are offline, mark earliest remaining leader for online recheck.
 After first Active, new Participants may join only an existing Team;
 they do not replace its leader. Existing Participants cannot transfer Teams.
 end note

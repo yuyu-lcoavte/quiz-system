@@ -33,7 +33,10 @@
 | SC-001 計時 | 使用三個全新瀏覽器身分。從送出有效活動代號開始計時，到活動頁顯示 Team 及成員資格停止，逐次填入秒數。每次須 ≤120 秒。 | 第 1 次 __ 秒；第 2 次 __ 秒；第 3 次 __ 秒，均待測 |
 | Cookie／CSRF | 在 Network／Application 檢查 `student_session` 的 `Path=/`、`HttpOnly`、`SameSite=Lax`。本機 HTTP Demo 的 Cookie 無 `Secure`，正式 HTTPS 的 `Secure` 由自動化驗證。確認首次加入請求有允許的 Origin，可無 CSRF；加入後的草稿寫入／提交帶 `X-CSRF-Token`。缺失或無效 Origin、缺失／錯誤 CSRF、已綁定重複加入等拒絕案例可對照自動化套件。 | 待驗 |
 | Waiting 與 Active | 加入 `DEMO-WAIT`，確認只顯示等待、沒有題目欄位。另開 `DEMO-ACTIVE`，確認 WebSocket upgrade 後發出 `session:watch`、收到 `session:state`，而且 `current-target` 成功，畫面顯示兩題、四個 Blank。 | 畫面已驗；瀏覽器 Network 檢查待驗 |
-| 晚到與轉組 | B 在 `DEMO-ACTIVE` 首次加入 A 的既有 Team，應可加入且保留 A 的組長資格。查詢同活動應恢復既有身分；頁面無轉組入口，開始後的後端拒絕由 `student-team-change` 整合測試驗證。 | 待驗 |
+| 唯一組員換組 | 在新的 `DEMO-WAIT`，讓 AAA 單獨加入一組。在「目前組別」按「更換組別」並確認，無需指定接任者。移入空組時 AAA 成為組長；用另一份資料重試移入已有組長的組，AAA 應為一般組員。用新瀏覽器身分加入 AAA 原組，確認原組仍可選且新加入者成為組長。F5 確認 AAA 保留相同身分和新組別。 | 待驗；已補 UI 與整合測試 |
+| 非空組自動遞補 | A、B、C、D 依序加入同組。讓 B 離線，C、D 在線，A 換組後確認 C 接任。另用新資料讓其他組員都離線再換組，確認 B 暫任；若 C 先上線，確認 C 接任。若 B 先上線，確認保留指派。開題後確認只收到目前組別的草稿。 | 待 Windows 瀏覽器驗收 |
+| 開始後禁止換組 | 使用 `DEMO-ACTIVE` 確認沒有換組入口。由 Teacher 正式操作開下一輪後，即使回到 Waiting 仍應沒有入口；開始前開著的表單若遇到同時開始，應顯示拒絕，不能顯示成功。 | 待驗；後兩項需 Teacher 整合或既有測試資料，後端已有整合測試 |
+| 晚到加入 | B 在 `DEMO-ACTIVE` 首次加入 A 的既有 Team，應可加入且保留 A 的組長資格。查詢同活動應恢復既有身分。 | 待驗 |
 | 同組草稿、隔離 | A、B 在同一 Round 修改不同 Blank，再依序修改同一 Blank。兩頁應顯示最後一筆伺服器接受的值，其他格保留。C 在同 Session 不同 Team，D 在不同 Session，均不應收到 A／B 的草稿。 | 待驗 |
 | 重連與身分恢復 | A 保持原瀏覽器設定檔，記錄 `/me` 的 Participant ID 與組長資格。恢復後核對相同 Participant 和 Team、伺服器目前指派的提交資格，以及最新已保存草稿。 | 舊版單用戶端重新整理已驗；新版遞補驗收見下節 |
 | 提交與鎖定 | A 先留一格空白，再填完四格並等同步完成。未填齊不可提交，B 無組長提交操作。A 成功提交後，兩頁草稿都應唯讀；重新整理後仍鎖定。 | A 已驗；B 與雙頁鎖定待驗 |

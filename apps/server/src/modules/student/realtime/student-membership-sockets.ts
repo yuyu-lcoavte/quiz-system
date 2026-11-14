@@ -42,9 +42,13 @@ export function registerStudentMembershipSockets(
     }
   }
 
+  function onlineParticipants(scope: TeamScope): ReadonlySet<UUID> {
+    return new Set(Array.from(teammates(scope), member => member.participantId));
+  }
+
   function reconcile(scope: TeamScope, disconnectedParticipant?: UUID): void {
     try {
-      const changed = failover.reconcile(scope, () => new Set(Array.from(teammates(scope), member => member.participantId)), disconnectedParticipant);
+      const changed = failover.reconcile(scope, () => onlineParticipants(scope), disconnectedParticipant);
       if (changed) publish({ sessionId: scope.sessionId, teamId: scope.teamId });
     } catch (error) {
       console.warn('Student leader reconciliation failed.', error instanceof Error ? error.name : 'Unknown error');
@@ -68,5 +72,5 @@ export function registerStudentMembershipSockets(
     reconcile(scope);
   });
 
-  return { publish, reconcile };
+  return { publish, reconcile, onlineParticipants };
 }

@@ -38,6 +38,23 @@ First-time enrollment remains allowed after first Active, into an existing Team 
 This is not an existing Participant changing Teams; Student never creates Teams.
 end note
 
+== Change Team before first Active ==
+UI -> StudentApi : GET /me (verified Student cookie)
+StudentApi -> DB : read membership and check whether any Round has started
+StudentApi --> UI : eligible destination Teams
+Student -> UI : choose another Team (no successor input)
+UI -> StudentApi : POST team-change (Cookie, Origin, CSRF)
+StudentApi -> DB : BEGIN IMMEDIATE; revalidate history, Team and leadership
+alt eligible
+  StudentApi -> DB : assign earliest online teammate; otherwise flag earliest remaining for recheck; clear if empty
+  StudentApi -> DB : move Participant and assign destination leader if vacant; COMMIT
+  StudentApi --> UI : updated membership; invalidate affected Team memberships
+  UI -> StudentApi : re-read /me and CSRF
+  UI -> Foundation : existing session:watch for latest activity state
+else invalid or Session already started
+  StudentApi --> UI : reject without changing membership
+end
+
 == Activity state and target ==
 note over UI,Foundation
 The browser sends the Student-specific HttpOnly `student_session` cookie to both

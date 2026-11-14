@@ -45,10 +45,28 @@ export class TeamLeaderRepository {
     return result.changes === 1;
   }
 
-  replaceIfCurrent(teamId: UUID, currentParticipantId: UUID, next: Omit<TeamLeaderRecord, 'teamId'>): boolean {
+  removeIfCurrent(teamId: UUID, participantId: UUID): boolean {
+    return this.database.prepare('DELETE FROM team_leaders WHERE team_id = ? AND participant_id = ?')
+      .run(teamId, participantId).changes === 1;
+  }
+
+  needsOnlineRecheck(teamId: UUID): boolean {
+    const row = this.database.prepare('SELECT pending_online_recheck FROM team_leaders WHERE team_id = ?')
+      .get(teamId) as {pending_online_recheck: number} | undefined;
+    return row?.pending_online_recheck === 1;
+  }
+
+  clearOnlineRecheck(teamId: UUID, participantId: UUID): void {
+    this.database.prepare('UPDATE team_leaders SET pending_online_recheck = 0 WHERE team_id = ? AND participant_id = ?')
+      .run(teamId, participantId);
+  }
+
+  replaceIfCurrent(teamId: UUID, currentParticipantId: UUID, next: Omit<TeamLeaderRecord, 'teamId'>, pendingOnlineRecheck = false): boolean {
     const result = this.database.prepare(`UPDATE team_leaders SET participant_id = @participantId,
-      assigned_at = @assignedAt, assigned_by_kind = @assignedByKind, assigned_by_id = @assignedById
-      WHERE team_id = @teamId AND participant_id = @currentParticipantId`).run({ ...next, teamId, currentParticipantId });
+      assigned_at = @assignedAt, assigned_by_kind = @assignedByKind, assigned_by_id = @assignedById,
+      pending_online_recheck = @pendingOnlineRecheck
+      WHERE team_id = @teamId AND participant_id = @currentParticipantId`)
+      .run({ ...next, teamId, currentParticipantId, pendingOnlineRecheck: Number(pendingOnlineRecheck) });
     return result.changes === 1;
   }
 }

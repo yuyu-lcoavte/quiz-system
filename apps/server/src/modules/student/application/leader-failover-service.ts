@@ -5,7 +5,7 @@ import { createStudentRepositories, type TeamLeaderRecord } from '../persistence
 
 type TeamScope = StudentMembershipChangedPayload;
 
-/** A Team is eligible for arrival-triggered recovery only after an observed disconnect. */
+/** Arrival-triggered recovery follows an observed disconnect or a persisted offline assignment. */
 export class LeaderFailoverService {
   private readonly repositories;
   private readonly offline = new Map<UUID, TeamLeaderRecord>();
@@ -16,18 +16,22 @@ export class LeaderFailoverService {
 
   reconcile(scope: TeamScope, online: () => ReadonlySet<UUID>, disconnectedParticipant?: UUID): boolean {
     const { teamId } = scope;
-    if (!disconnectedParticipant && !this.offline.has(teamId)) return false;
+    if (!disconnectedParticipant && !this.offline.has(teamId) && !this.repositories.teamLeaders.needsOnlineRecheck(teamId)) return false;
     const result = this.database.transaction(() => {
       const leader = this.repositories.teamLeaders.findByTeamId(teamId);
       if (!leader) return { changed: false, offline: null };
       const observed = this.offline.get(teamId);
+      const pending = this.repositories.teamLeaders.needsOnlineRecheck(teamId);
       const wasObservedOffline = observed?.participantId === leader.participantId && observed.assignedAt === leader.assignedAt;
-      if (!wasObservedOffline && disconnectedParticipant !== leader.participantId) {
+      if (!pending && !wasObservedOffline && disconnectedParticipant !== leader.participantId) {
         return { changed: false, offline: null };
       }
 
       const present = online();
-      if (present.has(leader.participantId)) return { changed: false, offline: null };
+      if (present.has(leader.participantId)) {
+        if (pending) this.repositories.teamLeaders.clearOnlineRecheck(teamId, leader.participantId);
+        return { changed: false, offline: null };
+      }
       this.offline.set(teamId, leader);
       const successor = this.repositories.teamJoinOrder.listParticipants(teamId).find(id => present.has(id));
       if (!successor) return { changed: false, offline: leader };

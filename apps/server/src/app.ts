@@ -20,13 +20,13 @@ import { studentDraftRoomName } from './modules/student/realtime/student-draft-r
 import type { StudentEventSocket } from './modules/student/realtime/student-draft-socket.js';
 import { publishStudentDraftLock } from './modules/student/realtime/student-draft-socket.js';
 import { SubmissionService } from './modules/student/application/submission-service.js';
-import { parseUUID } from '@quiz/contracts/domain';
+import { parseUUID, type UUID } from '@quiz/contracts/domain';
 import { getStudentSocketIdentity } from './modules/student/realtime/student-draft-socket.js';
 import { LeaderFailoverService } from './modules/student/application/leader-failover-service.js';
 import { registerStudentMembershipSockets } from './modules/student/realtime/student-membership-sockets.js';
 import type { StudentMembershipChangedPayload } from '@quiz/contracts';
 
-export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {readonly studentSecurity?:StudentSecurityOptions;readonly studentDraftService?:DraftService;readonly studentSubmissionService?:SubmissionService;readonly publishStudentMembership?: (scope:StudentMembershipChangedPayload)=>void;}
+export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {readonly studentSecurity?:StudentSecurityOptions;readonly studentDraftService?:DraftService;readonly studentSubmissionService?:SubmissionService;readonly publishStudentMembership?: (scope:StudentMembershipChangedPayload)=>void;readonly studentOnlineParticipants?: (scope:StudentMembershipChangedPayload)=>ReadonlySet<UUID>;}
 
 export function createApp(options: FoundationServerOptions = {}) {
   const app = express();
@@ -38,7 +38,7 @@ export function createApp(options: FoundationServerOptions = {}) {
       const scope = parseUUID(/^\/sessions\/([^/]+)(?:\/|$)/.exec(request.path)?.[1]);
       return scope ? identity?.resolve(request.headers.cookie, scope)?.actorContext ?? null : null;
     },
-    studentRouter: createStudentRouter(options.database,options.studentSecurity,options.activityCodeRateLimit,options.studentDraftService,options.studentSubmissionService,options.publishStudentMembership) }));
+    studentRouter: createStudentRouter(options.database,options.studentSecurity,options.activityCodeRateLimit,options.studentDraftService,options.studentSubmissionService,options.publishStudentMembership,options.studentOnlineParticipants) }));
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;
@@ -57,7 +57,7 @@ export function createHttpServer(options: FoundationServerOptions = {}) {
   }):undefined;
   const submission=options.database?new SubmissionService(options.database,(teamId,lock)=>publishStudentDraftLock(socketServer,studentSocket,teamId,lock)):undefined;
   let membership: ReturnType<typeof registerStudentMembershipSockets> | undefined;
-  const app = createApp({...options,studentDraftService:draft,studentSubmissionService:submission,publishStudentMembership:scope=>membership?.publish(scope)});
+  const app = createApp({...options,studentDraftService:draft,studentSubmissionService:submission,publishStudentMembership:scope=>membership?.publish(scope),studentOnlineParticipants:scope=>membership?.onlineParticipants(scope) ?? new Set()});
   const httpServer = createServer(app);
   const stateService = options.database ? new SessionStateService(options.database) : null;
   const studentActors = new WeakSet<object>();

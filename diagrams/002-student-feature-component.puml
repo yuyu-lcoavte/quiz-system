@@ -72,6 +72,7 @@ Composition ..> WinnerService : proposed End wiring
 note bottom of StudentModule
 First-time join after first Active is allowed only into an existing Team.
 Student never creates Teams; existing members cannot transfer after first Active.
+Before first Active, Student moves auto-assign the source leader using trusted presence and join order.
 Student owns enrollment, opaque identity mapping, leader state, drafts,
 acceptedOrder creation and Student-only result projection.
 The `student_session` HttpOnly cookie uses Path=/ for Student HTTP and /socket.io;

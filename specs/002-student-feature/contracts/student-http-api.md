@@ -50,19 +50,21 @@ The response does not return the bearer cookie value. A repeated request with th
 - Proposed default absolute lifetime: 24 hours, configurable by server environment. Revoked/expired/missing association returns 401; the UI offers rejoin/recovery and never restores by display name.
 - `GET /api/v1/student/sessions/{sessionId}/me` resolves the cookie's server-side Session-to-Participant association and returns current Team/leader status. It does not mutate identity or membership.
 - `/me` is the authoritative, `Cache-Control: no-store` membership read after initial load, reconnect, F5 or a Student membership invalidation. `isLeader` reflects the current persisted assignment; the same Cookie and Participant ID may now return `false`.
-- Student membership responses may additionally include the authenticated Participant's own `displayName` for the membership panel. This optional Student-only field comes from the canonical Participant; it grants no authority and does not expose other members' identities or alter Foundation DTOs.
+- The authenticated no-store `/me` also returns `teamChange`: `null` after first Active (including later Waiting), otherwise `{ teams }` listing other existing Teams in the Session as `{ teamId, name }`. It does not expose candidates. The mutation rechecks eligibility inside the write transaction.
 - `GET /api/v1/student/sessions/{sessionId}/csrf-token` resolves the same protected identity and returns a short-lived HMAC-signed CSRF token bound to credential and Session. Response uses `Cache-Control: no-store`; tokens already held in other tabs remain valid until their own expiry.
 - Browser credential and CSRF values are excluded from logs and analytics.
 
 ### `POST /api/v1/student/sessions/{sessionId}/team-change`
 
-Allows a Student to change Team before the first Round becomes Active. Cookie identity and CSRF header are required. Body:
+Allows a Student to change Team before the first Round becomes Active. Cookie identity, allowed Origin and CSRF header are required. Body:
 
 ```json
-{ "targetTeamId": "<uuid>", "successorParticipantId": "<uuid-or-null>" }
+{ "targetTeamId": "<uuid>" }
 ```
 
-If requester is the source Team leader, `successorParticipantId` must identify an existing source-Team Participant and explicit handoff is required. Non-leaders use `null`. In one transaction, the server validates Session/phase and membership, transfers leadership if needed, updates the canonical Participant's Team and associates it to the target Team. If the target has no leader, the first successful member becomes its leader.
+The server rejects client-selected successors. In the write transaction, a departing leader is replaced by the earliest-joined online source teammate. If all are offline, the earliest remaining teammate is appointed pending an online recheck. If none remain, the source stays available as an empty Team without a leader. A non-leader move leaves the source assignment intact. The destination retains its leader if present; an empty destination receives the mover as leader. Commit before notifying both Teams to refresh membership; rollback sends no notification.
+
+Success returns the updated membership. The UI re-reads `/me` and requests the current Foundation state with the existing `session:watch`; drafts are scoped to the refreshed Team and Round. A move attempted after first Active returns `409 INVALID_PHASE`, even when the latest state says Waiting.
 
 ## Draft and Submission
 

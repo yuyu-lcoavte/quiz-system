@@ -3,19 +3,27 @@ import { HttpError } from '../../../errors/http-error.js';
 import type { EnrollmentService } from './enrollment-service.js';
 import type { StudentMembershipChangedPayload } from '@quiz/contracts';
 export class TeamChangeService {
- constructor(private readonly enrollment:EnrollmentService,private readonly publish?: (scope: StudentMembershipChangedPayload) => void){}
- change(sessionId:UUID,cookie:string|undefined,targetTeamId:UUID,successorParticipantId:UUID|null){
+ constructor(private readonly enrollment:EnrollmentService,private readonly publish?: (scope: StudentMembershipChangedPayload) => void,
+  private readonly onlineParticipants: (scope: StudentMembershipChangedPayload) => ReadonlySet<UUID> = () => new Set()){}
+ change(sessionId:UUID,cookie:string|undefined,targetTeamId:UUID){
   const e=this.enrollment;
   const change=e.database.transaction(()=>{
    const member=e.membership(cookie,sessionId);
-   if(e.database.prepare('SELECT 1 FROM rounds WHERE session_id=? AND (started_at IS NOT NULL OR phase IN (\'Active\',\'Ended\'))').get(sessionId))throw new HttpError(409,'INVALID_PHASE','Team changes close after first Active.');
+   if(e.hasStarted(sessionId))throw new HttpError(409,'INVALID_PHASE','Team changes close after first Active.');
    if(!e.foundation.teams.listBySession(sessionId).some(t=>t.id===targetTeamId)||targetTeamId===member.team.teamId)throw new HttpError(400,'INVALID_INPUT','Invalid destination Team.');
    const now=new Date().toISOString();
    if(member.isLeader){
-    const successor=successorParticipantId?e.foundation.participants.findById(successorParticipantId):null;
-    if(!successor||successor.teamId!==member.team.teamId||successor.id===member.participantId)throw new HttpError(409,'LEADER_TRANSFER_REJECTED','A source-Team successor is required.');
-    if(!e.student.teamLeaders.replaceIfCurrent(member.team.teamId,member.participantId,{participantId:successor.id,assignedAt:now,assignedByKind:'participant',assignedById:member.participantId}))throw new HttpError(409,'STALE_STATE','Leader changed.');
-   }else if(successorParticipantId!==null)throw new HttpError(400,'INVALID_INPUT','Only a leader supplies a successor.');
+    const sourceTeamId = member.team.teamId;
+    const remaining = e.student.teamJoinOrder.listParticipants(sourceTeamId).filter(id => id !== member.participantId);
+    const online = remaining.length ? this.onlineParticipants({sessionId,teamId:sourceTeamId}) : new Set<UUID>();
+    const onlineSuccessor = remaining.find(id => online.has(id));
+    const successor = onlineSuccessor ?? remaining[0];
+    const changed = successor
+     ? e.student.teamLeaders.replaceIfCurrent(sourceTeamId, member.participantId,
+       {participantId:successor,assignedAt:now,assignedByKind:'system',assignedById:null}, !onlineSuccessor)
+     : e.student.teamLeaders.removeIfCurrent(sourceTeamId, member.participantId);
+    if (!changed) throw new HttpError(409, 'STALE_STATE', 'Leader changed.');
+   }
    e.student.teamJoinOrder.remove(member.participantId);
    e.foundation.participants.moveToTeam(member.participantId,targetTeamId);
    e.student.teamJoinOrder.append(targetTeamId,member.participantId);

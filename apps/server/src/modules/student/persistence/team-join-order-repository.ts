@@ -17,7 +17,7 @@ export class TeamJoinOrderRepository {
   }
 
   listParticipants(teamId: UUID): UUID[] {
-    const rows = this.database.prepare('SELECT participant_id FROM student_team_join_order WHERE team_id = ? ORDER BY join_order')
+    const rows = this.database.prepare('SELECT p.id AS participant_id FROM participants p LEFT JOIN student_team_join_order j ON j.team_id = p.team_id AND j.participant_id = p.id WHERE p.team_id = ? ORDER BY j.join_order IS NULL, j.join_order, p.created_at, p.id')
       .all(teamId) as { participant_id: UUID }[];
     return rows.map(row => row.participant_id);
   }

@@ -1,7 +1,7 @@
 import { randomUUID,randomBytes } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { UUID } from '@quiz/contracts/domain';
-import type { StudentMembershipView,StudentEnrollmentRequest } from '@quiz/contracts';
+import type { StudentMembershipDetails,StudentMembershipView,StudentEnrollmentRequest } from '@quiz/contracts';
 import { createFoundationRepositories } from '../../../persistence/repositories/index.js';
 import { createStudentRepositories } from '../persistence/index.js';
 import { hashStudentSessionToken,readStudentCookie,StudentIdentityService } from './student-identity-service.js';
@@ -17,6 +17,19 @@ export class EnrollmentService {
   const p=this.foundation.participants.findById(identity.actorContext.actorId as UUID)!;
   const team=this.foundation.teams.listBySession(sessionId).find(t=>t.id===p.teamId)!;
   return {sessionId,participantId:p.id,displayName:p.displayName??'',team:{teamId:team.id,name:team.name},isLeader:this.student.teamLeaders.findByTeamId(team.id)?.participantId===p.id};
+ }
+ hasStarted(sessionId: UUID): boolean {
+  return Boolean(this.database.prepare(
+    "SELECT 1 FROM rounds WHERE session_id=? AND (started_at IS NOT NULL OR phase IN ('Active','Ended')) LIMIT 1",
+  ).get(sessionId));
+ }
+ membershipDetails(cookie: string | undefined, sessionId: UUID): StudentMembershipDetails {
+  const member = this.membership(cookie, sessionId);
+  if (this.hasStarted(sessionId)) return { ...member, teamChange: null };
+  const teams = this.foundation.teams.listBySession(sessionId)
+    .filter(team => team.id !== member.team.teamId)
+    .map(team => ({ teamId: team.id, name: team.name }));
+  return { ...member, teamChange: { teams } };
  }
  enroll(sessionId:UUID,input:StudentEnrollmentRequest,cookie:string|undefined,csrfToken?:string){
   return this.database.transaction(()=>{
