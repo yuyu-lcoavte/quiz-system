@@ -13,12 +13,17 @@
 ### Session 2026-11-10
 
 - Q: 學生應以哪種方式建立可由伺服器驗證、並在重新整理或重新連線後恢復的活動內身分？ → A: 使用不需帳密的活動內身分；加入時由伺服器建立，並可在同一瀏覽器恢復。
-- Q: 第一位成功加入的學生取得組長資格後，若該生轉組或離線，應如何確保組別只有一位可提交者？ → A: 後端以原子方式決定首位加入者；短暫離線保留組長資格，開始前轉組須明確交接，若組長無法恢復則由授權教師轉交。
+- Q: 第一位成功加入的學生取得組長資格後，若該生轉組或離線，應如何確保組別只有一位可提交者？ → A: 後端原子指派首位加入者，開始前轉組須明確交接。當時的短暫離線保留規則已由 2026-11-14 決議取代；教師手動轉交仍保留原提案。
 - Q: 同組不同學生編輯同一個答案時，草稿應如何同步、保存與處理同格衝突？ → A: Student Feature 伺服器保存並即時共享同組草稿；同格衝突由伺服器最後接受的修改勝出；重新整理或重新連線後恢復草稿。
 - Q: 單題有多個填空時，何時可以提交，且成功提交後應如何處理共用草稿？ → A: 單題的所有 Blank 都須填入非空白答案；成功提交後，同組共用草稿與欄位轉為唯讀，不得再修改或重送。
 - Q: Round 結束後，學生端應顯示哪些已公布的搶答結果？ → A: 僅顯示勝出組別名稱及該組成功提交的答案，不顯示其他組別的提交內容。
 - Q: Teacher 結束一輪時，應由哪個 Feature 依後端接受順序選出勝者，並提供學生結果頁所需的勝出組別與答案？ → A: Teacher 的可信後端只呼叫單一 `StudentTrustedEndCoordinator.endRound(...)`。Coordinator 使用 Foundation 交易服務；Student Winner Resolver 在同一 SQLite `BEGIN IMMEDIATE` 交易與連線內同步選取勝者，Foundation 在該交易中持久化 Ended 與 Result，成功 Commit 後才派送既有狀態通知。任何失敗均 Rollback 且不廣播；不得先在交易外查詢勝者再另行 End，不變更 Foundation 對外契約。
 - Q: 活動首次進入 Active 後，尚未加入的學生是否仍可加入？ → A: 可以首次加入已存在的組別；不得因此建立新組別。這是首次加入，不是既有學生轉組；既有學生在活動開始後仍不得轉組，且不新增 Teacher 停止加入設定。
+
+### Session 2026-11-14
+
+- 組長最後一條有效 Socket.IO 連線由伺服器偵測為中斷時，立即從同組在線且合資格者依加入該組的順序遞補，跳過離線或不合資格者。任何一條有效連線仍在就不觸發。無額外緩衝，也無教師可設定的遞補秒數。
+- 遞補原子提交後通知同組重讀目前身分與提交資格。原組長重連恢復原 Participant，若已被替換便不自動取回組長資格。無其他在線合資格者時不強制指派。此 Student 決議須同步 OpenSpec／Teacher，T004 待審閱。
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -37,6 +42,8 @@
 3. **Given** 活動存在且可供加入，**When** 學生選擇一個組別並完成加入，**Then** 後端建立或確認參與者與該組的關係，之後的活動操作以此可信關係授權。
 4. **Given** 查詢端超過活動代號入口的伺服器限制，**When** 學生繼續查詢，**Then** 系統呈現受限制的回覆，不建立成員身分。
 5. **Given** 活動已首次進入 Active 且 Session 仍可查詢，**When** 尚未加入的學生選擇一個已存在的組別，**Then** 系統允許首次加入該組；不建立新組別，也不改變既有成員的組長或轉組權限。
+6. **Given** 組長有兩條有效連線，較早加入的組員 B 離線、其後的 C 在線，**When** 組長先失去一條連線再失去最後一條，**Then** 第一次不換人，最後一次由 C 接任；原組長重連仍是同一 Participant，但提交資格依新指派。
+7. **Given** 全組沒有其他在線合資格者，**When** 組長最後一條連線中斷，**Then** 系統不強制指定接任者；可在重新取得權威身分狀態時確認是否曾發生遞補。
 
 ### User Story 2 - 以組別共同準備並提交答案 (Priority: P1)
 
@@ -94,7 +101,7 @@
 - **FR-001**: 學生端 MUST 使用既有共用應用程式的 `/student/join` 與 `/student/session/:sessionId` 路由；不得另建前端應用程式或變更共用路由契約。
 - **FR-002**: 系統 MUST 允許尚未加入活動的學生以 Activity Code 查詢活動是否存在及其必要摘要；查詢 MUST 沿用 Foundation 的匿名唯讀、伺服器驗證與節流邊界，且不得建立 Participant、Team membership 或其他受保護權限。
 - **FR-003**: 系統 MUST 在活動加入流程中呈現該 Session 已存在的可選組別並允許學生選擇；組別及 Participant 的建立／確認 MUST 由伺服器驗證並維持與 Session 的關聯。Session 首次進入 Active 後，尚未加入者仍 MUST 可首次加入已存在的組別；本 Feature MUST NOT 建立新組別。
-- **FR-004**: 系統 MUST 依 Q02 將後端原子化接受加入的第一位 Participant 設為該組唯一組長；並行加入不得產生多位組長。組長短暫離線或以同一活動身分恢復時保留資格；活動開始前組長轉組須明確交接，若組長無法恢復則只能由授權教師轉交。提交資格 MUST 由可信後端判定，不得由客戶端傳入角色或組長宣告。
+- **FR-004**: 第一位成功加入 Team 的 Participant MUST 原子取得組長資格，每 Team 至多一位。伺服器偵測現任組長最後一條有效 Socket.IO 連線中斷後 MUST 立即執行 SQLite 交易，依加入該組的順序選取最早在線且合資格的其他組員，跳過離線或不合資格者。無候選時不強制指派；已有接任者時原組長重連不自動取回資格。組長變更成功提交後 MUST 通知同組更新身分與提交資格。活動開始前組長轉組仍須明確交接；授權教師手動轉交仍保留原提案。
 - **FR-025**: 學生 MUST 不需建立可跨活動重用的帳號或密碼；加入活動後由伺服器建立活動內 Participant 身分，並允許同一瀏覽器在重新整理或重新連線後恢復該 Participant。身分憑證的具體傳遞與保存方式留待 Plan，且不可由客戶端自稱 Participant ID 取代伺服器驗證。
 - **FR-005**: 系統 MUST 依 Q03 以 Cookie 記錄相關選組資訊；已加入學生只可在活動首次進入 Active 前變更組別，首次 Active 後不得轉組。首次加入一個既有組別的晚到學生不視為轉組。Cookie 中的資料 MUST NOT 作為伺服器驗證 Participant、Team 或組長資格的唯一依據。
 - **FR-006**: 系統 MUST 對缺少、格式錯誤或不存在的 Activity Code 顯示可理解錯誤；錯誤資訊不得洩漏無關 Session、Team、Participant 或答案資料。
@@ -104,7 +111,7 @@
 - **FR-010**: 系統 MUST 將 QuestionGroup 的多道 Question 視為一個共同提交目標；符合 Q18 的題組必須所有題目完成後才可共同提交，並以同一 Round／Submission 表達。
 - **FR-011**: Question 或 QuestionGroup 沒有可作答 Blank 時，學生端 MUST 不允許建立空答案 Submission，並呈現可理解的不可作答提示。
 - **FR-012**: 系統 MUST 依 Q02 允許同組多位學生參與答案編輯；Student Feature 伺服器 MUST 保存並即時同步該 Team／Round 的共同草稿，重新整理或重新連線後可恢復。多人編輯同一 Blank 時，以伺服器最後接受的更新為準。此草稿同步屬 Student Feature 責任，不得假定或擴充 Foundation 的活動狀態 Socket.IO 契約來傳答案。
-- **FR-013**: 系統 MUST 僅允許後端驗證具有組長提交資格的 Participant 成功提交；伺服器必須由可信身分推導 Team 與 Participant，不得採用請求中自稱的角色或 Team 作為權威資料。
+- **FR-013**: 系統 MUST 僅允許後端驗證具有當前組長提交資格的 Participant 成功提交；伺服器必須在提交交易中重新查驗最新組長指派，並由可信身分推導 Team 與 Participant，不得採用請求中自稱的角色或 Team 作為權威資料。
 - **FR-014**: 系統 MUST 拒絕純空白或僅含空白字元的提交答案，並由後端驗證 Blank 屬於目前 Round 的有效 Question 或 QuestionGroup、目前 Round 為 Active，且 Participant 所屬 Team 與 Round 同一 Session。
 - **FR-015**: 同一 Team 在同一 Round MUST 至多成功建立一筆有效 Submission；成功後再次提交 MUST 被拒絕。單題多個 Blank MUST 全部填入非空白答案才能提交；題組 MUST 完成所有 Question 和其可作答 Blank 後才能提交。成功提交後，伺服器 MUST 將該 Team／Round 共用草稿設為唯讀並拒絕後續修改。
 - **FR-016**: `acceptedOrder` MUST 由 Student Feature 的可信伺服器端提交服務依實際接受順序產生並交由 Foundation 持久化；客戶端不得提供權威值，學生端不得以本機時鐘產生順位。
@@ -120,7 +127,7 @@
 ### Key Entities *(include if feature involves data)*
 
 - **Participant**: 已加入活動的學生身分；由 Student Feature 建立／確認，並由可信後端綁定到 Team。每個活動採不需跨活動帳密的活動內身分，同一瀏覽器可恢復該 Participant；具體身分憑證形式留待 Plan。
-- **Team**: Session 內的組別；組員共同作答，依共同決議由第一位加入的 Participant 擔任組長。
+- **Team**: Session 內的組別；組員共同作答，第一位成功加入者為初始組長，後續資格依目前伺服器指派。
 - **Late Enrollment**: Session 首次 Active 後的首次加入；只可選擇已存在 Team，不建立新 Team，也不變更既有 Participant 的組別。
 - **Activity Code Lookup**: 加入前的有限度活動查詢；與加入後 Participant identity／Team membership 分開。
 - **Round**: 一次搶答輪次及所有學生答案的範圍；重新開題使用新 Round ID。
@@ -150,7 +157,7 @@
 - 老師端已建立 Session、Activity Code、Team、Question、Blank 及 QuestionGroup 資料；學生端消費其處理後的結構化資料，不讀取或解析 Excel。
 - 學生只能在目前 Round 為 Active 時取得題目內容及提交；等待狀態與活動階段資訊可於題目未開放時顯示。
 - 活動首次進入 Active 後仍允許尚未加入的學生首次加入已存在 Team；這不允許新建 Team 或既有 Participant 轉組，也不新增 Teacher 停止加入設定。
-- Q02、Q03、Q07、Q08、Q09、Q10、Q11、Q12、Q18、Q20 的已確認行為依共同需求文件為準；本規格不變更其決議。
+- Q02 的首任組長與僅當前組長可提交仍適用；FR-004 補充共同需求 U02 的離線遞補，須同步 OpenSpec／Teacher。Q03、Q07、Q08、Q09、Q10、Q11、Q12、Q18、Q20 依共同需求文件為準。
 - 沒有可作答 Blank 的題目不接受空答案 Submission。單題有多個 Blank 時各欄位獨立輸入且都必須完成；題組內所有 Question 的可作答 Blank 都必須完成。
 - `Result` 的勝者依 Student Feature 可信後端所記錄的最早有效接受順序選出，不採自動批改或公平輪替；Teacher 只呼叫 Student 的單一可信 End coordinator，由 Student resolver 在 Foundation End 交易內選出勝者，Foundation 保存 Ended 與 Result；沒有有效 Submission 時不建立 Result。
 - Group name、Question 顯示編號／提示及 Blank label 以 Teacher Feature 提供的共用資料為準；其匯入辨識與保留原始 `(1)`、`(2)` 等標記由 Teacher Feature 處理及確認。
@@ -164,7 +171,7 @@
 - Q16 是否保留來源 Guided Notes 的 `(1)`、`(2)` 標記，以及匯出時如何回寫，屬 Teacher 匯入／匯出決議；Student 只顯示 Teacher 提供的 Blank 資料，不解析 Excel 或推測標記語意。
 - U10 題組如何從來源檔案辨識、Q13 `.xlsx` 流程是否符合助教要求，屬 Teacher Feature 與課程驗收的待確認項目；Student 僅消費已建立的 QuestionGroup。
 - Q22 共用測試案例的細節待兩組協調；本規格列出學生端驗收行為，但不宣稱已取得逐項共同測試案例審閱。
-- 組長無法恢復時，規則已決定由授權教師轉交；Teacher 提供 UI，Student 服務檢查 ActorContext 中的 `team:leader:transfer` capability。此 capability 目前不在 Foundation 已列出的讀取權限中，屬 Teacher Feature 必須提供且雙方需審閱的新增 capability 名稱。
+- OpenSpec／Teacher 須同步 FR-004 的最後有效連線、立即遞補、加入順序、無候選與重連行為，以及同組通知與提交的共同驗收。教師手動轉交仍由 Teacher 提供 UI、Student 驗證可信後端授權；`team:leader:transfer` 仍是待 T004 審閱的提案。無教師設定遞補秒數的功能。
 - Teacher 只呼叫 Student 的單一可信 End coordinator；該 coordinator 使用 `round:end` capability 驗證 ActorContext，將 Student winner resolver callback 傳給 Foundation 內部 lifecycle transaction。此 capability 目前亦非 Foundation 既有能力；Teacher／Student／Foundation 負責人仍需審閱內部介面提案。Student result projection 為 Student-owned；不修改 Foundation 的 `ResultView` 或其他對外契約。
 
 ## Dependencies and Compatibility

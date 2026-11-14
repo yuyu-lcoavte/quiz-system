@@ -1,6 +1,6 @@
 # Student Feature Data Model
 
-This design extends the existing Foundation SQLite schema additively. Foundation Team, Participant, Submission, SubmissionAnswer and Result rows remain the canonical domain records. Student tables hold only browser credential state, the current leader assignment and draft state.
+This design extends the existing Foundation SQLite schema additively. Foundation Team, Participant, Submission, SubmissionAnswer and Result rows remain the canonical domain records. Student tables hold browser credential state, the current leader assignment, planned Team join order and draft state.
 
 ## Reused Foundation Entities
 
@@ -61,7 +61,21 @@ The current single authorized submitter for a canonical Team.
 | `assignedByKind` | `participant | teacher | system` | Server-derived source for current assignment; not accepted from a browser. |
 | `assignedById` | string or null | Trusted actor ID for transfer; no credential material. |
 
-**Relationship**: Each Team has zero or one current leader until its first successful member joins; after that it has exactly one active leader unless the service reports an integrity error. A database unique key on `teamId` and a transactional membership check enforce the rule. History/audit events are outside this Feature unless required by a later review.
+**Relationship**: Each Team has at most one persisted assignment. Its holder may be offline when no other eligible member is online at the last-disconnect check. Use the existing `teamId` primary key and composite Team/Participant foreign key. Automatic assignments use `assignedByKind = system` and `assignedById = null`. History/audit events remain outside this Feature.
+
+### `StudentTeamJoinOrder` (planned additive migration)
+
+| Field | Rule |
+| --- | --- |
+| `participantId` | Primary key; points to the canonical Participant. |
+| `teamId` | Composite foreign key `(teamId, participantId)` to canonical membership. |
+| `joinOrder` | Positive server-assigned integer, unique within the Team. |
+
+Allocate the next order inside the existing enrollment or pre-start team-change `BEGIN IMMEDIATE` transaction. Cookie recovery or repeat enrollment keeps the current order. On a move, remove the old order row before moving canonical membership, then insert the destination order in the same transaction. Backfill existing memberships deterministically by Participant `created_at`, then `id` per Team. Exact historical team-entry order for moved members and tied historical creation timestamps cannot be reconstructed from existing data. Backfill leaves existing leader rows intact. Persist only join order, with canonical Participant/Team remaining authoritative.
+
+### Student socket presence (process-local)
+
+Index authorized sockets by `(sessionId, participantId)` with unique socket IDs; derive Team from current canonical membership. Presence requires at least one live connection with valid Student credential and current Session/Team scope. Closing one socket removes only that ID. Stale disconnects cannot replace a leader already reassigned. Persist no socket IDs or presence booleans in SQLite.
 
 ### `TeamRoundDraft`
 
@@ -121,6 +135,8 @@ Application validation remains responsible for authorization and temporal rules 
 `BEGIN IMMEDIATE`: resolve canonical Session and selected pre-existing Team; resolve/create a valid browser credential; create the canonical Participant and Session association; insert TeamLeader only if the Team has none; return current membership and leadership. This first-time join is allowed before and after the Session first enters Active; it never creates a Team. A repeated request from the same credential/Session returns the existing Participant. A different first-member request serializes behind the writer lock; database uniqueness prevents two leaders.
 
 ### Team change and leader handoff
+
+For automatic failover, start `BEGIN IMMEDIATE` on the last valid disconnect. Re-read the current assignment, confirm the disconnected Participant still holds it and has no other valid sockets, and select the first same-Team member by `joinOrder` with current eligible presence. Replace conditionally; a missing candidate leaves the row unchanged. Commit before publishing invalidation. Enrollment, pre-start handoff, future Teacher transfer and submission serialize on the same SQLite writer boundary.
 
 `BEGIN IMMEDIATE`: resolve requester from ActorContext; verify source membership and that no Round in the Session has ever entered Active; if requester is leader, require a valid existing source-Team successor and update TeamLeader before moving membership; update canonical Participant's `team_id`; if the destination Team has no leader, assign the requester; update credential association; commit. Any failed validation rolls back the entire change. A new Participant may still first join an existing Team after first Active; that is enrollment, not transfer. Teacher recovery transfer invokes the separate trusted service and uses the same membership/unique constraints.
 

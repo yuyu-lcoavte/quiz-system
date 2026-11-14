@@ -58,4 +58,4 @@ npm.cmd test -- tests/integration/migrations.test.ts tests/integration/migration
 | Migration 與交易指定測試 | 6 個測試檔、21 項全部通過。涵蓋 Migration 路徑解析、Student 增量 Schema、組長資料約束、SQLite 寫鎖與同步 Winner Resolver。 |
 | Demo 資料準備 | 已執行 Quickstart 的 fixture 命令，成功在暫存目錄建立三個 Demo Session 的 SQLite 檔。 |
 
-本次結果是目前分支的自動化回歸基準。Phase 8 的 T060 最終檢查依賴已審閱的 Teacher 整合，仍待完成。2026-11-12 已在隔離 Demo 實際操作單用戶端 Waiting／Active／Ended、草稿重新整理、提交及鎖定。測試期間 Vite 再度記錄 `ECONNABORTED`，當次操作均成功，觸發條件仍待查。T061 的三次計時、同一組長身分的短暫離線恢復與正式 Teacher／Student 瀏覽器驗收仍待執行。[Windows 人工驗收紀錄](../../tests/manual/student-feature.md)
+上述為遞補變更前的自動化回歸基準。T060 最終檢查須等 T066 與已審閱的 Teacher 整合。2026-11-12 已在隔離 Demo 實測單用戶端 Waiting／Active／Ended、草稿重新整理、提交及鎖定，並記錄 `ECONNABORTED` 當次未阻礙操作。新版 F5／多連線遞補、T061 三次計時與正式 Teacher／Student 瀏覽器驗收均待執行。[Windows 人工驗收紀錄](../../tests/manual/student-feature.md)

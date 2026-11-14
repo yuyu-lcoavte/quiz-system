@@ -129,6 +129,12 @@ T004 remains unchecked in `specs/002-student-feature/tasks.md`. These are intern
 
 ## Independent preparation before T004
 
+### 2026-11-14 Student rule update, awaiting cross-group synchronization
+
+OpenSpec/Teacher should align Q02/U02 acceptance with the Student decision: initial leader is the first successful join; loss of the last valid socket triggers immediate selection of the earliest eligible online teammate, with no configurable grace. Other sockets preserve presence. With no candidate the assignment stays; a replaced leader recovers identity but not leadership after F5/reconnect. Align how both implementations show role changes and test eligibility at submit time. See [Student Spec](../../specs/002-student-feature/spec.md) and [Realtime Contract](../../specs/002-student-feature/contracts/student-realtime.md).
+
+T004 remains pending. Review the existing Teacher manual transfer proposal, including ordering against automatic failover, stale current-leader behavior, post-commit notice reuse and Teacher membership refresh. The proposed capability strings and End callback remain pending. The automatic Student path does not use either proposed capability.
+
 - T025/T026 can reuse `TeamLeaderRepository.replaceIfCurrent` inside the future Student write transaction. Repository tests cover updating one row, a stale expected leader, and rejection of a successor from another Team or Session. The repository receives an expected Participant ID from its caller and does not authenticate that caller. Teacher authentication, expected-state semantics at the service boundary, input/output/error mapping, and the Teacher call remain under review.
 - The current Student submission test suite uses two connections to the same temporary SQLite file. An independent writer holds `BEGIN IMMEDIATE`; the real Student submission observes contention, leaves the draft editable and emits no lock notification. After the writer releases the lock, a new submission succeeds; the synchronous resolver then sees the committed candidate without persisting a Result. This exercises the SQLite and Student prerequisites for T041.
 

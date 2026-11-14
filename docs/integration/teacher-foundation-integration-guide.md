@@ -107,12 +107,12 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 ### 8.1 組長轉交
 
 - 第一位成功加入某組的學生，由 Student 後端**原子**指定為該組唯一組長。
-- 短暫斷線不轉交組長；搶答首次開始前若組長轉組，須先完成明確交接；搶答開始後不可自由換組。
-- 原組長無法恢復身分時，由**已驗證的教師**發起指定新組長操作。
+- 2026-11-14 Student 新決議，待 OpenSpec／Teacher 同步：最後有效 Socket.IO 連線中斷後立即依加入順序選擇在線合資格組員，無候選就保留原指派。原組長被替換後不因重連取回角色。搶答首次開始前若組長轉組，仍須明確交接；開始後不可自由換組。
+- **已驗證教師**指定新組長的手動操作保留原提案；無教師遞補秒數設定。
 - Foundation 既有 ActorContext 權限只有 `session:read`、`session:watch`、`target:preview`、`target:read`、`results:read`，不含組長管理權限。Student Plan 提議新增 `team:leader:transfer` capability 字串，由 Teacher 驗證後放入伺服器建立的 ActorContext；此名稱不是 Foundation 已有 grant，待 Teacher 組員審閱。
 - **Teacher Feature 負責**：顯示組員與目前組長、提供「指定新組長」UI，以及可信授權操作入口。
 - **Student Feature 負責**：驗證目標組員資格、保證同組同時最多一位組長、以交易完成轉交並提供最新權限狀態。
-- **Student Plan 介面提案，尚待 Teacher 組員審閱**：`specs/002-student-feature/contracts/internal-services.md` 提出可信 Teacher 呼叫 Student 後端服務的介面及錯誤；需雙方確認模組註冊方式、權限名稱與狀態回饋。組長狀態可由 Teacher 重讀服務取得，Student 提案目前不新增即時組長廣播事件。
+- **Student Plan 介面提案，尚待 Teacher 組員審閱**：`specs/002-student-feature/contracts/internal-services.md` 定義可信 Teacher 服務草案；需確認權限名稱、手動轉交與遞補競爭、Teacher 如何重讀組長狀態。規劃中的 `student:membership:changed` 只通知有權限的同組 Student 重讀 `/me`，Teacher 接收介面未定案。
 
 ### 8.2 結束搶答、勝者選取與 Result 儲存
 

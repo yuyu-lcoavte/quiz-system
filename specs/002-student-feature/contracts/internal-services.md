@@ -34,6 +34,8 @@ It is produced by trusted Teacher authentication middleware, never request JSON.
 
 ## 1. Teacher-Authorized Leader Transfer
 
+This proposal remains open. The planned automatic path is a Student socket lifecycle operation and uses no Teacher permission. Both paths serialize updates to the same assignment; T004 must confirm stale-command handling and whether the reviewed manual service reuses Student post-commit invalidation. The existing Teacher input, output and capability proposals are retained.
+
 ```ts
 interface TransferTeamLeaderInput {
   sessionId: UUID;

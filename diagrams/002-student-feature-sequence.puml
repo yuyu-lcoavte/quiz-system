@@ -6,6 +6,7 @@ actor Student
 participant "Student Web UI" as UI
 participant "Student HTTP / Service" as StudentApi
 participant "Student Draft Socket" as DraftSocket
+participant "Student Presence / Failover\n(planned)" as Presence
 participant "Foundation Query / State" as Foundation
 participant "Teacher Backend" as Teacher
 participant "StudentTrustedEndCoordinator\n(T004 proposal)" as EndCoordinator
@@ -82,6 +83,30 @@ Same-Blank conflict: last server-accepted edit wins.
 Refresh/reconnect uses persisted snapshot; Foundation state events carry no answers.
 The UI serializes writes per Blank and retains focused/unsaved input.
 Remote differences are indicated; submission waits for saved authoritative values.
+end note
+
+== Leader disconnect and role recovery (planned) ==
+UI -> Presence : authenticated activity and draft sockets connect
+UI -> Presence : F5 or other transport disconnect
+Presence -> Presence : remove socket ID and check other valid sockets
+alt current leader lost last valid socket
+  Presence -> DB : BEGIN IMMEDIATE; recheck leader and scope
+  Presence -> DB : select first eligible online teammate by join order
+  alt eligible candidate exists
+    Presence -> DB : conditionally replace assignment; COMMIT
+    Presence --> UI : student:membership:changed to affected Team's connected clients
+  else no candidate
+    Presence -> DB : keep assignment; no notification
+  end
+else other valid socket remains or actor is no longer leader
+  Presence -> Presence : no leader change
+end
+UI -> StudentApi : GET /me on reconnect or membership invalidation
+StudentApi -> DB : resolve same Cookie identity and current assignment
+StudentApi --> UI : Participant / Team / current isLeader
+note over UI,Presence
+No application grace period. Reconnection does not reclaim a replaced role.
+Disable submit until current role is resolved; preserve the draft.
 end note
 
 == Submission ==

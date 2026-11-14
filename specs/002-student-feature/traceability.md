@@ -9,7 +9,7 @@
 | FR-001 共用路由 | T047、T049–T050、T054 | `router.tsx`、`StudentJoinPlaceholder.tsx`、`StudentSessionPlaceholder.tsx` | `student-join-pages.test.tsx`、`student-result-state.test.tsx` |
 | FR-002 匿名限流查詢 | T017、T021、T050 | `student-identity-client.ts`、`join-options-service.ts`、`session-query-service.ts` | `student-join-options.test.ts`、`foundation-api.test.ts` |
 | FR-003 既有組別／晚到加入 | T018、T021–T023、T047、T050 | `join-options-service.ts`、`enrollment-service.ts`、`StudentJoinPlaceholder.tsx` | `student-enrollment.test.ts`、`student-join-pages.test.tsx`；晚到瀏覽器操作待驗 |
-| FR-004 原子指派及保留組長 | T005–T007、T018–T020、T022、T024–T026 | `002-student-feature.sql`、`team-leader-repository.ts`、`enrollment-service.ts`、`team-change-service.ts` | `student-enrollment.test.ts`、`student-leader-reconnect.test.ts`、`student-team-change.test.ts`、`student-repositories.test.ts`；短暫離線瀏覽器驗收及教師轉交待驗，教師轉交受 T004 限制 |
+| FR-004 原子指派及離線遞補 | T005–T007、T018–T020、T022、T024–T026、T062–T066 | `002-student-feature.sql`、`team-leader-repository.ts`、`enrollment-service.ts`、`team-change-service.ts`；遞補服務待實作 | `student-enrollment.test.ts`、`student-leader-reconnect.test.ts`、`student-team-change.test.ts`、`student-repositories.test.ts`；新版遞補待驗，教師轉交受 T004 限制 |
 | FR-005 Cookie 與轉組時限 | T019–T020、T023–T024、T051 | `student-identity-service.ts`、`enrollment-controller.ts`、`team-change-service.ts` | `student-identity.test.ts`（API）、`student-team-change.test.ts` |
 | FR-006 無效代號及錯誤隱私 | T017、T021、T047、T050 | `join-options-controller.ts`、`StudentJoinPlaceholder.tsx` | `student-join-options.test.ts`、`student-join-pages.test.tsx` |
 | FR-007 Waiting 不揭露題目 | T029、T039、T042、T049、T054 | `session-controller.ts`、`draft-service.ts`、`StudentSessionPlaceholder.tsx` | `foundation-api.test.ts`、`student-draft.test.ts`（API）、`student-result-state.test.tsx` |
@@ -33,6 +33,16 @@
 | FR-025 無帳密及身分恢復 | T007、T011–T012、T019、T022–T023、T047、T051 | `identity-repository.ts`、`student-identity-service.ts`、`student-identity-client.ts` | `student-identity.test.ts`（API）、`student-leader-reconnect.test.ts`、`student-join-pages.test.tsx`；瀏覽器重新整理已驗，短暫離線後身分比對待驗 |
 
 ## Success Criteria
+
+### 2026-11-14 failover delta (pending verification)
+
+| Requirement | New tasks | Affected implementation and evidence |
+| --- | --- | --- |
+| FR-004 / FR-005 | T062–T064, T066 | Enrollment and team-change order, trusted multi-socket presence, ordered fallback and no-candidate handling. `student-leader-reconnect.test.ts` retains a no-candidate case and needs online-successor cases; `student-migration.test.ts` covers the new backfill and constraints. |
+| FR-013 / SC-002 / SC-004 | T062, T064–T066 | Existing submission transaction rechecks `team_leaders`; extend `student-submission-transaction.test.ts` for both writer orders and assert former/current leader outcomes with no duplicate submission. |
+| FR-024 / FR-025 | T064–T066 | `/me` and Student-only invalidation update current role; add UI coverage for F5, missed notice, obsolete membership response and preserved draft. Browser recheck requires separate identities and a multi-tab case. |
+
+The prior 52 checked tasks and 173 passing tests describe the baseline. Student failover and notification remain planned. T025/T026 and cross-module acceptance still depend on T004. See the [Gate record](../../docs/integration/student-feature-review-gate.md).
 
 | 準則 | Tasks | 實作 | 自動化證據及人工驗收 |
 | --- | --- | --- | --- |

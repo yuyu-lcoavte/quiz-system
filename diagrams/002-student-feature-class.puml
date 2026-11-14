@@ -76,6 +76,20 @@ class TeamLeader <<Student>> {
   participantId: UUID
   assignedAt: datetime
 }
+class StudentTeamJoinOrder <<planned SQLite>> {
+  participantId: UUID
+  teamId: UUID
+  joinOrder: positive integer
+}
+class StudentSocketPresence <<planned process-local>> {
+  sessionId: UUID
+  participantId: UUID
+  socketIds: Set<SocketId>
+}
+Participant "1" -- "0..1" StudentTeamJoinOrder : current Team order
+Team "1" -- "0..*" StudentTeamJoinOrder : unique order within Team
+Participant "1" -- "0..1" StudentSocketPresence : all valid sockets
+StudentSocketPresence ..> TeamLeader : last disconnect may replace assignment
 class TeamRoundDraft <<Student>> {
   teamId: UUID
   roundId: UUID
@@ -137,6 +151,8 @@ note right of TeamLeader
 At most one row per Team.
 First successful enrollment inserts it atomically.
 The leader Participant must belong to that Team.
+On last valid socket disconnect, select earliest eligible online teammate.
+Without a candidate, retain the current assignment.
 After first Active, new Participants may join only an existing Team;
 they do not replace its leader. Existing Participants cannot transfer Teams.
 end note

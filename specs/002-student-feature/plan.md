@@ -34,6 +34,16 @@ Draft retry persistence uses additive `003-student-draft-mutations.sql`: receipt
 
 **Scale/Scope**: One course activity application; dynamic question/group/blank counts; multiple Participants per Team; a single accepted Submission per Team/Round; one current leader per Team.
 
+### Student leader failover design (2026-11-14, planned)
+
+Use the shared Socket.IO server's authenticated Student connection lifecycle across all phases. Track a set of socket IDs per Session/Participant in the single server process, counting both the activity and draft sockets and all tabs. Resolve current credential and Team membership when evaluating presence or publishing; a stale socket from a previous Team cannot grant presence or receive notices for that Team. Handle disconnect idempotently, then evaluate the current leader's last valid connection in the same synchronous execution path as the SQLite transaction. Transport heartbeat detection still applies; add no application grace timer. A multi-process deployment would require shared presence and is outside this plan.
+
+Record accepted join order for the current Team using the additive Student data model. In `BEGIN IMMEDIATE`, recheck current leader, scope and presence, select the earliest eligible online teammate and conditionally replace the same assignment. A candidate is an existing member of the same Team and Session with a live, currently authorized Student socket. Keep the existing assignment if there is no candidate. Connection or enrollment alone does not trigger failover or restore a replaced leader. Publish the Student-only membership invalidation after any committed assignment change, including pre-start handoff and, after T004, the reviewed manual handoff. No change or rollback emits no notice. Failed writes leave the old assignment intact; log the operational failure and, if retried, recheck leader and presence from scratch.
+
+The browser refreshes `/me` on connection, reconnection and invalidation. A full F5 refresh may disconnect all of that Participant's sockets and trigger handoff while an eligible teammate is online. The Cookie restores the same Participant and Team; the role comes from the current assignment. Hide or disable submission while role refresh is unresolved. Serialize or supersede in-flight membership reads so a stale response cannot restore a prior role. Preserve the current draft. The submission service already rereads the leader within `BEGIN IMMEDIATE`; verify both transaction orders with failover, without reopening the same Team/Round submission.
+
+OpenSpec/Teacher synchronization covers the behavior, the no-candidate and F5 cases, and common acceptance tests. Student owns the automatic path. T004 remains open for the Teacher manual-transfer and End interfaces, including manual versus automatic update ordering; no Teacher configuration, new Foundation permission or Foundation public contract change is planned.
+
 ## Constitution Check
 
 ### Initial gate
@@ -108,7 +118,7 @@ tests/
 └── manual/student-feature.md
 ```
 
-**Structure Decision**: Extend the existing `apps/web`, `apps/server`, `packages/contracts`, `tests` and migration runner. Keep Foundation entities authoritative. Student-specific tables store credentials, leader mapping and drafts only; canonical Participant/Submission/Result data remain in Foundation tables. The root composition injects one shared `Database` instance into the Student End coordinator, Student winner resolver and Foundation lifecycle transaction port; only the coordinator is called by Teacher. Foundation depends on the generic resolver callback shape, not the Student module, to keep dependencies acyclic.
+**Structure Decision**: Extend the existing `apps/web`, `apps/server`, `packages/contracts`, `tests` and migration runner. Keep Foundation entities authoritative. Student-specific tables store credentials, leader mapping, planned Team join order and drafts; canonical Participant/Submission/Result data remain in Foundation tables. The root composition injects one shared `Database` instance into the Student End coordinator, Student winner resolver and Foundation lifecycle transaction port; only the coordinator is called by Teacher. Foundation depends on the generic resolver callback shape, not the Student module, to keep dependencies acyclic.
 
 ## Design Gate Summary
 
