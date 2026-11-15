@@ -32,10 +32,13 @@ npm.cmd run dev
 | 活動代號 | 初始資料 |
 | --- | --- |
 | `DEMO-WAIT` | Waiting，學生畫面不顯示題目。 |
-| `DEMO-ACTIVE` | Active，兩題、四個 Blank，可用不同學生身分測試同組草稿和提交。 |
+| `DEMO-SINGLE-ACTIVE` | Active，單題模式，一題、兩個 Blank。 |
+| `DEMO-ACTIVE` | Active，題組模式，兩題、四個 Blank，可用不同學生身分測試同組草稿和提交。 |
 | `DEMO-ENDED` | Ended，含已持久化的勝出組別及四筆答案。 |
 
 每個代號各是一場活動。Fixture 只透過本機命令建立獨立 SQLite 檔，會拒絕覆寫既有檔案。Teacher 控制 Round及 Submit／End 競爭須另做整合驗收。操作步驟與已回報的瀏覽器觀察見 [Windows 人工驗收紀錄](../../tests/manual/student-feature.md)。
+
+從加入頁先進入 `DEMO-SINGLE-ACTIVE`，確認只顯示一題兩格，兩格都有答案後由組長送出。再回加入頁進入 `DEMO-ACTIVE`，確認同一輪顯示兩題四格，四格填齊後一起提交一次。若先前已建立舊版 Demo，請停止開發伺服器並重新執行上方整段指令，產生含新代號的獨立資料庫。
 
 ## 指定自動化測試
 

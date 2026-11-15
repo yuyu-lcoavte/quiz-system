@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { it,expect,vi,afterEach } from 'vitest';
 import { StudentTargetEditor } from '../../apps/web/src/modules/student/StudentTargetEditor.js';
 import { StudentSubmissionControls } from '../../apps/web/src/modules/student/StudentSubmissionControls.js';
-import { ids } from '../helpers/foundation.js';
+import { blank, createFoundationTestContext, ids, question, questionGroup, round, session } from '../helpers/foundation.js';
+import { SessionQueryService } from '../../apps/server/src/modules/sessions/application/session-query-service.js';
 import { StudentDraftPanel } from '../../apps/web/src/modules/student/StudentDraftPanel.js';
 import { StudentSessionPlaceholder } from '../../apps/web/src/pages/StudentSessionPlaceholder.js';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -36,6 +37,70 @@ it('permits only a ready leader to submit and reports incomplete/saving states',
 });
 const membership={sessionId:ids.session1,participantId:ids.participant1,team:{teamId:ids.team1,name:'Team A'},isLeader:true};
 function draftProps(){realtime.snapshot={sessionId:ids.session1,roundId:ids.round1,version:1,status:'editable',answers:[{blankId:ids.blank1,value:'saved',revision:1}]};return {sessionId:ids.session1,roundId:ids.round1,target:{roundId:ids.round1,target:{kind:'question' as const,question:q}},membership,csrfToken:'csrf',activityConnected:true,onIdentityRefresh:vi.fn()};}
+
+it('shows only the selected Question and reloads the target and draft when the next Round starts', async () => {
+ const { database, repositories } = createFoundationTestContext();
+ const query = new SessionQueryService(database);
+ const now = '2026-11-14T00:00:00.000Z';
+ repositories.sessions.create(session());
+ repositories.questionGroups.create(questionGroup());
+ repositories.questions.create(question(ids.question1, ids.session1, { questionGroupId: ids.group1, prompt: 'First question' }));
+ repositories.questions.create(question(ids.question2, ids.session1, { questionGroupId: ids.group1, prompt: 'Second question', position: 1 }));
+ repositories.blanks.create({ ...blank(), label: 'First blank' });
+ repositories.blanks.create({ ...blank(ids.blank2, ids.question1, 1), label: 'Second blank' });
+ repositories.blanks.create({ ...blank(ids.blankOther, ids.question2), label: 'Next Round blank' });
+ repositories.rounds.create({ ...round(), phase: 'Active', startedAt: now });
+ repositories.rounds.create(round(ids.round2, ids.session1, { questionId: ids.question2 }));
+ const setCurrentRound = database.prepare('UPDATE sessions SET current_round_id=?, state_version=? WHERE id=?');
+ setCurrentRound.run(ids.round1, 1, ids.session1);
+ const firstDraft = { sessionId: ids.session1, roundId: ids.round1, version: 1, status: 'editable',
+  answers: [{ blankId: ids.blank1, value: 'First Round draft', revision: 1 }] };
+ const nextDraft = { ...firstDraft, roundId: ids.round2, version: 0, answers: [] };
+ // The page must load each draft over HTTP. The socket mock does not replay it on watch.
+ realtime.snapshot = { sessionId: ids.session1, roundId: ids.round1 };
+ const respond = (data: unknown) => ({ ok: true, json: async () => ({ data }) });
+ const fetcher = vi.fn(async (url: unknown) => {
+  const path = String(url);
+  if (path.endsWith('/me')) return respond(membership);
+  if (path.endsWith('/csrf-token')) return respond({ csrfToken: 'csrf' });
+  if (path.endsWith('/current-target')) return respond(query.getCurrentTarget(ids.session1));
+  if (path.endsWith(`/rounds/${ids.round1}/draft`)) return respond(firstDraft);
+  if (path.endsWith(`/rounds/${ids.round2}/draft`)) return respond(nextDraft);
+  throw new Error(`Unexpected request: ${path}`);
+ });
+ vi.stubGlobal('fetch', fetcher);
+ render(<MemoryRouter initialEntries={[`/student/session/${ids.session1}`]}><Routes>
+  <Route path="/student/session/:sessionId" element={<StudentSessionPlaceholder/>}/>
+ </Routes></MemoryRouter>);
+
+ expect(await screen.findByLabelText('First blank')).toHaveValue('First Round draft');
+ expect(screen.getAllByRole('textbox')).toHaveLength(2);
+ expect(screen.getByLabelText('Second blank')).toBeInTheDocument();
+ expect(screen.queryByText('Second question')).not.toBeInTheDocument();
+ expect(screen.queryByLabelText('Next Round blank')).not.toBeInTheDocument();
+
+ const [stateSocket, firstDraftSocket] = realtime.sockets;
+ const targetReads = () => fetcher.mock.calls.filter(([url]) => String(url).endsWith('/current-target'));
+ expect(targetReads()).toHaveLength(1);
+ database.prepare("UPDATE rounds SET phase='Ended', ended_at=? WHERE id=?").run(now, ids.round1);
+ setCurrentRound.run(ids.round2, 2, ids.session1);
+ act(() => stateSocket.receive('session:state:changed', query.getState(ids.session1)));
+ expect(screen.getByText('等待老師開始')).toBeInTheDocument();
+ expect(screen.queryByText('First question')).not.toBeInTheDocument();
+ expect(screen.queryByDisplayValue('First Round draft')).not.toBeInTheDocument();
+ expect(firstDraftSocket.connected).toBe(false);
+ expect(targetReads()).toHaveLength(1);
+
+ database.prepare("UPDATE rounds SET phase='Active', started_at=? WHERE id=?").run(now, ids.round2);
+ setCurrentRound.run(ids.round2, 3, ids.session1);
+ act(() => stateSocket.receive('session:state:changed', query.getState(ids.session1)));
+ expect(await screen.findByLabelText('Next Round blank')).toHaveValue('');
+ expect(screen.getByText('Second question')).toBeInTheDocument();
+ expect(screen.queryByLabelText('First blank')).not.toBeInTheDocument();
+ expect(screen.queryByDisplayValue('First Round draft')).not.toBeInTheDocument();
+ expect(targetReads()).toHaveLength(2);
+ expect(fetcher.mock.calls.some(([url]) => String(url).endsWith(`/rounds/${ids.round2}/draft`))).toBe(true);
+});
 
 it('refreshes membership on notices and reconnect, ignoring obsolete reads without discarding the draft', async () => {
  const props = draftProps();
