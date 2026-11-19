@@ -69,6 +69,45 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 
 > 目前共同決議已由學生端統一整理：老師端需提供**教師結束搶答入口**；組長權限與答案接受順序、勝者選取由 Student 後端負責；Round End／Result 儲存與狀態同步沿用 Foundation。Student Plan 已提出內部介面草案；實際 capability 名稱與服務介接仍依 T004 跨模組審閱結果定案，不需要在老師端重做相同服務。
 
+## 五、T004 跨模組審閱紀錄
+
+- **審閱者**：Teacher Feature 負責人
+- **日期**：2026-11-20
+- **老師端分支**：`feature/teacher`
+- **審閱範圍**：Teacher End 入口、`round:end` 授權、Foundation 同交易 callback、組裝方式；不重開已定案之 Student／Teacher／Foundation 責任分工。
+- **學生端暨 Foundation 負責人審閱**：（待補；本紀錄僅代表 Teacher Feature 負責人意見）
+
+### 5.1 接受的介面
+
+| 項目 | 結論 |
+| --- | --- |
+| 權限名稱 `round:end` | 接受。由 Teacher middleware 於伺服器端核發，不接受客戶端宣稱。 |
+| Teacher ActorContext | 接受既有 `ActorContext` 型別，不修改 Foundation 型別。系統僅一個老師帳號，HttpOnly Cookie 只證明老師身分、不綁定活動。Teacher HTTP 解析器**只對老師專用路徑**（例如 `/api/v1/teacher/...`）生效，依該路徑中的 sessionId 確認 Session 存在後，臨時產生 `{ actorKind:'teacher', actorId:'teacher', sessionId, permissions:['session:read','session:watch','target:preview','target:read','results:read','round:end'] }`；對共用的 `/api/v1/sessions/:id/...` 讀取路徑不產生老師身分。老師頁面所需的狀態、題目、結果由老師專用 API 提供，具體路徑於 Teacher plan 決定。 |
+| 單一 End 呼叫 | 接受。Teacher 後端只呼叫一次 `StudentTrustedEndCoordinator.endRound(input, actorContext)`，input 為 `{ sessionId, roundId, expectedStateVersion, requestId }`，requestId 由 Teacher 後端產生；回傳 commit 後的 `SessionStateSnapshot`。前端不指定勝者。 |
+| 錯誤對應 | 接受 401／403／404／409；Teacher 另行處理 400 `INVALID_INPUT` 與 500（含 SQLite busy），轉為畫面提示。 |
+| Foundation `endRoundWithWinnerResolver` | 接受：同一 `better-sqlite3` Database instance、單一外層 `BEGIN IMMEDIATE`、同步 resolver callback、無勝者時清除同一邏輯目標舊 Result、失敗 rollback 且不推播、commit 後才推播。 |
+| 實作負責 | T044、T045 依原 tasks.md 由 Student 負責人實作；Teacher 只呼叫 coordinator。 |
+| FR-004 組長斷線遞補 | Teacher 無意見；同步 OpenSpec 由 Student 負責人處理。 |
+
+### 5.2 需修改或補充
+
+1. **Socket 授權方式調整**：Foundation `resolveSocketActorContext(socket)` 無法取得 watch payload 的 sessionId。Teacher 的 Socket 解析器只驗證老師 Cookie，回傳不含 `sessionId` 的老師 ActorContext；Session 存在與 `session:watch` 權限改由 `authorizeWatch(actor, sessionId)` 檢查。Teacher Socket 連線不得帶 `auth.sessionId`，避免進入 Student handshake。無需修改 Foundation 檔案。
+2. **型別命名與依賴方向（T044）**：`FoundationLifecycleEndPort` 不得以 Student 的 `StudentEndRoundInput` 為參數型別；T044 在 Foundation 定義自己的輸入型別（名稱由實作者決定，不得與既有 `EndRoundInput { roundId, endedAt, expectedStateVersion, result? }` 同名），coordinator 對齊此型別。文件中 coordinator 輸入一律稱 `StudentEndRoundInput`。
+3. **範圍檢查（T044）**：交易內須驗證 Round 屬於 `input.sessionId` 且為該 Session 目前 Round，不符回 404／409。
+4. **推播語意（T044 與文件）**：現行實作在 commit 後同步呼叫 `publish()`、不等待送達；文件「非同步派送」改為「commit 後呼叫、不等待送達」。publish 失敗不得讓已 commit 的 End 回報為失敗（需 try/catch 並記錄）。
+5. **requestId 語意**：目前僅供追蹤與日誌，不提供冪等；重複 End 以 `expectedStateVersion` 衝突（409）處理。
+6. **組裝（T045）**：`createHttpServer` 建立 coordinator（注入同一 Database、Foundation port、`StudentWinnerResolver`），並與 `SessionLifecycleService` 一同提供給 Teacher router；`startServer` 傳入 Teacher 的 `resolveActorContext`、`resolveSocketActorContext`、`authorizeWatch`。`router.ts` 新增 Teacher router 掛載點。以上為新增組裝，不改 Foundation 公開 HTTP、DTO、Socket.IO 契約。
+
+### 5.3 已知風險（不阻擋 T004）
+
+- 同一瀏覽器同時持有老師與學生 Cookie：因 Teacher HTTP 解析器只對老師專用路徑生效，學生頁面呼叫共用 `/sessions/:id/...` 讀取路徑時仍以學生身分授權，不會取得老師權限。Demo 時老師與各組學生仍須使用不同瀏覽器設定檔或無痕視窗，因為同一瀏覽器只有一份學生 Cookie，不同學生會互相覆蓋身分。
+- Teacher Cookie 寫入操作與 Socket 須有 Origin／CSRF 防護，於 Teacher plan 規劃。
+- 老師登出後已加入的 Socket room 不會被移除；單一老師本機 Demo 接受此限制。
+
+### 5.4 Gate 狀態
+
+Teacher Feature 負責人同意 5.1 並要求 5.2 修改。待學生端暨 Foundation 負責人確認 5.2 第 2～4、6 點後，T004 方可勾選；T041、T044、T045 依序解除阻擋。
+
 ---
 
 **參考**：`docs/integration/teacher-foundation-integration-guide.md`、`specs/002-student-feature/spec.md`、`specs/001-shared-foundation/contracts/`。
