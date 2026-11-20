@@ -25,12 +25,12 @@ component "Student Feature Module" as StudentModule {
 }
 component "Foundation Module" as Foundation {
   component "Session Query / Current Target" as ReadService
-  component "Lifecycle Transaction Service\nexisting End with supplied Result" as Lifecycle
+  component "SessionLifecycleService\nsupplied Result + synchronous WinnerResolver" as Lifecycle
   component "Foundation session-state events" as StateEvents
 }
 component "Teacher Feature Backend" as TeacherModule
 component "Server Composition Root" as Composition
-interface "Proposed internal callback port\n(roundId) => Result | null" as WinnerPort
+interface "Synchronous winner callback\n(roundId) => Result | null" as WinnerPort
 database "Shared SQLite\nFoundation entities + Student tables" as DB
 
 Student --> Web
@@ -59,15 +59,15 @@ WinnerService --> DB : accepted order in caller transaction
 ResultProjection --> DB : persisted Result / winning answers
 ReadService --> DB
 Lifecycle --> DB
-TeacherModule ..> EndCoordinator : proposed single endRound call
-EndCoordinator ..> Lifecycle : proposed Foundation internal port
-Lifecycle ..> WinnerPort : proposed callback inside write transaction
+TeacherModule ..> EndCoordinator : production call pending T045
+EndCoordinator ..> Lifecycle : FoundationLifecycleEndPort (wiring pending T045)
+Lifecycle --> WinnerPort : callback inside write transaction
 WinnerService ..|> WinnerPort : implemented resolver, wiring pending
 Lifecycle --> StateEvents : publish only after commit
 StateEvents --> Web : existing Foundation state contract
-Composition ..> EndCoordinator : proposed injection
+Composition ..> EndCoordinator : injection pending T045
 Composition ..> Lifecycle
-Composition ..> WinnerService : proposed End wiring
+Composition ..> WinnerService : End wiring pending T045
 
 note bottom of StudentModule
 First-time join after first Active is allowed only into an existing Team.
@@ -89,14 +89,15 @@ end note
 note bottom of Foundation
 Existing public HTTP/DTO/Socket.IO contracts remain unchanged.
 Foundation and Student share one SQLite connection.
-The planned internal End callback is gated by T004; Foundation will not import Student.
-State publication is dispatched after commit.
+T044 adds the approved internal End callback with Foundation-owned input.
+Foundation imports no Student types. T045 production wiring remains pending.
+Notify after outer Commit; log delivery failures and return the committed snapshot.
 end note
 
 note right of TeacherModule
 Foundation currently grants only read/watch capabilities.
-Teacher End authorization via round:end is pending T004.
-The proposed Teacher integration calls one Student End coordinator.
+Teacher End authorization via round:end is accepted by T004; implementation awaits T045.
+Teacher integration calls one Student End coordinator.
 Teacher owns login/UI; Student selects the winner.
 end note
 @enduml

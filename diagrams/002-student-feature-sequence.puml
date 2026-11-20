@@ -137,9 +137,10 @@ DB --> StudentApi : committed Submission + locked draft
 StudentApi --> UI : accepted outcome for this Team
 StudentApi --> DraftSocket : publish student:draft:locked after commit
 
-== Proposed Submission / End serialization (pending T004) ==
+== Submission / End serialization (T004 approved; production wiring pending T045) ==
 note over Teacher,Lifecycle
-Teacher authorization and Foundation callback wiring are pending review.
+Teacher authorization and production Coordinator wiring await T045.
+T044 supplies the Foundation-owned synchronous transaction Port.
 Student Winner Resolver is implemented and tested independently.
 end note
 alt Submission gets SQLite write lock first
@@ -148,7 +149,7 @@ alt Submission gets SQLite write lock first
   Teacher -> EndCoordinator : endRound(input, trusted ActorContext)
   EndCoordinator -> EndCoordinator : verify teacher scope + round:end capability
   EndCoordinator -> Lifecycle : endRoundWithWinnerResolver(input, callback)
-  Lifecycle -> DB : BEGIN IMMEDIATE; recheck Active/current/version
+  Lifecycle -> DB : outer BEGIN IMMEDIATE; check Session/round ownership/current/Active/version
   Lifecycle -> WinnerResolver : callback(roundId) inside transaction
   WinnerResolver -> DB : read canonical Round Submissions by acceptedOrder
   DB --> WinnerResolver : earliest Submission or none
@@ -162,7 +163,7 @@ else End gets SQLite write lock first
   Teacher -> EndCoordinator : endRound(input, trusted ActorContext)
   EndCoordinator -> EndCoordinator : verify teacher scope + round:end capability
   EndCoordinator -> Lifecycle : endRoundWithWinnerResolver(input, callback)
-  Lifecycle -> DB : BEGIN IMMEDIATE; recheck Active/current/version
+  Lifecycle -> DB : outer BEGIN IMMEDIATE; check Session/round ownership/current/Active/version
   Lifecycle -> WinnerResolver : callback(roundId) inside transaction
   WinnerResolver -> DB : read canonical Round Submissions by acceptedOrder
   DB --> WinnerResolver : current earliest Submission or none
@@ -182,8 +183,10 @@ Teacher makes one synchronous internal End call. Foundation owns the synchronous
 the synchronous Student callback returns only the winner candidate. No Promise is awaited inside it.
 Resolver/SQL failure rolls back and skips publish.
 With no Submission, Foundation creates no Result and clears prior logical-target Result.
-All services use the same Database object; Commit precedes async Socket.IO dispatch;
-notification delivery is never awaited inside the transaction. No Foundation↔Student import cycle exists.
+All services use the same Database object; capture the snapshot before outer Commit.
+Notify after Commit without awaiting delivery; log delivery failures and return success.
+Nested caller-owned transactions are rejected by the publishing Port.
+No Foundation↔Student import cycle exists.
 end note
 
 == Student result projection ==

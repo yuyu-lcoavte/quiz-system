@@ -27,7 +27,7 @@ It is produced by trusted Teacher authentication middleware, never request JSON.
 
 ## Single Teacher End Interface with Student Winner Resolver
 
-The Student adapter and its scoped authorization checks are implemented in `student-trusted-end-coordinator.ts`. Existing tests inject a local Port that holds an outer immediate transaction while invoking the resolver and Foundation persistence primitive. T044/T045 must implement and wire the accepted production Port; T041 must validate that real path.
+The Student adapter and its scoped authorization checks are implemented in `student-trusted-end-coordinator.ts`. T044 provides the formal Foundation Port in `session-lifecycle-service.ts`, implemented by `SessionLifecycleService`. The transaction command and `WinnerResolver` type live in `foundation-transactions.ts`. End integration tests now inject that actual lifecycle service into the existing Coordinator; the former local mock transaction has been removed. Production composition and Teacher security adapters await T045.
 
 Teacher calls exactly one trusted internal service. It does not invoke the Foundation lifecycle service and Student resolver as separate operations.
 
@@ -48,7 +48,7 @@ interface StudentTrustedEndCoordinator {
 
 type WinnerResolver = (roundId: UUID) => Result | null; // synchronous; never return/await a Promise
 
-// Defined by Foundation. The documentation name can be finalized in T044.
+// Defined by Foundation in foundation-transactions.ts.
 // This type must not import StudentEndRoundInput or reuse the existing persistence EndRoundInput name.
 interface FoundationLifecycleEndInput {
   sessionId: UUID;
@@ -72,6 +72,8 @@ interface StudentWinnerResolver {
 `StudentTrustedEndCoordinator.endRound()` is a synchronous in-process call. It checks `actor.actorKind === 'teacher'`, matching `sessionId`, and the accepted `round:end` capability. It then calls the injected `FoundationLifecycleEndPort` once, passing the Student resolver callback. The Teacher UI sends no winning Submission ID and receives only the committed state snapshot. The callback is synchronous and returns the canonical Foundation `Result` candidate, or `null` when no Submission exists. No function invoked inside the SQLite transaction may return a Promise or await asynchronous work.
 
 The two input types are structurally aligned. Foundation owns its input, callback Port and canonical Result contract; it imports no Student type. The existing Coordinator code still needs its Port type aligned in T045. Teacher generates `requestId` for tracing and safe logging only; this contract provides no idempotency guarantee.
+
+T044's lifecycle method rejects caller-owned transactions, then the transaction function obtains the outer `BEGIN IMMEDIATE` lock and validates the requested Session, Round ownership/current selection, Active phase and expected version before invoking the resolver. The existing `endRoundWithResult` persistence runs on the same connection as a nested savepoint, including its existing logical-target Result replacement/removal. The authoritative snapshot is captured within the outer transaction. Only after the outer Commit does the lifecycle method call the publisher. A Promise/thenable returned by the resolver is rejected; notification work returned after Commit may settle asynchronously and is observed for failure without delaying End.
 
 ### Transaction connection and concurrency
 
@@ -118,7 +120,7 @@ There is no separate winner query followed by End, so no Submission can be accep
 
 Teacher and Student/Foundation accepted the design in section 5 on 2026-11-20. T004 is complete. Implementation verification remains:
 
-1. T044 implements the Foundation-owned input and synchronous Port, in-transaction checks, atomic Result/state persistence and post-commit notification error isolation.
+1. T044 implements the Foundation-owned input and synchronous Port, in-transaction checks, atomic Result/state persistence and post-commit notification error isolation. Its independent verification is recorded in the Quickstart; production wiring remains T045.
 2. T045 reuses the Coordinator, wires the shared services and Teacher router, and removes Student-to-Teacher Socket fallback. Teacher implements trusted credential/capability issuance and security adapters.
 3. T041 validates Submit/End races and rollback/publication behavior through the actual T044/T045 path.
 4. T059–T061 validate contracts, regression and formal browser/security acceptance.

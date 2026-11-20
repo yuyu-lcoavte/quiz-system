@@ -66,3 +66,15 @@ npm.cmd test -- tests/integration/migrations.test.ts tests/integration/migration
 T066 已以隔離 Demo 實測兩個 Cookie 身分、多分頁、F5、無候選及新組員上線後遞補，另確認新任組長提交後兩端草稿鎖定。Vite 再度記錄 `ECONNABORTED`，本次已驗收操作均完成。T060 最終整合檢查與 T061 正式 Teacher／Student 驗收仍待已審閱的 Teacher 介接。[Windows 人工驗收紀錄](../../tests/manual/student-feature.md)
 
 取消教師組長操作後，Student End 準備階段的 `npm.cmd run check` 通過，包含 TypeScript、45 個測試檔的 187 項 Vitest 測試及 Production Build。新增的 End 測試使用測試專用 port、同一筆外層 SQLite 寫入交易及現有 Foundation 持久化程式，驗證兩種取鎖順序、結果讀取、回滾與通知時機。T041、T045 須在 T044 正式 callback 與 Teacher 接線後完成驗證。
+
+## T044 Foundation End Port 驗證（2026-11-20）
+
+`SessionLifecycleService.endRoundWithWinnerResolver(input, resolver)` 現在提供正式同步 Foundation Port。命令型別 `FoundationLifecycleEndInput` 與 `WinnerResolver` 定義於 `foundation-transactions.ts`，Port 介面定義於 `session-lifecycle-service.ts`。
+
+交易先取得外層 `BEGIN IMMEDIATE` 寫鎖，檢查 Session、Round 所屬關係、目前 Round、Active 與預期版本，然後同步查詢勝者。既有 `endRoundWithResult` 與 Result Repository 在同一連線以 savepoint 重用持久化邏輯，最後於外層交易內讀取快照並 Commit。Commit 後呼叫 publisher；通知丟錯或回傳 rejected Promise 均記錄錯誤，End 仍回傳成功快照。拒絕以外部既存交易包裝此發布 Port，避免 savepoint 被誤認為 Commit。
+
+`tests/integration/student-end-race.test.ts` 已移除測試專用 End transaction，改以正式 Foundation lifecycle 執行既有 Coordinator。案例涵蓋兩種 SQLite 取鎖順序、acceptedOrder 選擇、錯誤 Session／Round／版本／階段、無勝者的單題及題組舊結果清除、其他活動與題目隔離、resolver／持久化 Rollback、跨連線可見性、通知失敗及不等待通知送達。
+
+本輪以 `NODE_ENV=test` 執行完整 `npm.cmd run check`，TypeScript、46 個測試檔的 219 項 Vitest 測試與 Production Build 全部通過。Build 有現存前端產物大於 500 kB 的 Vite 警告，建置成功。三張 Student PlantUML 已依正式 Port 更新並以 CLI 重新產生 PNG。
+
+T044 已完成。T041、T045、T059～T061 保持未完成。T045 仍須完成 Teacher router／服務正式組裝、Student Socket 失效禁止 fallback，以及 Teacher Cookie／Origin／CSRF 與授權測試。本輪未執行 Teacher 驅動的瀏覽器驗收。

@@ -82,7 +82,7 @@ All three calls are synchronous. The composition root injects the same `better-s
 
 ### Current implementation boundary
 
-The inspected Foundation implementation has `endRoundWithResult()` in `apps/server/src/modules/sessions/application/foundation-transactions.ts` and `SessionLifecycleService.endRound()` in `session-lifecycle-service.ts`. It accepts a supplied static Result before its own transaction; it does **not** currently expose the proposed synchronous resolver callback. The existing lifecycle publishes after its transaction returns. T044 is therefore a planned minimal Foundation **internal** service seam, not an existing implementation. Foundation HTTP paths, DTOs, event names and payloads remain unchanged.
+T044 now implements the Foundation-owned `FoundationLifecycleEndInput`, `WinnerResolver` and transaction entry in `foundation-transactions.ts`. `SessionLifecycleService` implements the formal `FoundationLifecycleEndPort`, publishes after the outer Commit and isolates notification failures. The original supplied-Result persistence is reused on the same connection through savepoints. The End tests inject the real lifecycle Port; production Coordinator/router and Socket security composition remain T045.
 
 ## T004 review record — Design approved 2026-11-20
 
@@ -96,7 +96,7 @@ Review evidence is recorded in `student-teacher-decisions.md`, sections 5.1–5.
 5. Student handshake or watch identity failure cannot fall back to Teacher. T045 fixes the `app.ts` watch fallback; Teacher validates signed Cookie and Origin, rejects Student-routed sockets, and supplies trusted watch authorization.
 6. Teacher HTTP Origin/CSRF and Socket Cookie/Origin verification are required for formal integration acceptance. `requestId` is tracing only; Teacher refreshes authoritative state after either 409 `STALE_STATE` or `INVALID_PHASE`.
 
-T004 is complete as a design gate. T041/T044/T045 and Teacher security implementation remain unverified on the production path. OpenSpec leadership-rule synchronization remains separately pending.
+T004 is complete as a design gate. T044 has passed independent Port/transaction tests recorded in Quickstart. T041/T045 and Teacher security implementation still require production composition verification. OpenSpec leadership-rule synchronization remains separately pending.
 
 ## T004 technical review preparation
 
@@ -116,7 +116,7 @@ The following inventory records the earlier preparation baseline; the approved d
 | Task | Minimum change |
 | --- | --- |
 | T041 | Exercise the real End path with both write-lock orders, stale Round/version, no winner and prior logical-target Result removal, resolver/persistence failure and zero publication on rollback. At publication, assert that another connection can read committed state and Result. |
-| T044 | Define the Foundation-owned input and synchronous callback Port. Check Session/current Round/Active/version under the outer `BEGIN IMMEDIATE`, reuse End/Result persistence, then publish after commit. Catch/log notification failures and return the committed snapshot. |
+| T044 | Independently implemented and verified. The formal Foundation Port checks scope/current Round/Active/version before the resolver, reuses End/Result persistence and isolates notification failures after outer Commit. |
 | T045 | Reuse the existing Coordinator with the bound resolver and approved Foundation Port. Wire the shared Database, lifecycle, publisher and Teacher router in the composition root. Fix Student watch failure to return null without Teacher fallback; test mixed Cookies, invalid credentials and scopes. Teacher owns Cookie/Origin/CSRF, trusted Teacher actors and watch authorization. |
 
 ### Copy-ready review checklist
@@ -148,4 +148,4 @@ After the actual T044/T045 End path is wired, use two connections to one isolate
 | Reopened target has no successful Submission | End creates no Result, clears the prior logical target Result, and Student projects `winner: null`. |
 | Resolver or Result write fails | Round phase, `stateVersion` and the previous Result remain unchanged. No Ended publication; a subsequent valid submission remains possible while Active. |
 
-The test design leaves the Teacher entry point and Foundation callback invocation to the reviewed interfaces. T041, T044 and T045 remain unchecked.
+T044's tests now exercise the formal Foundation callback Port and existing Student Coordinator with a shared Database, replacing the earlier mock transaction. T044 is checked. T041 and T045 remain unchecked until Teacher entry/composition and Socket security verification are complete.
