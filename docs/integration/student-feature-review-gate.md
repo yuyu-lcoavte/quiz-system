@@ -1,8 +1,8 @@
 # Student Feature Foundation Review Gate
 
-**Scope**: T001–T003 verification and proposal record for `002-student-feature`.
+**Scope**: T001–T003 verification and T004 design approval for `002-student-feature`.
 
-**Status**: T001–T003 completed by checking the repository and current contracts. T004 is **pending**. The Student architecture owner has decided the responsibility direction, but the Teacher/Foundation member has not yet approved each proposed capability or internal signature. Nothing in this document grants a new permission or changes a Foundation public contract.
+**Status**: T004 **design review completed on 2026-11-20**. Teacher and Student/Foundation accepted the interfaces, responsibility split and security rules in section 5 of `student-teacher-decisions.md`. Production implementation and safety/integration tests remain T041, T044, T045 and T059–T061. Teacher issues the accepted `round:end` capability through trusted authentication.
 
 ## T001 — Existing workspace and Foundation reuse
 
@@ -47,49 +47,62 @@ The Foundation identity contract defines these existing capability names for its
 | `target:read` | Authorized current-target read (`session-controller.ts`) |
 | `results:read` | Protected Foundation results read (`session-controller.ts`) |
 
-The proposed Teacher End capability is `round:end`. Teacher middleware must authorize the Session before issuing it in a server-created ActorContext.
+The accepted Teacher End capability is `round:end`. Teacher middleware must authorize the Session before issuing it in a server-created ActorContext; production issuance remains Teacher implementation work.
 
-## T003 — Internal End service proposal
+## T003 — Internal End service design accepted at T004
 
-### Single Teacher End call and synchronous Winner Resolver proposal
+### Single Teacher End call and synchronous Winner Resolver
 
-The proposed in-process signatures are:
+The accepted design distinguishes Student input from the Foundation-owned input. The following documentation name for the Foundation input may be finalized in T044:
 
 ```ts
 interface StudentTrustedEndCoordinator {
-  endRound(input: EndRoundInput, actor: TeacherScopedActorContext): SessionStateSnapshot;
+  endRound(input: StudentEndRoundInput, actor: TeacherScopedActorContext): SessionStateSnapshot;
 }
 
 type WinnerResolver = (roundId: UUID) => Result | null;
 
+// Foundation owns this type; its fields align structurally with StudentEndRoundInput.
+interface FoundationLifecycleEndInput {
+  sessionId: UUID;
+  roundId: UUID;
+  expectedStateVersion: number;
+  requestId: string;
+}
+
 interface FoundationLifecycleEndPort {
   endRoundWithWinnerResolver(
-    input: EndRoundInput,
+    input: FoundationLifecycleEndInput,
     resolveWinner: WinnerResolver,
   ): SessionStateSnapshot;
 }
 ```
 
-All three calls are synchronous. The composition root must inject the same `better-sqlite3` Database instance used by `DatabaseManager`; Foundation opens one `BEGIN IMMEDIATE` transaction, invokes the Student resolver synchronously on that connection, persists Ended/stateVersion and Result (or no Result), then commits. No Promise may be returned or awaited from transaction work. Only after successful commit may Foundation dispatch the existing `session:state:changed` notification; notification delivery is not awaited inside the transaction. Resolver or persistence failure rolls back and does not publish. With no Submission, the resolver returns `null`; Foundation creates no Result and clears the old Result for the same logical target. Teacher calls only the coordinator and does not select a winner or separately call Foundation End.
+All three calls are synchronous. The composition root injects the same `better-sqlite3` Database instance into lifecycle, submission and winner resolver. Foundation owns one outer `BEGIN IMMEDIATE`, checks Session/current Round/Active/version before invoking the callback, and commits Ended/stateVersion/Result together. After commit it calls the existing state publisher without waiting for delivery. Notification exceptions are caught and logged while the committed snapshot remains the successful return value. Resolver or persistence failure rolls back and publishes nothing. No winner clears the prior Result for the same logical target. Teacher calls only the coordinator.
 
 ### Current implementation boundary
 
 The inspected Foundation implementation has `endRoundWithResult()` in `apps/server/src/modules/sessions/application/foundation-transactions.ts` and `SessionLifecycleService.endRound()` in `session-lifecycle-service.ts`. It accepts a supplied static Result before its own transaction; it does **not** currently expose the proposed synchronous resolver callback. The existing lifecycle publishes after its transaction returns. T044 is therefore a planned minimal Foundation **internal** service seam, not an existing implementation. Foundation HTTP paths, DTOs, event names and payloads remain unchanged.
 
-## T004 review record — Pending
+## T004 review record — Design approved 2026-11-20
 
-No cross-member approval is claimed here. Before T004-dependent implementation, record the Teacher/Foundation reviewers and their decisions on:
+Review evidence is recorded in `student-teacher-decisions.md`, sections 5.1–5.4. Teacher reviewed on 2026-11-20 from `feature/teacher`; the Student/Foundation owner accepted the merged section in this work session on the same date. The accepted items are:
 
-1. Confirm `round:end` and trusted Teacher middleware issuance for the requested Session.
+1. `round:end` and trusted Teacher middleware issuance for the requested Session.
 2. Teacher's single call to `StudentTrustedEndCoordinator.endRound(...)`.
 3. Synchronous `WinnerResolver(roundId): Result | null` execution in Foundation's existing `BEGIN IMMEDIATE` transaction and shared connection ownership.
 4. No-winner Result handling, rollback/no-broadcast behavior, and composition-root wiring without a circular dependency.
 
-T004 remains unchecked in `specs/002-student-feature/tasks.md`. These are internal integration proposals; no Foundation public API, DTO or Socket.IO contract is being changed by T001–T003.
+5. Student handshake or watch identity failure cannot fall back to Teacher. T045 fixes the `app.ts` watch fallback; Teacher validates signed Cookie and Origin, rejects Student-routed sockets, and supplies trusted watch authorization.
+6. Teacher HTTP Origin/CSRF and Socket Cookie/Origin verification are required for formal integration acceptance. `requestId` is tracing only; Teacher refreshes authoritative state after either 409 `STALE_STATE` or `INVALID_PHASE`.
+
+T004 is complete as a design gate. T041/T044/T045 and Teacher security implementation remain unverified on the production path. OpenSpec leadership-rule synchronization remains separately pending.
 
 ## T004 technical review preparation
 
-### Confirmed in the repository
+### Historical source inventory before T004 approval
+
+The following inventory records the earlier preparation baseline; the approved design and current remaining work are recorded above and below.
 
 - The Student baseline at `f5197bb` has automatic succession, a Team-scoped `student:membership:changed` notification, and a Cookie-authenticated `/me` read. The notification prompts a refresh and carries no leader ID. Student submission rereads the current leader inside its own `BEGIN IMMEDIATE` transaction.
 - `TeamLeaderRepository.replaceIfCurrent`, the one-row-per-Team constraint and the composite Team/Participant foreign key are reusable. Automatic succession rereads the leader and candidate presence under the write lock. Its pending offline assignment is process-local and compared with the current Participant and assignment timestamp.
@@ -103,30 +116,30 @@ T004 remains unchecked in `specs/002-student-feature/tasks.md`. These are intern
 | Task | Minimum change |
 | --- | --- |
 | T041 | Exercise the real End path with both write-lock orders, stale Round/version, no winner and prior logical-target Result removal, resolver/persistence failure and zero publication on rollback. At publication, assert that another connection can read committed state and Result. |
-| T044 | Add an internal Foundation End entry taking the requested Session, Round, expected state version and synchronous winner callback. Verify scope/current Round/Active/version under the same `BEGIN IMMEDIATE` lock, call the callback once on that connection and reuse existing End/Result persistence. Keep the current internal supplied-Result caller compatible and share the transaction body. The publishing lifecycle entry must own the outer transaction so an inner savepoint cannot be mistaken for Commit. |
-| T045 | Add the trusted Student End coordinator to enforce the reviewed Teacher scope/permission and delegate once to Foundation with the existing bound Student resolver. Compose both with the same Database instance. Teacher receives the committed snapshot; Foundation never imports Student. |
+| T044 | Define the Foundation-owned input and synchronous callback Port. Check Session/current Round/Active/version under the outer `BEGIN IMMEDIATE`, reuse End/Result persistence, then publish after commit. Catch/log notification failures and return the committed snapshot. |
+| T045 | Reuse the existing Coordinator with the bound resolver and approved Foundation Port. Wire the shared Database, lifecycle, publisher and Teacher router in the composition root. Fix Student watch failure to return null without Teacher fallback; test mixed Cookies, invalid credentials and scopes. Teacher owns Cookie/Origin/CSRF, trusted Teacher actors and watch authorization. |
 
 ### Copy-ready review checklist
 
 - **Teacher** — Identify the branch or commit, confirm trusted Session authorization, `round:end` issuance, and the single synchronous End signature and error mapping.
 - **Foundation**: Confirm one outer `BEGIN IMMEDIATE`, with Session/current Round/Active/version checked before invoking the synchronous resolver on the same Database instance. Confirm Result replacement and no-winner removal, committed snapshot, post-Commit publication and zero publication on rollback. Confirm composition in the server root and reuse of the existing public state event.
 - **OpenSpec / Teacher**: Align Q02/U02 acceptance on first join, last valid socket, earliest eligible online successor, no candidate, reassessment on later valid arrival/re-subscribe, same identity after F5 and no automatic reclaim of a replaced role. Confirm joint acceptance of server-side submission eligibility.
-- **Gate closeout**: Record each reviewer's name/role, date, branch/commit if available, and the accepted or revised signatures, capabilities and decisions in `student-teacher-decisions.md`. T004 remains pending until the required reviewers confirm. If a proposal is rejected, reconcile the design before implementation.
+- **Gate closeout**: Completed on 2026-11-20 in `student-teacher-decisions.md` section 5. This records interface and responsibility-design acceptance. Formal implementation and integration evidence remain in the subsequent tasks.
 
 After T004, run T041 against the T044/T045 production path, then T059, T060 and T061. Student Coordinator and test-only contract verification can be prepared independently.
 
 ## Independent preparation before T004
 
-### 2026-11-14 Student rule update, awaiting cross-group synchronization
+### 2026-11-14 Student rule update, Teacher no objection recorded 2026-11-20
 
-OpenSpec/Teacher should align Q02/U02 acceptance with the Student decision: initial leader is the first successful join; loss of the last valid socket triggers immediate selection of the earliest eligible online teammate, with no configurable grace. Other sockets preserve presence. With no candidate the assignment stays; a replaced leader recovers identity but not leadership after F5/reconnect. Align how both implementations show role changes and test eligibility at submit time. See [Student Spec](../../specs/002-student-feature/spec.md) and [Realtime Contract](../../specs/002-student-feature/contracts/student-realtime.md).
+Teacher recorded no objection to FR-004 in section 5.1. Student remains responsible for synchronizing OpenSpec Q02/U02 acceptance; no OpenSpec approval is recorded. The first successful join is leader; loss of the last valid socket immediately selects the earliest eligible online teammate. With no candidate the assignment stays. A replaced leader recovers identity and reads the current role after F5/reconnect. See [Student Spec](../../specs/002-student-feature/spec.md) and [Realtime Contract](../../specs/002-student-feature/contracts/student-realtime.md).
 
-T004 remains pending for Teacher End authorization, the same-transaction Foundation callback and production wiring.
+T004 design approval is complete; Teacher authorization, Foundation callback implementation and production wiring await their implementation tasks.
 - The current Student submission test suite uses two connections to the same temporary SQLite file. An independent writer holds `BEGIN IMMEDIATE`; the real Student submission observes contention, leaves the draft editable and emits no lock notification. After the writer releases the lock, a new submission succeeds; the synchronous resolver then sees the committed candidate without persisting a Result. This exercises the SQLite and Student prerequisites for T041.
 
 ### T041 test design (provisional)
 
-After the callback signature is approved and the actual End path is wired, use two connections to one isolated database. Coordinate transaction order with explicit test barriers, using a separate worker for operations that block synchronously. On the End side the Foundation transaction and Student resolver must share one connection. Observe published snapshots and query committed data from the other connection when a notification is received.
+After the actual T044/T045 End path is wired, use two connections to one isolated database. Coordinate transaction order with explicit test barriers, using a separate worker for operations that block synchronously. On the End side the Foundation transaction and Student resolver must share one connection. Observe published snapshots and query committed data from the other connection when a notification is received. Also verify that a notification exception after commit preserves the successful End response.
 
 | Scenario | Assertion after integration |
 | --- | --- |

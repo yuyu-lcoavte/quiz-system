@@ -12,7 +12,7 @@ description: "Dependency-ordered implementation tasks for Student Feature"
 
 **Execution rule**: All tasks start unchecked. Do not implement a task before its listed dependencies and review gates pass. Tests are TDD tasks: write the test first, verify it fails for the expected reason, then implement.
 
-Active task accounting excludes the two Cancelled entries (T025/T026). There are 64 active tasks, 57 complete, 7 open, and 2 Cancelled among 66 retained IDs.
+Active task accounting excludes the two Cancelled entries (T025/T026). There are 64 active tasks, 58 complete, 6 open, and 2 Cancelled among 66 retained IDs.
 
 ## Format: `- [ ] [TaskID] [P?] [Story?] Description`
 
@@ -27,7 +27,7 @@ Active task accounting excludes the two Cancelled entries (T025/T026). There are
 - [X] T001 [P] Verify the existing workspace, Node/npm requirements, Vitest/Supertest/Socket.IO Client tools, Express composition root, `ActorContext`, SQLite `DatabaseManager`, Foundation repositories, and Socket.IO server; record actual source paths and reuse boundaries in `docs/integration/student-feature-review-gate.md`.
 - [X] T002 Record the implemented Foundation capabilities (`session:read`, `session:watch`, `target:preview`, `target:read`, `results:read`) and record `round:end` as the proposed End capability, in `docs/integration/student-feature-review-gate.md` after T001 creates the review record.
 - [X] T003 Document and review the single `StudentTrustedEndCoordinator.endRound(...)` call, synchronous `WinnerResolver(roundId): Result | null` callback, shared SQLite instance/transaction ownership, no-winner behavior, and rollback/no-broadcast behavior in `docs/integration/student-feature-review-gate.md`.
-- [ ] T004 Obtain Teacher and Foundation owner review of the interfaces and permission names; record which responsibility directions are already decided, which signatures/capabilities were accepted or changed, and reviewer/date in `docs/integration/student-teacher-decisions.md`. **Gate**: tasks marked “blocked until T004 review” MUST NOT start until this record is approved; rejected proposals return to Plan/Clarify before implementation.
+- [X] T004 Obtain Teacher and Foundation owner review of the interfaces and permission names; record accepted signatures/capabilities, responsibility split and reviewer/date in `docs/integration/student-teacher-decisions.md` section 5. **Design Gate approved 2026-11-20** by Teacher and Student/Foundation. This accepts the interface/security design; T041/T044/T045 implementation and security/integration tests remain incomplete.
 
 **Gate boundary**: The architecture owner has decided the responsibility direction. T004 review covers the Teacher End entry, `round:end` authorization, and the Foundation same-transaction callback; it does not re-open the decided Student/Teacher/Foundation responsibility split. No new Foundation public HTTP, DTO, or Socket.IO contract is authorized here.
 
@@ -134,8 +134,8 @@ Active task accounting excludes the two Cancelled entries (T025/T026). There are
 
 - [X] T042 [US3] Integrate the existing Foundation `SessionStateClient` into the Student activity route in `apps/web/src/modules/student/student-session-state.ts`; display authoritative state and Round reference, ignore stale versions, and resubscribe/reconcile on reconnect without duplicating Foundation Socket.IO events.
 - [X] T043 [US3] Implement the synchronous Student winner resolver over canonical accepted Submissions in `apps/server/src/modules/student/application/winner-resolver.ts`; order by persisted `accepted_order`, construct the canonical Foundation Result candidate, and return `null` when no valid Submission exists without writing Result or publishing state.
-- [ ] T044 [US3] Add the minimal Foundation internal lifecycle port that accepts a synchronous winner callback using the same `Database` connection and `BEGIN IMMEDIATE` transaction in `apps/server/src/modules/sessions/application/foundation-transactions.ts` and `apps/server/src/modules/sessions/application/session-lifecycle-service.ts`; persist Ended/stateVersion/Result atomically, clear the prior logical-target Result on no winner, and publish only after commit. **Blocked until T004 review**; do not change Foundation public HTTP, DTO, or Socket.IO contracts.
-- [ ] T045 [US3] Complete production wiring after T004, T043 and T044 for the single synchronous `StudentTrustedEndCoordinator.endRound(input, actorContext)` in `apps/server/src/modules/student/application/student-trusted-end-coordinator.ts`; validate the reviewed Teacher scope/capability and call the Foundation lifecycle port once with the synchronous Student resolver. Student-side adapter preparation can proceed with an injected test port. Completion requires the approved Foundation port and production wiring. Teacher calls the coordinator once.
+- [ ] T044 [US3] After T004 (design approved 2026-11-20), add the Foundation-owned End input and synchronous winner callback Port in `apps/server/src/modules/sessions/application/foundation-transactions.ts` and `apps/server/src/modules/sessions/application/session-lifecycle-service.ts`. Use the same Database and one outer `BEGIN IMMEDIATE`; verify Session/current Round/Active/version before resolver execution. Persist Ended/stateVersion/Result atomically, clear the prior logical-target Result on no winner, then publish after commit. Catch/log notification failures and return the committed snapshot successfully. Keep Foundation public contracts compatible.
+- [ ] T045 [US3] After T004, T043 and T044, reuse the existing synchronous `StudentTrustedEndCoordinator` in `apps/server/src/modules/student/application/student-trusted-end-coordinator.ts`, align its Port type to the Foundation-owned input, and complete production composition in `apps/server/src/app.ts` and `apps/server/src/api/router.ts`. Share Database/lifecycle/publisher/resolver, mount the Teacher router after dependencies are ready, and remove Student-to-Teacher watch fallback on identity failure. Verify mixed Cookies, expired Student identity, invalid Origin and trusted Teacher scope/capability through Teacher adapters. Teacher owns Cookie/Origin/CSRF and Teacher Socket authorization; formal security tests remain required.
 - [X] T046 [US3] Implement the Student-only Ended result projection and route in `apps/server/src/modules/student/application/student-result-service.ts` and `apps/server/src/api/student/result-controller.ts`; require enrolled Participant context and return only winning Team name/answers or `winner: null`.
 
 ---
@@ -192,7 +192,7 @@ The following tasks cover Student automatic succession. Coordinate FR-004 with O
 - **US1 (T017–T024)**: Depends on Phase 2.
 - **US2 Draft (T027–T032)**: Depends on the trusted identity/Team context and draft migration in Phase 2; functional collaboration also depends on a joined Participant from US1.
 - **US2 Submission (T033–T038)**: Depends on US1 membership/leader and US2 draft work. Submission and draft lock are one transaction.
-- **US3 (T039–T046)**: State display can begin after Phase 2; result projection depends on Foundation records and submission behavior. T041, T044 and T045 are blocked until T004 passes.
+- **US3 (T039–T046)**: State display can begin after Phase 2; result projection depends on Foundation records and submission behavior. T004 design approval is complete; T041/T044/T045 remain unimplemented on the formal path and follow their listed dependencies.
 - **UI (T047–T054)**: UI tests precede implementation; each page depends on its corresponding server/API or adapter task. Tasks for different pages/components can run in parallel only when file paths do not overlap.
 - **Polish (T055–T061)**: Documentation/traceability tasks can proceed after contracts stabilize; final checks and manual acceptance depend on all selected Student stories and the reviewed Teacher integration.
 
@@ -209,7 +209,7 @@ The following tasks cover Student automatic succession. Coordinate FR-004 with O
 - US1 tests T017–T020 can be authored in parallel; service and controller work follows the corresponding tests.
 - US2 draft contract/persistence tests T027–T028 can run in parallel. HTTP, realtime and web adapter tasks must use the shared DraftService contract.
 - US2 submission tests T033–T034 can run in parallel; implementation proceeds validator → transaction service → API/notification.
-- US3 state tests T039 and result tests T040 can run in parallel. End transaction tasks T041/T044/T045 remain gated by T004.
+- US3 state tests T039 and result tests T040 can run in parallel. T004 passed design review on 2026-11-20; proceed with T041 tests first, T044, T045, then validate T041 against the real path.
 - UI pages with distinct file paths may be split across contributors after their APIs stabilize; do not have multiple contributors edit the same shared Student router, `app.ts`, or contracts index concurrently.
 
 ## Independent Acceptance Criteria
