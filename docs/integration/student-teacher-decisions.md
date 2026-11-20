@@ -91,22 +91,37 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 
 ### 5.2 需修改或補充
 
-1. **Socket 授權方式調整**：Foundation `resolveSocketActorContext(socket)` 無法取得 watch payload 的 sessionId。Teacher 的 Socket 解析器只驗證老師 Cookie，回傳不含 `sessionId` 的老師 ActorContext；Session 存在與 `session:watch` 權限改由 `authorizeWatch(actor, sessionId)` 檢查。Teacher Socket 連線不得帶 `auth.sessionId`，避免進入 Student handshake。無需修改 Foundation 檔案。
+1. **Socket 授權方式調整**：Foundation `resolveSocketActorContext(socket)` 無法取得 watch payload 的 sessionId。Teacher 的 Socket 解析器只驗證老師身分，回傳不含 `sessionId` 的老師 ActorContext；Session 存在與 `session:watch` 權限改由 `authorizeWatch(actor, sessionId)` 檢查。Teacher Socket 連線不得帶 `auth.sessionId`，避免進入 Student handshake。無需修改 Foundation 的 `socket-server.ts`、`session-events.ts` 或 `ActorContext` 型別；但 `app.ts` 的學生身分 fallback 需調整（見下）。
+   - **現況（2026-11-20 對照程式碼）**：
+     - Handshake：Student middleware（`apps/server/src/modules/student/realtime/student-draft-socket.ts` 的 `registerStudentDraftSocket`）只在 `auth.sessionId` 存在時走學生驗證；sessionId 格式錯誤、Origin 不在白名單或 Cookie 解析失敗時直接拒絕連線，不會退回其他驗證。`auth.sessionId` 不存在時直接放行，**不檢查 Origin 或任何身分**。
+     - Watch：`apps/server/src/app.ts` 的 `resolveSocketActorContext`（約第 66～70 行）在每次 `session:watch` 時重新解析學生身分；若 handshake 時已是學生 Socket、但重新解析失敗（例如憑證已失效），會**退回呼叫外部 `options.resolveSocketActorContext`**，也就是日後的 Teacher resolver。這不符合下列規則，必須調整。
+     - `authorizeWatch`（約第 72～73 行）：不在 `studentActors` 中的身分一律交給外部 `options.authorizeWatch`。
+   - **Teacher Socket 驗證規則**：
+     - Teacher 身分必須同時驗證有效的老師簽章 Cookie 與 Origin 白名單。
+     - 身分只由驗證通過的伺服器端憑證決定；`auth.sessionId` 只決定走哪一條驗證路徑，不代表身分。
+     - 走學生路徑（有 `auth.sessionId`）時，學生驗證失敗即拒絕，不得退回嘗試 Teacher resolver 或其他 resolver；handshake 與每次 watch 皆適用。
+     - 走老師路徑（無 `auth.sessionId`）時，老師 Cookie 或 Origin 驗證失敗即拒絕。
+     - `authorizeWatch` 須驗證：身分物件由伺服器端可信的 Teacher resolver 產生（例如由 Teacher 模組以 `WeakSet` 登記其產生的 ActorContext，不依賴前端傳來的任何欄位）、`actorKind` 為 `teacher`、具備 `session:watch` 權限、Session 存在。
+   - **調整位置與負責**：
+     - `apps/server/src/app.ts` 的 `resolveSocketActorContext`：Socket 帶有學生 handshake 身分時，重新解析失敗應回傳 `null`，不得退回外部 resolver。由 **T045**（Student 負責人，同時處理 composition root 組裝）負責。
+     - Teacher Socket resolver 的 Cookie 簽章與 Origin 驗證、遇到帶 `auth.sessionId` 或已有學生身分的 Socket 時回傳 `null`、可信身分登記及 `authorizeWatch` 檢查：由 **Teacher 實作**負責，透過 `startServer` 傳入的 `resolveSocketActorContext`／`authorizeWatch` 接上。
 2. **型別命名與依賴方向（T044）**：`FoundationLifecycleEndPort` 不得以 Student 的 `StudentEndRoundInput` 為參數型別；T044 在 Foundation 定義自己的輸入型別（名稱由實作者決定，不得與既有 `EndRoundInput { roundId, endedAt, expectedStateVersion, result? }` 同名），coordinator 對齊此型別。文件中 coordinator 輸入一律稱 `StudentEndRoundInput`。
 3. **範圍檢查（T044）**：交易內須驗證 Round 屬於 `input.sessionId` 且為該 Session 目前 Round，不符回 404／409。
 4. **推播語意（T044 與文件）**：現行實作在 commit 後同步呼叫 `publish()`、不等待送達；文件「非同步派送」改為「commit 後呼叫、不等待送達」。publish 失敗不得讓已 commit 的 End 回報為失敗（需 try/catch 並記錄）。
-5. **requestId 語意**：目前僅供追蹤與日誌，不提供冪等；重複 End 以 `expectedStateVersion` 衝突（409）處理。
+5. **requestId 語意**：目前僅供追蹤與日誌，不提供冪等；重複 End 以 409 處理：可能回 `STALE_STATE`（版本已變）或 `INVALID_PHASE`（Round 已非 Active），Teacher 收到任一種都重新讀取最新狀態後再顯示。
 6. **組裝（T045）**：`createHttpServer` 建立 coordinator（注入同一 Database、Foundation port、`StudentWinnerResolver`），並與 `SessionLifecycleService` 一同提供給 Teacher router；`startServer` 傳入 Teacher 的 `resolveActorContext`、`resolveSocketActorContext`、`authorizeWatch`。`router.ts` 新增 Teacher router 掛載點。以上為新增組裝，不改 Foundation 公開 HTTP、DTO、Socket.IO 契約。
 
 ### 5.3 已知風險（不阻擋 T004）
 
 - 同一瀏覽器同時持有老師與學生 Cookie：因 Teacher HTTP 解析器只對老師專用路徑生效，學生頁面呼叫共用 `/sessions/:id/...` 讀取路徑時仍以學生身分授權，不會取得老師權限。Demo 時老師與各組學生仍須使用不同瀏覽器設定檔或無痕視窗，因為同一瀏覽器只有一份學生 Cookie，不同學生會互相覆蓋身分。
-- Teacher Cookie 寫入操作與 Socket 須有 Origin／CSRF 防護，於 Teacher plan 規劃。
+- Teacher Cookie 簽章驗證、HTTP 寫入操作的 Origin 白名單與 CSRF 防護，以及 Socket 的 Cookie＋Origin 驗證，為**正式整合驗收的必要條件**；未通過不得視為整合完成。具體機制於 Teacher plan 規劃。
 - 老師登出後已加入的 Socket room 不會被移除；單一老師本機 Demo 接受此限制。
 
 ### 5.4 Gate 狀態
 
-Teacher Feature 負責人同意 5.1 並要求 5.2 修改。待學生端暨 Foundation 負責人確認 5.2 第 2～4、6 點後，T004 方可勾選；T041、T044、T045 依序解除阻擋。
+Teacher Feature 負責人同意 5.1 並要求 5.2 修改。待學生端暨 Foundation 負責人確認 5.2 第 1～4、6 點後，T004 方可勾選；T041、T044、T045 依序解除阻擋。
+
+T004 只確認介面與安全規則；Cookie、Origin、CSRF 及 Socket fallback 的實際測試在 T045 與最後整合驗收完成。
 
 ---
 
