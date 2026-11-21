@@ -78,3 +78,22 @@ T066 已以隔離 Demo 實測兩個 Cookie 身分、多分頁、F5、無候選�
 本輪以 `NODE_ENV=test` 執行完整 `npm.cmd run check`，TypeScript、46 個測試檔的 219 項 Vitest 測試與 Production Build 全部通過。Build 有現存前端產物大於 500 kB 的 Vite 警告，建置成功。三張 Student PlantUML 已依正式 Port 更新並以 CLI 重新產生 PNG。
 
 T044 已完成。T041、T045、T059～T061 保持未完成。T045 仍須完成 Teacher router／服務正式組裝、Student Socket 失效禁止 fallback，以及 Teacher Cookie／Origin／CSRF 與授權測試。本輪未執行 Teacher 驅動的瀏覽器驗收。
+
+## T045 正式服務組裝與 Socket 隔離（2026-11-21）
+
+`createHttpServer` 已將同一 Database 上的 Student Submission、Winner Resolver、Foundation lifecycle／publisher 與既有 Coordinator 正式組裝。可選 `createTeacherRouter(services)` 在依賴就緒後接入真實 Teacher Router；`startServer(TeacherIntegrationOptions)` 會轉送其 HTTP／Socket 身分與 watch 授權 adapter。介面與建立順序見 [Internal Services](contracts/internal-services.md)。預設沒有 Teacher router 或 Teacher 權限核發。
+
+已驗證學生憑證失效／過期時，`session:watch` 回覆 `UNAUTHENTICATED`，不呼叫外部 Teacher resolver、不加入目標 Room；同時帶兩種 Cookie 也不提升身分。Student `auth.sessionId` 僅選擇驗證路徑，不提供權限。
+
+```powershell
+$env:NODE_ENV = 'test'
+npm.cmd test -- tests/integration/student-end-composition.test.ts tests/realtime/student-socket-auth.test.ts
+npm.cmd run check
+git diff --check
+```
+
+指定測試已通過 2 個檔案、16 項測試。包括正式 Coordinator 的 End、同一交易內的勝者查詢、跨連線確認 Commit 後才發布、真實 Student Socket、startup 注入，以及受控 Teacher adapter 的 Cookie／Origin／watch 邊界。受控 adapter 僅存在測試中，沒有新增正式測試端點。
+
+完整 `NODE_ENV=test`、`npm.cmd run check` 結果為 Exit 0：Contracts／Server／Web 及測試 TypeScript 檢查、47 個 Vitest 測試檔的 231 項測試、Production Build 全部通過。保留現存 Vite 大於 500 kB 的產物警告，建置成功。`git diff --check` 無錯誤；三張 Student `.puml` 已用 PlantUML CLI 重產 PNG 並檢視。
+
+真實 Teacher Router、簽章 Cookie、Origin／CSRF 與 watch 授權程式尚未提供，故 **T045 保持未完成**。本輪未執行新的瀏覽器人工驗收，也未完成 T041 或 T059～T061。

@@ -27,7 +27,7 @@ It is produced by trusted Teacher authentication middleware, never request JSON.
 
 ## Single Teacher End Interface with Student Winner Resolver
 
-The Student adapter and its scoped authorization checks are implemented in `student-trusted-end-coordinator.ts`. T044 provides the formal Foundation Port in `session-lifecycle-service.ts`, implemented by `SessionLifecycleService`. The transaction command and `WinnerResolver` type live in `foundation-transactions.ts`. End integration tests now inject that actual lifecycle service into the existing Coordinator; the former local mock transaction has been removed. Production composition and Teacher security adapters await T045.
+The Student adapter and its scoped authorization checks are implemented in `student-trusted-end-coordinator.ts`. T044 provides the formal Foundation Port in `session-lifecycle-service.ts`, implemented by `SessionLifecycleService`. The transaction command and `WinnerResolver` type live in `foundation-transactions.ts`. End integration tests inject that actual lifecycle service into the existing Coordinator; the former local mock transaction has been removed. The server now composes these services; production Teacher security adapters and their formal acceptance remain pending under T045.
 
 Teacher calls exactly one trusted internal service. It does not invoke the Foundation lifecycle service and Student resolver as separate operations.
 
@@ -71,7 +71,7 @@ interface StudentWinnerResolver {
 
 `StudentTrustedEndCoordinator.endRound()` is a synchronous in-process call. It checks `actor.actorKind === 'teacher'`, matching `sessionId`, and the accepted `round:end` capability. It then calls the injected `FoundationLifecycleEndPort` once, passing the Student resolver callback. The Teacher UI sends no winning Submission ID and receives only the committed state snapshot. The callback is synchronous and returns the canonical Foundation `Result` candidate, or `null` when no Submission exists. No function invoked inside the SQLite transaction may return a Promise or await asynchronous work.
 
-The two input types are structurally aligned. Foundation owns its input, callback Port and canonical Result contract; it imports no Student type. The existing Coordinator code still needs its Port type aligned in T045. Teacher generates `requestId` for tracing and safe logging only; this contract provides no idempotency guarantee.
+The two input types are structurally aligned. Foundation owns its input, callback Port and canonical Result contract; it imports no Student type. The Coordinator imports the canonical Foundation Port and re-exports that type from its previous Student module path for compatibility; it declares no duplicate Port. Teacher generates `requestId` for tracing and safe logging only; this contract provides no idempotency guarantee.
 
 T044's lifecycle method rejects caller-owned transactions, then the transaction function obtains the outer `BEGIN IMMEDIATE` lock and validates the requested Session, Round ownership/current selection, Active phase and expected version before invoking the resolver. The existing `endRoundWithResult` persistence runs on the same connection as a nested savepoint, including its existing logical-target Result replacement/removal. The authoritative snapshot is captured within the outer transaction. Only after the outer Commit does the lifecycle method call the publisher. A Promise/thenable returned by the resolver is rejected; notification work returned after Commit may settle asynchronously and is observed for failure without delaying End.
 
@@ -112,8 +112,8 @@ There is no separate winner query followed by End, so no Submission can be accep
 
 - Teacher HTTP resolution applies only to Teacher-specific paths. It verifies the signed Cookie and requested Session before constructing a scoped ActorContext for End. Common Student Session reads continue to resolve the Student identity.
 - Teacher sockets omit `auth.sessionId` and validate Teacher signed Cookie plus allowed Origin. The trusted resolver rejects sockets with Student handshake scope or identity. Teacher watch authorization verifies trusted actor provenance, teacher kind, `session:watch` and Session existence.
-- Student handshake or watch identity failure rejects authorization. T045 updates `app.ts` so an already identified Student socket whose credential can no longer be resolved returns `null` without calling Teacher fallback.
-- `createHttpServer` composes the existing lifecycle, publisher, resolver and Coordinator with one Database and exposes the services to the Teacher router. `startServer` supplies Teacher HTTP and Socket resolvers and watch authorization. T045 arranges router mounting after dependencies are available.
+- Student handshake or watch identity failure rejects authorization. `app.ts` returns `null` without calling the external resolver if an identified Student credential is revoked/expired, or its credential/Participant/Session identity no longer matches. A socket carrying `auth.sessionId` also cannot enter the external resolver path when no verified Student identity exists. The outer Session event handler maps `null` to `UNAUTHENTICATED` and does not join the requested room. Client-declared role or permissions grant no authority.
+- `createHttpServer` composes the existing lifecycle, publisher, resolver and Coordinator with one Database. It accepts the optional `createTeacherRouter(services)` factory described below. `startServer(teacherIntegration = {})` forwards the supplied Teacher HTTP/Socket resolvers, watch authorizer and factory; it creates no Teacher identity itself. Real Teacher adapters are not present in the inspected workspace.
 - Teacher Cookie, Origin and CSRF tests, mixed-Cookie isolation and Student-failure fallback tests are required for formal integration acceptance. The accepted local single-Teacher Demo limitation is that logout does not evict existing Socket rooms.
 
 ## T004 approval and remaining implementation verification
@@ -121,8 +121,35 @@ There is no separate winner query followed by End, so no Submission can be accep
 Teacher and Student/Foundation accepted the design in section 5 on 2026-11-20. T004 is complete. Implementation verification remains:
 
 1. T044 implements the Foundation-owned input and synchronous Port, in-transaction checks, atomic Result/state persistence and post-commit notification error isolation. Its independent verification is recorded in the Quickstart; production wiring remains T045.
-2. T045 reuses the Coordinator, wires the shared services and Teacher router, and removes Student-to-Teacher Socket fallback. Teacher implements trusted credential/capability issuance and security adapters.
+2. T045's Student/server preparation now reuses the Coordinator, wires shared services to an optional Teacher router factory and removes Student-to-Teacher Socket fallback. Controlled-adapter tests validate these seams. T045 remains unchecked until the real Teacher router and credential/capability/security adapters pass integration acceptance.
 3. T041 validates Submit/End races and rollback/publication behavior through the actual T044/T045 path.
 4. T059–T061 validate contracts, regression and formal browser/security acceptance.
 
 This approval records interface and responsibility-design review; it does not certify implementation or tests. Foundation public HTTP, DTO and Socket.IO contracts remain the integration baseline.
+
+## Implemented composition seam (2026-11-21)
+
+`apps/server/src/app.ts` exports:
+
+```ts
+interface TeacherServiceDependencies {
+  readonly database: Database.Database;
+  readonly sessionLifecycle: SessionLifecycleService;
+  readonly endCoordinator: StudentTrustedEndCoordinator;
+}
+
+// Relevant FoundationServerOptions member:
+interface TeacherRouterComposition {
+  createTeacherRouter?: (services: TeacherServiceDependencies) => ExpressRouter;
+}
+
+type TeacherIntegrationOptions = Pick<FoundationServerOptions,
+  'createTeacherRouter' | 'resolveActorContext' |
+  'resolveSocketActorContext' | 'authorizeWatch'>;
+```
+
+Startup opens/migrates one Database, then creates Student draft/submission services and mounts an empty Teacher router container before the terminal error handlers. After HTTP/Socket servers, membership handling and the state publisher are ready, it creates one lifecycle, one winner resolver and one Coordinator. The factory receives those ready instances; its returned router is installed beneath `/api/v1/teacher`. Supplying the factory without a Database, or together with a prebuilt `teacherRouter`, is rejected. Without an adapter no Teacher endpoints are installed.
+
+Teacher connects its real router using this factory and calls `services.endCoordinator.endRound(input, trustedSessionActor)` once. It must not wrap that call in another transaction or call lifecycle End separately. For other Teacher controls it receives the same `sessionLifecycle`; repositories use the supplied Database. `createHttpServer` also returns `endCoordinator` alongside its existing lifecycle/publisher, or `null` without a Database.
+
+The Teacher-owned startup adapter must provide signed-Cookie and allowed-Origin Socket resolution, provenance-aware Session watch authorization, and scoped HTTP authentication plus Origin/CSRF enforcement on mutation routes. Only controlled test adapters have been exercised here. They neither issue production Teacher credentials nor create a production test End endpoint. The approved logout/room-revocation limitation and repeated-End 409 behavior are unchanged.

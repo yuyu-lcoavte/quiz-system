@@ -204,9 +204,16 @@ or winner=null. No losing submissions or acceptedOrder.
 Foundation ResultView is not expanded.
 end note
 
-StudentTrustedEndCoordinator ..> FoundationLifecycleEndPort : production wiring pending T045
+class TeacherServiceDependencies <<server integration>> {
+  database: Database
+  sessionLifecycle: SessionLifecycleService
+  endCoordinator: StudentTrustedEndCoordinator
+}
+TeacherServiceDependencies --> SessionLifecycleService : same instance
+TeacherServiceDependencies --> StudentTrustedEndCoordinator : same instance
+StudentTrustedEndCoordinator ..> FoundationLifecycleEndPort : injected lifecycle
 FoundationLifecycleEndPort ..> WinnerResolver : invoke within same write transaction
-StudentWinnerResolver ..|> WinnerResolver : synchronous resolver; wiring pending
+StudentWinnerResolver ..|> WinnerResolver : synchronous resolver on shared Database
 StudentTrustedEndCoordinator ..> ActorContext : accepted round:end capability
 
 note bottom of FoundationLifecycleEndPort
@@ -217,6 +224,7 @@ Check Session/current Round/Active/version after BEGIN IMMEDIATE, before callbac
 Reuse End/Result persistence on the same connection; snapshot is read in transaction.
 Commit precedes notification; delivery is not awaited.
 Log notification failures and return the committed snapshot.
-T004 design approved; Teacher issuance and production wiring await T045.
+Composition creates the lifecycle, resolver and Coordinator once.
+Teacher Router factory receives the ready services; Teacher adapter acceptance pending.
 end note
 @enduml

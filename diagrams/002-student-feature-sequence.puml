@@ -9,7 +9,7 @@ participant "Student Draft Socket" as DraftSocket
 participant "Student Presence / Failover" as Presence
 participant "Foundation Query / State" as Foundation
 participant "Teacher Backend" as Teacher
-participant "StudentTrustedEndCoordinator\n(production wiring pending)" as EndCoordinator
+participant "StudentTrustedEndCoordinator\n(composed in createHttpServer)" as EndCoordinator
 participant "Foundation Lifecycle Transaction" as Lifecycle
 participant "Student Winner Resolver" as WinnerResolver
 database "Shared SQLite\n(same Database instance)" as DB
@@ -137,9 +137,11 @@ DB --> StudentApi : committed Submission + locked draft
 StudentApi --> UI : accepted outcome for this Team
 StudentApi --> DraftSocket : publish student:draft:locked after commit
 
-== Submission / End serialization (T004 approved; production wiring pending T045) ==
+== Submission / End serialization (Teacher adapter acceptance pending) ==
 note over Teacher,Lifecycle
-Teacher authorization and production Coordinator wiring await T045.
+Server builds one lifecycle, resolver and Coordinator on the shared Database.
+The optional Teacher Router factory receives ready services.
+Teacher Cookie/Origin/CSRF and real router acceptance remain pending.
 T044 supplies the Foundation-owned synchronous transaction Port.
 Student Winner Resolver is implemented and tested independently.
 end note
@@ -188,6 +190,20 @@ Notify after Commit without awaiting delivery; log delivery failures and return 
 Nested caller-owned transactions are rejected by the publishing Port.
 No Foundation↔Student import cycle exists.
 end note
+
+== Student Socket trust boundary ==
+UI -> Foundation : session:watch after Student handshake
+Foundation -> DB : re-resolve credential and canonical Participant in handshake Session
+alt credential no longer valid or identity scope changed
+  Foundation --> UI : session:error UNAUTHENTICATED
+  note over Foundation,Teacher
+  Return null without invoking the external Teacher resolver or authorizer.
+  A client-supplied auth.sessionId only selects the Student path.
+  end note
+else current Student identity valid
+  Foundation -> Foundation : authorize scoped Participant and session:watch
+  Foundation --> UI : authoritative session:state
+end
 
 == Student result projection ==
 UI -> StudentApi : GET Student result after Ended
