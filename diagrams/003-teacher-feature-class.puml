@@ -1,0 +1,169 @@
+@startuml
+title Teacher Feature — Class Diagram (Plan)
+top to bottom direction
+hide empty members
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+skinparam nodesep 30
+skinparam ranksep 60
+skinparam packageStyle rectangle
+
+package "Auth" {
+  class TeacherConfig {
+    passwordHash
+    sessionSecret
+    allowedOrigins
+    serviceAccountKeyFile
+  }
+  class PasswordHasher <<pure>> {
+    hash(password)
+    verify(password, encoded)
+  }
+  class LoginRateLimiter {
+    5 failures / 15 min / address
+    50 failures / 15 min total
+  }
+  class LoginSessionService {
+    login(password, address)
+    logout(cookie)
+    verify(cookie)
+  }
+  class TeacherCsrfService {
+    issue(loginSessionId)
+    verify(token, loginSessionId)
+  }
+  class TeacherActorFactory {
+    forSession(sessionId) : ActorContext
+  }
+  class TeacherSocketIdentity {
+    resolve(socket) : ActorContext | null
+    authorizeWatch(actor, sessionId)
+  }
+}
+
+package "Activity and rounds" {
+  class ActivityService {
+    create(teamCount)
+    list()
+    detail(sessionId)
+  }
+  class TargetCatalog {
+    targets(sessionId) : TargetStatus[]
+    next(sessionId)
+  }
+  class RoundControlService {
+    select(target, version)
+    next(version)
+    start(version)
+    end(version, actor)
+  }
+  class TeacherResultProjection {
+    monitor(sessionId)
+    results(roundId)
+  }
+}
+
+package "Guided Notes" {
+  class SheetUrl <<pure>> {
+    parse(url) : SheetRef
+  }
+  class GuidedNotesParser <<pure>> {
+    parse(grid) : ParseResult
+  }
+  class ImportService {
+    preview(url)
+    confirm(url, digest)
+  }
+  class CellComposer <<pure>> {
+    compose(original, answers)
+  }
+  class WriteBackService {
+    preview(sessionId)
+    confirm(sessionId, digest)
+  }
+  interface SheetsGateway {
+    readSheet(ref)
+    readCells(ref, cells)
+    writeCells(ref, updates)
+  }
+  class GoogleSheetsGateway
+}
+
+package "tests/helpers (not production)" {
+  class FakeSheetsGateway <<test>> {
+    in-memory sheets
+    recorded writes
+    injectable failures
+  }
+}
+
+package "Export" {
+  class ActivityRecordService {
+    rows(sessionId)
+  }
+  class CsvWriter <<pure>> {
+    write(rows) : bytes
+  }
+}
+
+package "Teacher persistence (006)" {
+  class LoginSessionRepository
+  class SheetSourceRepository
+  class BlankCellRepository {
+    cellA1
+    originalContent
+    marker
+    lastWrittenContent
+  }
+}
+
+package "Foundation / Student (existing)" {
+  class SessionLifecycleService <<Foundation>> {
+    selectTarget()
+    startRound()
+  }
+  class FoundationRepositories <<Foundation>>
+  class ActorContext <<Foundation>>
+  class StudentTrustedEndCoordinator <<Student>> {
+    endRound(input, actor)
+  }
+}
+
+LoginSessionService --> PasswordHasher
+LoginSessionService --> LoginRateLimiter
+LoginSessionService --> LoginSessionRepository
+TeacherCsrfService ..> LoginSessionService
+TeacherSocketIdentity --> LoginSessionService
+TeacherActorFactory ..> ActorContext : creates
+TeacherSocketIdentity ..> ActorContext : creates
+
+ActivityService --> FoundationRepositories
+TargetCatalog --> FoundationRepositories
+RoundControlService --> TargetCatalog
+RoundControlService --> SessionLifecycleService
+RoundControlService --> StudentTrustedEndCoordinator
+TeacherResultProjection --> FoundationRepositories
+
+ImportService --> SheetUrl
+ImportService --> GuidedNotesParser
+ImportService --> SheetsGateway
+ImportService --> FoundationRepositories
+ImportService --> SheetSourceRepository
+ImportService --> BlankCellRepository
+WriteBackService --> CellComposer
+WriteBackService --> SheetsGateway
+WriteBackService --> BlankCellRepository
+WriteBackService --> TeacherResultProjection
+GoogleSheetsGateway ..|> SheetsGateway
+FakeSheetsGateway ..|> SheetsGateway
+
+ActivityRecordService --> TeacherResultProjection
+ActivityRecordService --> CsvWriter
+
+' Layout only: stack the packages in rows (Auth + rounds / Guided Notes + export / persistence + existing)
+PasswordHasher -[hidden]down- ImportService
+LoginRateLimiter -[hidden]down- WriteBackService
+TargetCatalog -[hidden]down- ActivityRecordService
+SheetUrl -[hidden]down- LoginSessionRepository
+CellComposer -[hidden]down- SessionLifecycleService
+@enduml

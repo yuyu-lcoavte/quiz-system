@@ -1,0 +1,86 @@
+@startuml
+title Teacher Feature — Component Diagram (Plan)
+top to bottom direction
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 40
+skinparam ranksep 50
+skinparam packageStyle rectangle
+
+actor Teacher
+actor "Students\n(>= 2 Teams)" as Students
+
+package "apps/web (shared React app)" as Web {
+  component "Teacher pages\n/teacher/login\n/teacher/dashboard\n/teacher/sessions/:sessionId" as TeacherUI
+  component "Session state client\n(Foundation, reused)" as StateClient
+  component "Student pages\n(Student Feature)" as StudentUI
+}
+
+package "apps/server — Teacher module (new)" as TeacherMod {
+  component "main.ts\nstartServer(teacherIntegration)" as Main
+  component "Teacher router\n/api/v1/teacher" as Router
+  component "Security middleware\nOrigin · cookie session · CSRF\nlogin rate limit · Session scope\n→ per-request Teacher ActorContext" as Security
+  component "Teacher Socket identity\ncookie + Origin\nauthorizeWatch" as SocketId
+
+  package "Teacher services" as Services {
+    component "Auth" as Auth
+    component "Activity\n(code + Teams)" as Activity
+    component "Round control\n(targets · next · reopen)" as Rounds
+    component "Monitor / results" as Monitor
+    component "Import\n(parser: pure)" as Import
+    component "Write-back\n(composer: pure)" as WriteBack
+    component "CSV export" as Export
+  }
+
+  component "Teacher repositories\n(migration 006)" as TeacherRepo
+  component "SheetsGateway\n(googleapis · fake in tests)" as Gateway
+}
+
+package "apps/server — shared (existing)" as Shared {
+  component "app.ts hook\ncreateTeacherRouter(services)\nservices = database, sessionLifecycle,\nendCoordinator\n+ Teacher Socket options" as Hook
+  component "Foundation\nSessionLifecycleService" as Lifecycle
+  component "Foundation\nrepositories" as FRepo
+  component "Foundation\nsession state events" as Events
+  component "Student\nStudentTrustedEndCoordinator\n+ WinnerResolver" as Coord
+}
+
+database "SQLite\n(shared file)" as DB
+cloud "Google Sheets" as Sheets
+
+Teacher --> TeacherUI
+Students --> StudentUI
+TeacherUI --> Router : JSON + cookie + X-CSRF-Token
+TeacherUI --> StateClient
+StudentUI --> StateClient
+StateClient --> SocketId : session:watch
+
+Main --> Hook : teacher integration
+Hook --> Router
+Router --> Security
+Security --> Services
+
+Rounds --> Lifecycle : select / start
+Rounds --> Coord : end (single call)
+Coord --> Lifecycle : same-transaction end
+Lifecycle --> Events : publish after commit
+Events ..> StateClient
+
+Services --> FRepo
+Services --> TeacherRepo
+Import --> Gateway
+WriteBack --> Gateway
+Gateway --> Sheets
+
+FRepo --> DB
+TeacherRepo --> DB
+
+note right of Security
+  Teacher identity only under /api/v1/teacher;
+  shared /api/v1/sessions/... reads stay Student-only.
+  (student-teacher-decisions.md section 5)
+end note
+note right of Gateway
+  Service-account key file outside the repo;
+  path in .env only.
+end note
+@enduml

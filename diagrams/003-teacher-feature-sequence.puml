@@ -1,0 +1,102 @@
+@startuml
+title Teacher Feature — Sequence Diagram (Plan)
+autonumber
+skinparam responseMessageBelowArrow true
+
+actor Teacher
+participant "Teacher pages" as UI
+participant "Teacher router\n+ security middleware" as Router
+participant "Teacher services" as Svc
+participant "SheetsGateway" as Gateway
+participant "Google Sheets" as Sheets
+participant "Foundation\nlifecycle" as Lifecycle
+participant "Student end\ncoordinator" as Coord
+participant "Session state\nevents" as Events
+actor "Students" as Students
+
+== P1 · Login ==
+Teacher -> UI : password
+UI -> Router : POST /auth/login (Origin)
+Router -> Svc : rate limit, scrypt verify, create session row
+Router --> UI : 204 + teacher_session cookie
+UI -> Router : GET /me
+Router --> UI : csrfToken, serviceAccountEmail
+
+== P1 · Create activity ==
+UI -> Router : POST /sessions {teamCount} (Origin, CSRF)
+Router -> Svc : Session + Teams in one transaction
+Router --> UI : activity code
+
+== P2 · Import Guided Notes ==
+UI -> Router : POST /sessions/:id/import/preview {url}
+Router -> Svc : parse URL
+Svc -> Gateway : readSheet(ref)
+Gateway -> Sheets : get merges + values
+alt not shared / not found / unavailable
+  Router --> UI : 403 / 404 / 502
+else readable
+  Gateway --> Svc : grid
+  Svc -> Svc : parseGuidedNotes(grid) (pure)
+  Router --> UI : preview + previewDigest (nothing saved)
+  Teacher -> UI : confirm
+  UI -> Router : POST …/import/confirm {url, previewDigest}
+  Svc -> Gateway : readSheet(ref) again
+  Svc -> Svc : digest matches → create Questions, Blanks,\nGroups, blank-cell rows (one transaction)
+  Router --> UI : 201
+end
+
+== P1 · Select, start ==
+UI -> Router : POST …/rounds/next {expectedStateVersion}
+Router -> Svc : first NotOpened target, blanks >= 1
+Svc -> Lifecycle : selectTarget(...)
+Lifecycle -> Events : publish after commit
+Events --> Students : Waiting (<= 2 s)
+Events --> UI : Waiting
+UI -> Router : POST …/rounds/start
+Svc -> Lifecycle : startRound(...)
+Lifecycle -> Events : publish after commit
+Events --> Students : Active
+
+== P1 · Monitor (poll every 1 s while Active) ==
+Students -> Students : leader submits (Student Feature)
+loop every 1 s
+  UI -> Router : GET …/monitor
+  Router --> UI : submitted, order, answers (no drafts)
+end
+note right of UI : answers hidden until\nteacher presses 顯示答案
+
+== P1 · End ==
+UI -> Router : POST …/rounds/end {expectedStateVersion}
+Router -> Coord : endRound(input, teacher ActorContext)
+Coord -> Lifecycle : endRoundWithWinnerResolver
+Lifecycle -> Lifecycle : one transaction: resolve winner,\nEnded + Result (or clear old), commit
+Lifecycle -> Events : publish after commit
+Events --> Students : Ended
+Coord --> Router : committed snapshot
+alt 409 STALE_STATE / INVALID_PHASE
+  Router --> UI : 409
+  UI -> Router : GET /sessions/:id (reload)
+end
+UI -> Router : GET …/results
+Router --> UI : full order, winner / no winner
+
+== P3 · Write-back ==
+UI -> Router : POST …/write-back/preview
+Svc -> Gateway : readCells(target cells)
+Router --> UI : entries (write / restore) + planDigest
+Teacher -> UI : confirm
+UI -> Router : POST …/write-back/confirm {planDigest}
+Svc -> Gateway : readCells again
+alt any cell changed or missing
+  Router --> UI : 409 SHEET_CONFLICT, nothing written
+else unchanged
+  Svc -> Gateway : writeCells (one atomic batch)
+  Gateway -> Sheets : batchUpdate
+  Svc -> Svc : save lastWrittenContent
+  Router --> UI : written
+end
+
+== P4 · Export ==
+UI -> Router : GET …/export.csv
+Router --> UI : CSV (BOM, one row per Round × Team)
+@enduml

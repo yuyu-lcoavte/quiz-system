@@ -16,7 +16,9 @@
     "typecheck": "npm run build --workspace @quiz/contracts && npm run typecheck --workspaces --if-present && tsc -p tests/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "teacher:hash-password": "npm run teacher:hash-password --workspace @quiz/server",
+    "teacher:seed-demo": "npm run build --workspace @quiz/contracts && npm run teacher:seed-demo --workspace @quiz/server"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.4",

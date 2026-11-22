@@ -21,7 +21,7 @@
 - 必須明確界定模組責任，以共用契約互動並降低耦合。
   共用基礎架構、資料模型、API 與模組介面必須一致；變更須由雙方協調並同步受影響模組。
 - 學生端必須透過共用資料模型或 API 取得處理後的題目與填空資料，動態呈現答案欄位。
-  Excel 匯入、解析與答案回寫由老師端負責。
+  Guided Notes（Google Sheets）匯入、解析與答案寫回由老師端負責。
 - 共用首頁、Route 命名及 API 格式必須由雙方協調；本憲章不指定具體格式。
 
 ### III. Git 版本管理與 AI 操作界線
@@ -34,14 +34,16 @@
 
 ### IV. 資料正確性與安全
 
-- 所有外部輸入必須驗證，包括上傳檔案、活動代號、答案、識別碼及即時訊息。
+- 所有外部輸入必須驗證，包括上傳檔案、從 Google Sheets 讀取的資料、活動代號、答案、識別碼及即時訊息。
   後端必須驗證格式、資料所屬關係與操作狀態；前端檢查不得取代後端檢查。
-- 不得以硬編碼題目、答案、題數、填空數或 Excel 儲存格位置實作產品邏輯。
+- 不得以硬編碼題目、答案、題數、填空數或試算表儲存格位置實作產品邏輯。
   固定內容僅能作為明確隔離的測試資料，不得成為產品對特定範本的依賴。
 - 使用者操作必須經後端身分與權限驗證，包括教師管理及組長提交資格。
   Route、前端按鈕及客戶端角色資訊不得作為唯一權限依據。
 - 密碼、API Key、Token 等機敏資料不得寫入程式碼、版本庫或 GitHub，
   必須透過安全組態或憑證保存機制管理，並避免記錄於日誌；明文憑證不得進入日誌。
+- Google Service Account 金鑰屬機敏資料，只能放在後端 `.env` 或其指向的本機檔案，
+  不得進入版本庫。
 
 ### V. 測試與品質證據
 
@@ -83,11 +85,12 @@
 
 - 本憲章定義治理原則；共同需求與後續確認的 Feature 規格定義產品行為。
   課程官方要求不可由本憲章或單組文件推翻，來源衝突時必須提出討論並同步修訂。
-- `docs/examples/` 的老師 Excel 範本僅為解析及驗收參考，不得假設其他 Guided Notes 儲存格位置相同。
+- Guided Notes 以線上 Google Sheets 為來源。`docs/examples/` 的老師 `.xlsx` 範本僅保留作為格式、解析及驗收參考，
+  不得假設其他 Guided Notes／Google Sheets 儲存格位置相同。
 - 必須區分「單題多填空」與「多題共同提交」。範本名稱、合併題號、分列及填空標記，
   不得由 AI 擅自解讀為已確認的提交規則。
 - 已確認共同決議持續有效。帳號管理、組長恢復、多人編輯同步、填空標記保留、題組辨識、
-  Excel 流程合規性與共同測試細節等未決事項，須於相關規格追蹤，不透過憲章定案。
+  Guided Notes／Google Sheets 串接細節與共同測試細節等未決事項，須於相關規格追蹤，不透過憲章定案。
 - 課程允許本機模擬，技術選型不得將公開部署增加為必要條件。
 
 ## 開發流程與品質關卡
@@ -117,6 +120,18 @@
 
 ## Amendment History
 
+### 2.0.1 — 2026-11-22
+
+- **Reason**: 助教公告 Guided Notes 必須直接串接線上 Google Sheets 讀寫，不可下載成 `.xlsx` 在本地處理。原條文以 Excel 描述匯入與回寫流程，與課程要求不一致。
+- **Change**:
+  - Principle II：「Excel 匯入、解析與答案回寫」改為「Guided Notes（Google Sheets）匯入、解析與答案寫回」，仍由老師端負責。
+  - Principle IV：外部輸入驗證範圍補上「從 Google Sheets 讀取的資料」；「Excel 儲存格位置」改為「試算表儲存格位置」；補充 Google Service Account 金鑰屬機敏資料，只能放在後端 `.env` 或其指向的本機檔案，不得進入版本庫。
+  - 共同約束與需求來源：Guided Notes 以線上 Google Sheets 為來源，`docs/examples/` 的 `.xlsx` 保留作為格式參考；未決事項中的「Excel 流程合規性」改為「Guided Notes／Google Sheets 串接細節」。
+- **Version rationale**: PATCH。各原則的責任分工、禁止寫死位置及機敏資料保護精神不變；Service Account 金鑰條文是既有「API Key、Token 等機敏資料不得進入版本庫」的具體化，未新增原則或實質擴充治理；外部輸入補列 Google Sheets 資料，屬既有「所有外部輸入必須驗證」的明確列舉，驗證要求本身不變。
+- **Affected documents**: `docs/shared-requirements.md` Q13、U08、共同驗收第 2、7 項及 U10 已同步。共同 HackMD 及 OpenSpec 小組文件須另行同步；SpecKit 規格中仍以 Excel 描述匯入／匯出之處，於 Teacher Feature Specify／Clarify 時更新。
+- **Migration**: 老師端 Guided Notes 匯入與答案寫回改為透過 Google Sheets API 直接讀寫線上試算表，不再設計 `.xlsx` 上傳／下載流程。本次只修訂規範及文件，未修改程式碼，未執行任何 Git 操作。
+- **Approval**: 待另一位 SpecKit 組員確認；涉及共同功能，另須協調 OpenSpec 小組。
+
 ### 2.0.0 — 2026-11-09
 
 - **Reason**: 兩位 SpecKit 組員確認本專案共同整合分支採用 `master`，與原憲章條文的 `main` 不同。
@@ -125,5 +140,5 @@
 - **Migration**: 後續整合以 `master` 為目標分支，仍須使用 Feature Branch 與 Pull Request。本次只修訂規範及文件，未執行任何 Git 分支操作。
 - **Approval**: 兩位 SpecKit 組員已確認此分支決議。
 
-**Version**: 2.0.0 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-09
+**Version**: 2.0.1 | **Ratified**: 2026-11-08 | **Last Amended**: 2026-11-22
 
