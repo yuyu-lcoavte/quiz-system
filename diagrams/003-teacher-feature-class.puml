@@ -87,7 +87,14 @@ package "Guided Notes" {
     writeCells(ref, updates)
   }
   class GoogleSheetsGateway
-  class FakeSheetsGateway <<test>>
+}
+
+package "tests/helpers (not production)" {
+  class FakeSheetsGateway <<test>> {
+    in-memory sheets
+    recorded writes
+    injectable failures
+  }
 }
 
 package "Export" {

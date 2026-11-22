@@ -36,7 +36,7 @@ All earlier unknowns are resolved in [research.md](research.md); none remain mar
 
 | Principle | Initial gate | Post-design |
 |---|---|---|
-| I. 需求一致性 | Pass. Follows the clarified spec; Q16/U07 and U06/U10 Teacher decisions are recorded as sent to the larger group, not treated as group-confirmed. | Pass. |
+| I. 需求一致性 | Pass. Follows the clarified spec; Q16/U07 and U06/U10 were confirmed by the larger group on 2026-11-22 and synced to `docs/shared-requirements.md` (shared HackMD updated manually by the user). | Pass. |
 | II. 模組化與協作 | Pass with coordination items. Teacher code lives in its own folders; reuses Foundation and Student through the reserved hook. Shared-file edits are listed under **Coordination** below and are additive. | Pass. No Foundation or Student contract changes. |
 | III. Git 與 AI 界線 | Pass. Work on `feature/teacher`; no commit or push without the user's say-so. | Pass. |
 | IV. 資料正確性與安全 | Pass. Backend validates every input, including Google Sheets data; no hard-coded cell positions; Teacher authority checked on the server; password hash, session secret and service-account key only in `.env` / an out-of-repo key file; nothing secret logged. | Pass. Cookie + server session row, Origin, CSRF, login rate limit, Socket path isolation and CSV formula-injection guard specified in contracts. |
@@ -85,7 +85,7 @@ apps/server/src/
     ├── rounds/                          # target-catalog (targets, status, next), round-control-service
     ├── monitor/                         # teacher-result-projection
     ├── guided-notes/                    # parser (pure), import-service, sheet-url
-    ├── sheets/                          # sheets-gateway interface, googleapis gateway, fake gateway (tests)
+    ├── sheets/                          # sheets-gateway interface, googleapis gateway
     ├── write-back/                      # cell-composer (pure), write-back-service
     ├── export/                          # csv-writer (pure), activity-record-service
     ├── persistence/                     # teacher repositories over 006 tables
@@ -106,6 +106,7 @@ tests/
 ├── integration/teacher-*.test.ts        # end with coordinator, Student submit + Teacher end
 ├── realtime/teacher-socket.test.ts      # watch authorization, Student path isolation
 ├── fixtures/guided-notes/               # template transcriptions and variants
+├── helpers/fake-sheets-gateway.ts       # in-memory SheetsGateway for automated tests (not in production code)
 └── manual/teacher-feature.md            # real Google Sheet + two Students demo script
 ```
 

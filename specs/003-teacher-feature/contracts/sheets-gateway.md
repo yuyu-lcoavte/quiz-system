@@ -1,6 +1,6 @@
 # Sheets Gateway Contract (internal)
 
-Location: `apps/server/src/modules/teacher/sheets/`. Every Google Sheets call goes through this interface. Automated tests inject `FakeSheetsGateway`; only manual tests use the real one.
+Location: `apps/server/src/modules/teacher/sheets/` (interface and Google implementation). Every Google Sheets call goes through this interface. Automated tests inject `FakeSheetsGateway` from `tests/helpers/fake-sheets-gateway.ts`; only manual tests use the real one.
 
 ```ts
 interface SheetRef { spreadsheetId: string; sheetId: number | null }   // null = first tab
@@ -39,6 +39,6 @@ No Google error body, key path or key content is passed to the client or logs.
 
 Accept `https://docs.google.com/spreadsheets/d/<id>/...` with optional `gid` in the query or fragment; `<id>` = `[A-Za-z0-9_-]{20,}`. Anything else → 400 `INVALID_SHEET_URL`. The full URL is not logged.
 
-## Fake gateway (tests)
+## Fake gateway (tests, `tests/helpers/fake-sheets-gateway.ts`)
 
 Holds sheets in memory, records writes, can be set to fail with any of the error codes, and can change a cell between `readCells` calls to simulate another editor.
