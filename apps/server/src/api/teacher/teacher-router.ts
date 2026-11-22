@@ -18,6 +18,9 @@ import { createTeacherAuthMiddleware } from './middleware/teacher-auth.js';
 import { createTeacherCsrfMiddleware } from './middleware/teacher-csrf.js';
 import { createTeacherOriginMiddleware } from './middleware/teacher-origin.js';
 import { createTeacherSessionScopeMiddleware } from './middleware/session-scope.js';
+import { createTeacherImportController } from './import-controller.js';
+import { GuidedNotesImportService } from '../../modules/teacher/guided-notes/import-service.js';
+import type { SheetsGateway } from '../../modules/teacher/sheets/sheets-gateway.js';
 
 /** Everything the Teacher routes need; built once per server by `createTeacherIntegration`. */
 export interface TeacherRouterContext {
@@ -27,6 +30,8 @@ export interface TeacherRouterContext {
   readonly now: () => Date;
   /** Shared with the Socket identity so both verify the same login rows. */
   readonly loginSessions?: TeacherLoginSessionService;
+  /** Google Sheets access; null when GOOGLE_SERVICE_ACCOUNT_KEY_FILE is not configured. */
+  readonly sheetsGateway: SheetsGateway | null;
 }
 
 /**
@@ -49,7 +54,7 @@ export function createTeacherRouter(context: TeacherRouterContext): Router {
     ?? new TeacherLoginSessionService(context.repositories.loginSessions, config.sessionSecret!, context.now);
   const csrf = createTeacherCsrfService({ secret: config.sessionSecret!, now: nowMs });
   const limiter = createLoginRateLimiter({ now: nowMs });
-  const auth = createTeacherAuthController({ config, sessions, csrf, limiter, serviceAccountEmail: () => null });
+  const auth = createTeacherAuthController({ config, sessions, csrf, limiter, serviceAccountEmail: () => context.sheetsGateway?.serviceAccountEmail() ?? null });
 
   router.use(createTeacherOriginMiddleware(config.allowedOrigins));
   router.post('/auth/login', createLoginRateLimitMiddleware(limiter), auth.login);
@@ -59,7 +64,12 @@ export function createTeacherRouter(context: TeacherRouterContext): Router {
   router.post('/auth/logout', auth.logout);
   router.get('/me', auth.me);
 
-  const activities = createTeacherActivityController(new ActivityService(context.services.database, context.repositories, context.now));
+  const activityService = new ActivityService(context.services.database, context.repositories, context.now);
+  const activities = createTeacherActivityController(activityService);
+  const imports = createTeacherImportController(
+    new GuidedNotesImportService(context.services.database, context.repositories, context.sheetsGateway, context.now),
+    activityService,
+  );
   const rounds = createTeacherRoundController(new RoundControlService(context.services));
   const monitor = createTeacherMonitorController(new TeacherResultProjection(context.services.database));
 
@@ -73,6 +83,8 @@ export function createTeacherRouter(context: TeacherRouterContext): Router {
   router.post('/sessions/:sessionId/rounds/end', rounds.end);
   router.get('/sessions/:sessionId/monitor', monitor.monitor);
   router.get('/sessions/:sessionId/results', monitor.results);
+  router.post('/sessions/:sessionId/import/preview', imports.preview);
+  router.post('/sessions/:sessionId/import/confirm', imports.confirm);
 
   return router;
 }
