@@ -6,7 +6,11 @@ import { TeacherLoginSessionService } from '../../modules/teacher/auth/login-ses
 import { createTeacherCsrfService } from '../../modules/teacher/auth/teacher-csrf.js';
 import type { TeacherConfig } from '../../modules/teacher/config.js';
 import type { TeacherRepositories } from '../../modules/teacher/persistence/index.js';
+import { ActivityService } from '../../modules/teacher/activity/activity-service.js';
+import { RoundControlService } from '../../modules/teacher/rounds/round-control-service.js';
+import { createTeacherActivityController } from './activity-controller.js';
 import { createTeacherAuthController } from './auth-controller.js';
+import { createTeacherRoundController } from './round-controller.js';
 import { createLoginRateLimitMiddleware } from './middleware/login-rate-limit.js';
 import { createTeacherAuthMiddleware } from './middleware/teacher-auth.js';
 import { createTeacherCsrfMiddleware } from './middleware/teacher-csrf.js';
@@ -53,7 +57,17 @@ export function createTeacherRouter(context: TeacherRouterContext): Router {
   router.post('/auth/logout', auth.logout);
   router.get('/me', auth.me);
 
+  const activities = createTeacherActivityController(new ActivityService(context.services.database, context.repositories, context.now));
+  const rounds = createTeacherRoundController(new RoundControlService(context.services));
+
+  router.get('/sessions', activities.list);
+  router.post('/sessions', activities.create);
   router.use('/sessions/:sessionId', createTeacherSessionScopeMiddleware(context.services.database));
+  router.get('/sessions/:sessionId', activities.detail);
+  router.post('/sessions/:sessionId/rounds/select', rounds.select);
+  router.post('/sessions/:sessionId/rounds/next', rounds.next);
+  router.post('/sessions/:sessionId/rounds/start', rounds.start);
+  router.post('/sessions/:sessionId/rounds/end', rounds.end);
 
   return router;
 }
