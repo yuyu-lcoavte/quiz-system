@@ -102,7 +102,7 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 
 ## 8. 老師端必須預留的End 跨模組介接
 
-Teacher、Student 與 Foundation 的 End 介面待 T004 確認。
+Teacher、Student 與 Foundation 的 End 介面已於 2026-11-20 通過 T004 設計審閱；正式程式／安全驗收另計。最新決議以 `student-teacher-decisions.md` 第五節為準。
 
 ### 8.2 結束搶答、勝者選取與 Result 儲存
 
@@ -111,12 +111,14 @@ Teacher、Student 與 Foundation 的 End 介面待 T004 確認。
 1. 老師於 Teacher UI 發起「結束本輪」。
 2. Teacher 後端只呼叫一個 Student 內部介面：`StudentTrustedEndCoordinator.endRound(input, actorContext)`；前端不得指定勝者。
 3. Student coordinator 驗證 Teacher ActorContext 的 `round:end` capability，再把 Student 的同步 winner resolver callback 交給 Foundation lifecycle transaction。
-4. Foundation 與 Student 使用同一 `better-sqlite3` Database instance；Foundation 的 SQLite End 交易與 Student resolver 都同步執行，Foundation 在一個 `BEGIN IMMEDIATE` 交易內呼叫 resolver、持久化 `Ended`／`Result`／`stateVersion`。Commit 後才非同步派送既有 Socket.IO 狀態通知；不得在交易內等待通知，也不得讓交易 callback 回傳／等待 Promise。
+4. Foundation 與 Student 使用同一 `better-sqlite3` Database instance；Foundation 的 SQLite End 交易與 Student resolver 都同步執行，Foundation 在一個 `BEGIN IMMEDIATE` 交易內呼叫 resolver、持久化 `Ended`／`Result`／`stateVersion`。Commit 後呼叫既有 Socket.IO publisher，不等待送達；通知錯誤記錄後仍回傳已 Commit 的成功快照。不得在交易內等待通知，也不得讓交易 callback 回傳／等待 Promise。
 5. Student 結果投影在 Ended 後公開勝出組別名稱與其成功答案，**不公開其他組答案／順位**；沒有 Submission 時不建立 Result。
 
-**權限與介面狀態**：Foundation 目前沒有 `round:end` capability。Student Plan 提議此字串由 Teacher middleware 驗證後加入 ActorContext。
+**權限與介面狀態**：`round:end` 名稱與責任已通過設計審閱；由可信 Teacher middleware 驗證身分及指定 Session 後核發，Foundation 不自行授予。現有工作區尚無正式 Teacher 權限核發／Cookie／Origin／CSRF adapter。
 
-**必要並行安全條件**：不允許「先查勝者」與「稍後 End」之間有新提交插入。Plan 的交易內 callback 為內部介面提案，待 Teacher／Foundation 負責人審閱；它不改 Foundation 公開 HTTP、DTO 或 Socket.IO 契約。
+**必要並行安全條件**：不允許「先查勝者」與「稍後 End」之間有新提交插入。T044 已實作正式同步交易內 callback，不改 Foundation 公開 HTTP、DTO 或 Socket.IO 契約。
+
+**2026-11-21 組裝接點**：`app.ts` 的 `createHttpServer` 已建立共用 Database 上的唯一 lifecycle、publisher、Winner Resolver 及既有 Coordinator。Teacher 透過 `createTeacherRouter(services)` 取得 `database`、`sessionLifecycle`、`endCoordinator`，回傳的 Router 掛載於 `/api/v1/teacher`。`startServer(TeacherIntegrationOptions)` 可轉送該 factory、HTTP／Socket resolver 與 watch authorizer；未提供時不安裝 Teacher 路由。Teacher 後端只呼叫 `services.endCoordinator.endRound(input, actorContext)`，不另包交易。具體型別見 Student `contracts/internal-services.md`。Student Socket 重新解析失敗已禁止 fallback；受控 adapter 測試不能代替真實 Teacher 的簽章 Cookie、Origin／CSRF 及授權驗收，因此 T045 仍未完成。
 
 ## 8.3 活動開始後的首次加入
 

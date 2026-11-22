@@ -9,7 +9,7 @@ participant "Student Draft Socket" as DraftSocket
 participant "Student Presence / Failover" as Presence
 participant "Foundation Query / State" as Foundation
 participant "Teacher Backend" as Teacher
-participant "StudentTrustedEndCoordinator\n(production wiring pending)" as EndCoordinator
+participant "StudentTrustedEndCoordinator\n(composed in createHttpServer)" as EndCoordinator
 participant "Foundation Lifecycle Transaction" as Lifecycle
 participant "Student Winner Resolver" as WinnerResolver
 database "Shared SQLite\n(same Database instance)" as DB
@@ -137,9 +137,12 @@ DB --> StudentApi : committed Submission + locked draft
 StudentApi --> UI : accepted outcome for this Team
 StudentApi --> DraftSocket : publish student:draft:locked after commit
 
-== Proposed Submission / End serialization (pending T004) ==
+== Submission / End serialization (Teacher adapter acceptance pending) ==
 note over Teacher,Lifecycle
-Teacher authorization and Foundation callback wiring are pending review.
+Server builds one lifecycle, resolver and Coordinator on the shared Database.
+The optional Teacher Router factory receives ready services.
+Teacher Cookie/Origin/CSRF and real router acceptance remain pending.
+T044 supplies the Foundation-owned synchronous transaction Port.
 Student Winner Resolver is implemented and tested independently.
 end note
 alt Submission gets SQLite write lock first
@@ -148,7 +151,7 @@ alt Submission gets SQLite write lock first
   Teacher -> EndCoordinator : endRound(input, trusted ActorContext)
   EndCoordinator -> EndCoordinator : verify teacher scope + round:end capability
   EndCoordinator -> Lifecycle : endRoundWithWinnerResolver(input, callback)
-  Lifecycle -> DB : BEGIN IMMEDIATE; recheck Active/current/version
+  Lifecycle -> DB : outer BEGIN IMMEDIATE; check Session/round ownership/current/Active/version
   Lifecycle -> WinnerResolver : callback(roundId) inside transaction
   WinnerResolver -> DB : read canonical Round Submissions by acceptedOrder
   DB --> WinnerResolver : earliest Submission or none
@@ -162,7 +165,7 @@ else End gets SQLite write lock first
   Teacher -> EndCoordinator : endRound(input, trusted ActorContext)
   EndCoordinator -> EndCoordinator : verify teacher scope + round:end capability
   EndCoordinator -> Lifecycle : endRoundWithWinnerResolver(input, callback)
-  Lifecycle -> DB : BEGIN IMMEDIATE; recheck Active/current/version
+  Lifecycle -> DB : outer BEGIN IMMEDIATE; check Session/round ownership/current/Active/version
   Lifecycle -> WinnerResolver : callback(roundId) inside transaction
   WinnerResolver -> DB : read canonical Round Submissions by acceptedOrder
   DB --> WinnerResolver : current earliest Submission or none
@@ -182,9 +185,25 @@ Teacher makes one synchronous internal End call. Foundation owns the synchronous
 the synchronous Student callback returns only the winner candidate. No Promise is awaited inside it.
 Resolver/SQL failure rolls back and skips publish.
 With no Submission, Foundation creates no Result and clears prior logical-target Result.
-All services use the same Database object; Commit precedes async Socket.IO dispatch;
-notification delivery is never awaited inside the transaction. No Foundation↔Student import cycle exists.
+All services use the same Database object; capture the snapshot before outer Commit.
+Notify after Commit without awaiting delivery; log delivery failures and return success.
+Nested caller-owned transactions are rejected by the publishing Port.
+No Foundation↔Student import cycle exists.
 end note
+
+== Student Socket trust boundary ==
+UI -> Foundation : session:watch after Student handshake
+Foundation -> DB : re-resolve credential and canonical Participant in handshake Session
+alt credential no longer valid or identity scope changed
+  Foundation --> UI : session:error UNAUTHENTICATED
+  note over Foundation,Teacher
+  Return null without invoking the external Teacher resolver or authorizer.
+  A client-supplied auth.sessionId only selects the Student path.
+  end note
+else current Student identity valid
+  Foundation -> Foundation : authorize scoped Participant and session:watch
+  Foundation --> UI : authoritative session:state
+end
 
 == Student result projection ==
 UI -> StudentApi : GET Student result after Ended

@@ -1,7 +1,8 @@
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import express from 'express';
+import express, { Router, type Router as ExpressRouter } from 'express';
+import type Database from 'better-sqlite3';
 import { createApiRouter, type ApiRouterOptions } from './api/router.js';
 import { parseEnvironment } from './config/env.js';
 import { errorHandler, notFoundHandler } from './errors/error-handler.js';
@@ -25,8 +26,28 @@ import { getStudentSocketIdentity } from './modules/student/realtime/student-dra
 import { LeaderFailoverService } from './modules/student/application/leader-failover-service.js';
 import { registerStudentMembershipSockets } from './modules/student/realtime/student-membership-sockets.js';
 import type { StudentMembershipChangedPayload } from '@quiz/contracts';
+import { StudentTrustedEndCoordinator } from './modules/student/application/student-trusted-end-coordinator.js';
+import { StudentWinnerResolver } from './modules/student/application/winner-resolver.js';
 
-export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {readonly studentSecurity?:StudentSecurityOptions;readonly studentDraftService?:DraftService;readonly studentSubmissionService?:SubmissionService;readonly publishStudentMembership?: (scope:StudentMembershipChangedPayload)=>void;readonly studentOnlineParticipants?: (scope:StudentMembershipChangedPayload)=>ReadonlySet<UUID>;}
+/** Supplied to the Teacher-owned router only after the shared services are ready. */
+export interface TeacherServiceDependencies {
+  readonly database: Database.Database;
+  readonly sessionLifecycle: SessionLifecycleService;
+  readonly endCoordinator: StudentTrustedEndCoordinator;
+}
+
+export interface FoundationServerOptions extends ApiRouterOptions, SocketServerOptions {
+  readonly studentSecurity?: StudentSecurityOptions;
+  readonly studentDraftService?: DraftService;
+  readonly studentSubmissionService?: SubmissionService;
+  readonly publishStudentMembership?: (scope: StudentMembershipChangedPayload) => void;
+  readonly studentOnlineParticipants?: (scope: StudentMembershipChangedPayload) => ReadonlySet<UUID>;
+  readonly createTeacherRouter?: (services: TeacherServiceDependencies) => ExpressRouter;
+}
+
+/** Teacher supplies these adapters; the default startup installs no Teacher authority. */
+export type TeacherIntegrationOptions = Pick<FoundationServerOptions,
+  'createTeacherRouter' | 'resolveActorContext' | 'resolveSocketActorContext' | 'authorizeWatch'>;
 
 export function createApp(options: FoundationServerOptions = {}) {
   const app = express();
@@ -45,6 +66,14 @@ export function createApp(options: FoundationServerOptions = {}) {
 }
 
 export function createHttpServer(options: FoundationServerOptions = {}) {
+  if (options.createTeacherRouter && !options.database) {
+    throw new Error('Teacher router composition requires the shared Database.');
+  }
+  if (options.createTeacherRouter && options.teacherRouter) {
+    throw new Error('Supply either a Teacher router factory or an existing router.');
+  }
+  // Mount this container before terminal 404/error handlers, then populate it once services exist.
+  const teacherRouter = options.createTeacherRouter ? Router() : options.teacherRouter;
   const identity=options.database?new StudentIdentityService(createStudentRepositories(options.database)):null;
   const studentSocket=options.studentSocket??(identity&&options.studentSecurity?{allowedOrigins:options.studentSecurity.allowedOrigins,resolveIdentity:(cookie:string|undefined,id:import('@quiz/contracts/domain').UUID)=>identity.resolve(cookie,id)}:undefined);
   let socketServer:ReturnType<typeof createSocketServer>;
@@ -57,16 +86,25 @@ export function createHttpServer(options: FoundationServerOptions = {}) {
   }):undefined;
   const submission=options.database?new SubmissionService(options.database,(teamId,lock)=>publishStudentDraftLock(socketServer,studentSocket,teamId,lock)):undefined;
   let membership: ReturnType<typeof registerStudentMembershipSockets> | undefined;
-  const app = createApp({...options,studentDraftService:draft,studentSubmissionService:submission,publishStudentMembership:scope=>membership?.publish(scope),studentOnlineParticipants:scope=>membership?.onlineParticipants(scope) ?? new Set()});
+  const app = createApp({...options,teacherRouter,studentDraftService:draft,studentSubmissionService:submission,publishStudentMembership:scope=>membership?.publish(scope),studentOnlineParticipants:scope=>membership?.onlineParticipants(scope) ?? new Set()});
   const httpServer = createServer(app);
   const stateService = options.database ? new SessionStateService(options.database) : null;
   const studentActors = new WeakSet<object>();
   socketServer = createSocketServer(httpServer, {
     ...options,
     resolveSocketActorContext: socket => {
-      const scope = getStudentSocketIdentity(socket)?.sessionId;
-      const resolved = scope ? studentSocket?.resolveIdentity(socket.request.headers.cookie, scope) : null;
-      if (resolved) { studentActors.add(resolved.actorContext); return resolved.actorContext; }
+      const initial = getStudentSocketIdentity(socket);
+      if (initial) {
+        const resolved = studentSocket?.resolveIdentity(socket.request.headers.cookie, initial.sessionId);
+        if (!resolved || resolved.credentialId !== initial.credentialId
+          || resolved.actorContext.actorKind !== 'participant'
+          || resolved.actorContext.actorId !== initial.actorContext.actorId
+          || resolved.actorContext.sessionId !== initial.sessionId) return null;
+        studentActors.add(resolved.actorContext);
+        return resolved.actorContext;
+      }
+      // auth selects a validation path, never authority. An unverified Student path fails closed.
+      if (socket.handshake.auth?.sessionId !== undefined) return null;
       return options.resolveSocketActorContext?.(socket) ?? null;
     },
     authorizeWatch: (actor, sessionId) => {
@@ -86,10 +124,17 @@ export function createHttpServer(options: FoundationServerOptions = {}) {
   const sessionLifecycle = options.database
     ? new SessionLifecycleService(options.database, { publish: (snapshot) => { statePublisher.publish(snapshot); } })
     : null;
-  return { app, httpServer, socketServer, sessionLifecycle, statePublisher };
+  const winnerResolver = options.database ? new StudentWinnerResolver(options.database) : null;
+  const endCoordinator = sessionLifecycle && winnerResolver
+    ? new StudentTrustedEndCoordinator(sessionLifecycle, winnerResolver)
+    : null;
+  if (options.createTeacherRouter && teacherRouter && options.database && sessionLifecycle && endCoordinator) {
+    teacherRouter.use(options.createTeacherRouter({ database: options.database, sessionLifecycle, endCoordinator }));
+  }
+  return { app, httpServer, socketServer, sessionLifecycle, statePublisher, endCoordinator };
 }
 
-export function startServer() {
+export function startServer(teacherIntegration: TeacherIntegrationOptions = {}) {
   const config = parseEnvironment();
   const databaseManager = new DatabaseManager({ sqlitePath: config.sqlitePath });
   const database = databaseManager.open();
@@ -97,6 +142,7 @@ export function startServer() {
   const studentIdentity = new StudentIdentityService(createStudentRepositories(database));
 
   const { httpServer } = createHttpServer({
+    ...teacherIntegration,
     database,
     studentSecurity:config.studentCsrfSecret?{secret:config.studentCsrfSecret,allowedOrigins:config.studentAllowedOrigins,nodeEnv:config.nodeEnv}:undefined,
     studentSocket: {

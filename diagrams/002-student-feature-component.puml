@@ -19,18 +19,18 @@ component "Student Feature Module" as StudentModule {
   component "Submission Service" as SubmissionService
   component "Student Winner Resolver" as WinnerService
   component "Student Result Projection" as ResultProjection
-  component "StudentTrustedEndCoordinator\nStudent adapter, production wiring pending" as EndCoordinator
+  component "StudentTrustedEndCoordinator\ncomposed with shared lifecycle and resolver" as EndCoordinator
   component "Student Draft Socket Events" as DraftSocket
   component "Student Presence and Failover" as Presence
 }
 component "Foundation Module" as Foundation {
   component "Session Query / Current Target" as ReadService
-  component "Lifecycle Transaction Service\nexisting End with supplied Result" as Lifecycle
+  component "SessionLifecycleService\nsupplied Result + synchronous WinnerResolver" as Lifecycle
   component "Foundation session-state events" as StateEvents
 }
 component "Teacher Feature Backend" as TeacherModule
 component "Server Composition Root" as Composition
-interface "Proposed internal callback port\n(roundId) => Result | null" as WinnerPort
+interface "Synchronous winner callback\n(roundId) => Result | null" as WinnerPort
 database "Shared SQLite\nFoundation entities + Student tables" as DB
 
 Student --> Web
@@ -59,15 +59,15 @@ WinnerService --> DB : accepted order in caller transaction
 ResultProjection --> DB : persisted Result / winning answers
 ReadService --> DB
 Lifecycle --> DB
-TeacherModule ..> EndCoordinator : proposed single endRound call
-EndCoordinator ..> Lifecycle : proposed Foundation internal port
-Lifecycle ..> WinnerPort : proposed callback inside write transaction
-WinnerService ..|> WinnerPort : implemented resolver, wiring pending
+TeacherModule ..> EndCoordinator : injected services; Teacher adapter pending
+EndCoordinator --> Lifecycle : FoundationLifecycleEndPort
+Lifecycle --> WinnerPort : callback inside write transaction
+WinnerService ..|> WinnerPort : synchronous resolver
 Lifecycle --> StateEvents : publish only after commit
 StateEvents --> Web : existing Foundation state contract
-Composition ..> EndCoordinator : proposed injection
+Composition --> EndCoordinator : construct once after lifecycle
 Composition ..> Lifecycle
-Composition ..> WinnerService : proposed End wiring
+Composition --> WinnerService : shared Database
 
 note bottom of StudentModule
 First-time join after first Active is allowed only into an existing Team.
@@ -89,14 +89,17 @@ end note
 note bottom of Foundation
 Existing public HTTP/DTO/Socket.IO contracts remain unchanged.
 Foundation and Student share one SQLite connection.
-The planned internal End callback is gated by T004; Foundation will not import Student.
-State publication is dispatched after commit.
+T044 adds the approved internal End callback with Foundation-owned input.
+Foundation imports no Student types. Server returns the composed Coordinator.
+Teacher Router factory runs after lifecycle and Coordinator are ready.
+Notify after outer Commit; log delivery failures and return the committed snapshot.
 end note
 
 note right of TeacherModule
 Foundation currently grants only read/watch capabilities.
-Teacher End authorization via round:end is pending T004.
-The proposed Teacher integration calls one Student End coordinator.
+Teacher owns signed Cookie, Origin, CSRF and trusted watch authorization.
+Without its supplied adapter, Teacher endpoints are unavailable.
+Teacher integration calls one Student End coordinator.
 Teacher owns login/UI; Student selects the winner.
 end note
 @enduml
