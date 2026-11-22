@@ -124,3 +124,31 @@ export async function createActivity(server: TeacherTestServer, auth: TeacherAut
   if (created.status !== 201) throw new Error(`Create activity failed with ${created.status}.`);
   return created.body.data as { sessionId: UUID; activityCode: string };
 }
+
+export interface StudentAuth { readonly cookie: string; readonly csrfToken: string }
+
+/** Enrolls a student through the real Student API (server must be created with `withStudents: true`). */
+export async function joinStudent(server: TeacherTestServer, sessionId: UUID, teamId: UUID, name: string): Promise<StudentAuth> {
+  const response = await request(server.app).post(`/api/v1/student/sessions/${sessionId}/enrollments`)
+    .set('Origin', TEACHER_TEST_ORIGIN).send({ teamId, displayName: name });
+  if (response.status !== 201 && response.status !== 200) throw new Error(`Join failed with ${response.status}.`);
+  return { cookie: String(response.headers['set-cookie'][0]).split(';')[0], csrfToken: response.body.data.csrfToken as string };
+}
+
+/** Saves each blank in the shared draft (Team × Round). */
+export async function editDraft(server: TeacherTestServer, sessionId: UUID, roundId: UUID, student: StudentAuth, answers: Record<string, string>) {
+  for (const [blankId, value] of Object.entries(answers)) {
+    const response = await request(server.app).put(`/api/v1/student/sessions/${sessionId}/rounds/${roundId}/draft/answers/${blankId}`)
+      .set('Cookie', student.cookie).set('Origin', TEACHER_TEST_ORIGIN).set('X-CSRF-Token', student.csrfToken)
+      .send({ value, baseVersion: 0, clientMutationId: randomUUID() });
+    if (response.status !== 200) throw new Error(`Draft edit failed with ${response.status}.`);
+  }
+}
+
+/** Saves the draft and submits it as the Team leader; returns the submission response. */
+export async function submitAnswers(server: TeacherTestServer, sessionId: UUID, roundId: UUID, student: StudentAuth, answers: Record<string, string>) {
+  await editDraft(server, sessionId, roundId, student, answers);
+  return request(server.app).post(`/api/v1/student/sessions/${sessionId}/rounds/${roundId}/submissions`)
+    .set('Cookie', student.cookie).set('Origin', TEACHER_TEST_ORIGIN).set('X-CSRF-Token', student.csrfToken)
+    .send({ answers: Object.entries(answers).map(([blankId, value]) => ({ blankId, value })) });
+}

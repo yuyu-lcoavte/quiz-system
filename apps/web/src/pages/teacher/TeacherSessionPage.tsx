@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { TargetStatusView, TeacherSessionView } from '@quiz/contracts';
 import { parseUUID, type UUID } from '@quiz/contracts/domain';
+import { MonitorPanel } from '../../modules/teacher/MonitorPanel.js';
+import { ResultsPanel } from '../../modules/teacher/ResultsPanel.js';
 import { RoundControlPanel } from '../../modules/teacher/RoundControlPanel.js';
 import { TargetList } from '../../modules/teacher/TargetList.js';
 import { displayError, isConflict, TeacherApiError } from '../../modules/teacher/teacher-api-client.js';
@@ -87,6 +89,12 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
             onStart={() => run((version) => api.start(sessionId, version))}
             onEnd={() => run((version) => api.end(sessionId, version))}
           />
+          {view.state.currentRoundId && (
+            <MonitorPanel phase={view.state.phase} roundId={view.state.currentRoundId} load={() => api.monitor(sessionId)} />
+          )}
+          {view.state.currentRoundId && (
+            <ResultsPanel phase={view.state.phase} roundId={view.state.currentRoundId} load={() => api.results(sessionId, view.state.currentRoundId!)} />
+          )}
           <div>
             <h2 className="text-xl font-semibold">題目</h2>
             <TargetList targets={view.targets} canSelect={canSelect} busy={busy} onSelect={select} />

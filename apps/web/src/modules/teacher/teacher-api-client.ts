@@ -1,6 +1,8 @@
 import type {
   ActivitySummary,
   TeacherMeView,
+  TeacherMonitorView,
+  TeacherResultView,
   TeacherSessionView,
 } from '@quiz/contracts';
 import type { RoundTargetReference, SessionStateSnapshot, UUID } from '@quiz/contracts/domain';
@@ -81,6 +83,9 @@ export function createTeacherApiClient(options: TeacherApiClientOptions = {}) {
       call<SessionStateSnapshot>('POST', `${sessionPath(sessionId)}/rounds/start`, { expectedStateVersion }),
     end: (sessionId: UUID, expectedStateVersion: number) =>
       call<SessionStateSnapshot>('POST', `${sessionPath(sessionId)}/rounds/end`, { expectedStateVersion }),
+    monitor: (sessionId: UUID) => call<TeacherMonitorView>('GET', `${sessionPath(sessionId)}/monitor`),
+    results: (sessionId: UUID, roundId?: UUID) =>
+      call<TeacherResultView>('GET', `${sessionPath(sessionId)}/results${roundId ? `?roundId=${roundId}` : ''}`),
   };
 }
 

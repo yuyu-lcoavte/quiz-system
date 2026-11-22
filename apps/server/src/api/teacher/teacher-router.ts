@@ -11,6 +11,8 @@ import { RoundControlService } from '../../modules/teacher/rounds/round-control-
 import { createTeacherActivityController } from './activity-controller.js';
 import { createTeacherAuthController } from './auth-controller.js';
 import { createTeacherRoundController } from './round-controller.js';
+import { createTeacherMonitorController } from './monitor-controller.js';
+import { TeacherResultProjection } from '../../modules/teacher/monitor/teacher-result-projection.js';
 import { createLoginRateLimitMiddleware } from './middleware/login-rate-limit.js';
 import { createTeacherAuthMiddleware } from './middleware/teacher-auth.js';
 import { createTeacherCsrfMiddleware } from './middleware/teacher-csrf.js';
@@ -59,6 +61,7 @@ export function createTeacherRouter(context: TeacherRouterContext): Router {
 
   const activities = createTeacherActivityController(new ActivityService(context.services.database, context.repositories, context.now));
   const rounds = createTeacherRoundController(new RoundControlService(context.services));
+  const monitor = createTeacherMonitorController(new TeacherResultProjection(context.services.database));
 
   router.get('/sessions', activities.list);
   router.post('/sessions', activities.create);
@@ -68,6 +71,8 @@ export function createTeacherRouter(context: TeacherRouterContext): Router {
   router.post('/sessions/:sessionId/rounds/next', rounds.next);
   router.post('/sessions/:sessionId/rounds/start', rounds.start);
   router.post('/sessions/:sessionId/rounds/end', rounds.end);
+  router.get('/sessions/:sessionId/monitor', monitor.monitor);
+  router.get('/sessions/:sessionId/results', monitor.results);
 
   return router;
 }

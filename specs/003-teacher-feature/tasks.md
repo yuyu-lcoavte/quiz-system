@@ -111,14 +111,14 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 
 ### Tests for User Story 2
 
-- [ ] T049 [P] [US2] Write `tests/api/teacher-monitor.test.ts`: monitor lists every Team with `submitted`, `acceptedOrder`, `receivedAt`, per-blank answers; never draft data; Student cookie → 401; results only for Ended Rounds (409 `INVALID_PHASE` otherwise); winner from the Round's Result; replaced Rounds use the smallest `acceptedOrder`; no Submission → `winner: null`.
-- [ ] T050 [P] [US2] Write `tests/web/teacher-monitor-panel.test.tsx` with fake timers: polls every 1 s only while Active, stops after Ended; answers hidden by default and shown after the "顯示答案" toggle; always shown on the results panel.
+- [X] T049 [P] [US2] Write `tests/api/teacher-monitor.test.ts`: monitor lists every Team with `submitted`, `acceptedOrder`, `receivedAt`, per-blank answers; never draft data; Student cookie → 401; results only for Ended Rounds (409 `INVALID_PHASE` otherwise); winner from the Round's Result; replaced Rounds use the smallest `acceptedOrder`; no Submission → `winner: null`.
+- [X] T050 [P] [US2] Write `tests/web/teacher-monitor-panel.test.tsx` with fake timers: polls every 1 s only while Active, stops after Ended; answers hidden by default and shown after the "顯示答案" toggle; always shown on the results panel.
 
 ### Implementation for User Story 2
 
-- [ ] T051 [US2] Implement `apps/server/src/modules/teacher/monitor/teacher-result-projection.ts` (monitor for current Round; results for any Round of the Session; round number = ordinal among Rounds of the same target by `created_at`).
-- [ ] T052 [US2] Implement `apps/server/src/api/teacher/monitor-controller.ts` (`GET /sessions/:sessionId/monitor`, `GET /sessions/:sessionId/results?roundId=`) and register it. T049 passes.
-- [ ] T053 [US2] Implement `apps/web/src/modules/teacher/MonitorPanel.tsx` and `apps/web/src/modules/teacher/ResultsPanel.tsx`, and add them to `TeacherSessionPage.tsx`. T050 passes.
+- [X] T051 [US2] Implement `apps/server/src/modules/teacher/monitor/teacher-result-projection.ts` (monitor for current Round; results for any Round of the Session; round number = ordinal among Rounds of the same target by `created_at`).
+- [X] T052 [US2] Implement `apps/server/src/api/teacher/monitor-controller.ts` (`GET /sessions/:sessionId/monitor`, `GET /sessions/:sessionId/results?roundId=`) and register it. T049 passes.
+- [X] T053 [US2] Implement `apps/web/src/modules/teacher/MonitorPanel.tsx` and `apps/web/src/modules/teacher/ResultsPanel.tsx`, and add them to `TeacherSessionPage.tsx`. T050 passes.
 - [ ] T054 [US2] Add the US2 section to `tests/manual/teacher-feature.md`; run `npm.cmd run check` and the manual section; record results.
 
 **Checkpoint**: P1 (US1 + US2) complete — demoable with seeded data.

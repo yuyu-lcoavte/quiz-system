@@ -69,4 +69,10 @@ Notes / problems found:
 
 | # | Steps | Expected | Result |
 |---|---|---|---|
+| 2.1 | Teacher: open a target and 開始搶答 (seeded activity) | 作答狀況 lists 第1組、第2組 as 未送出, order —, answers empty | Not run |
+| 2.2 | 第2組 submits | Within 2 s the Teacher page shows 第2組 已送出, 第 1 名, answer column 「（已隱藏）」 | Not run |
+| 2.3 | Teacher presses 顯示答案, then 隱藏答案; 第1組 types in its draft without submitting | Answers appear only after 顯示答案 and hide again; 第1組's draft text never appears; 第1組 still 未送出 | Not run |
 | 2.4 | (moved from US1.9) After 第2組 then 第1組 submit, Teacher presses 結束搶答 | Teacher page shows the full order (第2組 1st, 第1組 2nd), the winner 第2組 and its answers | Not run |
+| 2.5 | Teacher: reopen a target, 開始, 結束 without submissions | Results show 「無勝者」 | Not run |
+| 2.6 | Students during Active (DevTools → Network on a student page) | No request returns another Team's submission, order or answers | Not run |
+| 2.7 | Teacher: press F5 while Active after one submission, and again after End | Monitor and results show the same data as before the refresh | Not run |
