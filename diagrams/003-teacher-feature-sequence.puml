@@ -1,117 +1,102 @@
 @startuml
-title Teacher Feature — Sequence Diagram (Specify level)
+title Teacher Feature — Sequence Diagram (Plan)
 autonumber
+skinparam responseMessageBelowArrow true
 
 actor Teacher
-participant "Teacher Pages" as UI
-participant "Teacher Access Guard" as Guard
-participant "Activity Management" as Activity
-participant "Guided Notes Import" as Import
-participant "Google Sheets Gateway" as Gateway
+participant "Teacher pages" as UI
+participant "Teacher router\n+ security middleware" as Router
+participant "Teacher services" as Svc
+participant "SheetsGateway" as Gateway
 participant "Google Sheets" as Sheets
-participant "Round Control" as Control
-participant "Foundation Lifecycle" as Lifecycle
-participant "Student End Coordinator" as Coord
-participant "Student Winner Resolver" as Resolver
-participant "Teacher Monitor" as Monitor
-participant "Answer Write-back" as WriteBack
-participant "Session State Events" as Events
-actor "Students (>= 2 Teams)" as Students
+participant "Foundation\nlifecycle" as Lifecycle
+participant "Student end\ncoordinator" as Coord
+participant "Session state\nevents" as Events
+actor "Students" as Students
 
-== Login ==
-Teacher -> UI : enter password
-UI -> Guard : login
-Guard -> Guard : verify password hash, rate limit
-Guard --> UI : teacher login credential (not readable by page scripts)
+== P1 · Login ==
+Teacher -> UI : password
+UI -> Router : POST /auth/login (Origin)
+Router -> Svc : rate limit, scrypt verify, create session row
+Router --> UI : 204 + teacher_session cookie
+UI -> Router : GET /me
+Router --> UI : csrfToken, serviceAccountEmail
 
-== Create activity ==
-Teacher -> UI : create activity with N Teams
-UI -> Guard : teacher-only request
-Guard -> Guard : verify credential, origin, CSRF
-Guard -> Activity : create
-Activity --> UI : activity code, Team 1..N names
+== P1 · Create activity ==
+UI -> Router : POST /sessions {teamCount} (Origin, CSRF)
+Router -> Svc : Session + Teams in one transaction
+Router --> UI : activity code
 
-== Import Guided Notes ==
-UI -> Guard : sheet URL
-Guard -> Import : parse request
-Import -> Gateway : read sheet
-Gateway -> Sheets : read cells and merges
-alt not shared / not found / bad URL
-  Sheets --> Gateway : error
-  Import --> UI : SHEET_NOT_SHARED / SHEET_NOT_FOUND / INVALID_SHEET_URL
+== P2 · Import Guided Notes ==
+UI -> Router : POST /sessions/:id/import/preview {url}
+Router -> Svc : parse URL
+Svc -> Gateway : readSheet(ref)
+Gateway -> Sheets : get merges + values
+alt not shared / not found / unavailable
+  Router --> UI : 403 / 404 / 502
 else readable
-  Sheets --> Gateway : cells
-  Import -> Import : locate headers, detect groups (vertical merge),\ndetect blanks (markers), validate
-  alt format invalid / duplicate numbers
-    Import --> UI : SHEET_FORMAT_INVALID / duplicate number
-  else ok
-    Import --> UI : preview (numbers, groups, blank cells)
-    Teacher -> UI : confirm
-    UI -> Import : confirm
-    Import -> Import : create Questions, Blanks, Groups,\nBlank Cell Mappings
-  end
+  Gateway --> Svc : grid
+  Svc -> Svc : parseGuidedNotes(grid) (pure)
+  Router --> UI : preview + previewDigest (nothing saved)
+  Teacher -> UI : confirm
+  UI -> Router : POST …/import/confirm {url, previewDigest}
+  Svc -> Gateway : readSheet(ref) again
+  Svc -> Svc : digest matches → create Questions, Blanks,\nGroups, blank-cell rows (one transaction)
+  Router --> UI : 201
 end
 
-== Round control ==
-Teacher -> UI : select target / next / reopen
-UI -> Guard : command with expected state version
-Guard -> Control : per-Session Teacher context
-Control -> Lifecycle : create Waiting Round
+== P1 · Select, start ==
+UI -> Router : POST …/rounds/next {expectedStateVersion}
+Router -> Svc : first NotOpened target, blanks >= 1
+Svc -> Lifecycle : selectTarget(...)
 Lifecycle -> Events : publish after commit
 Events --> Students : Waiting (<= 2 s)
-Teacher -> UI : start
-UI -> Control : start
-Control -> Lifecycle : Waiting -> Active
+Events --> UI : Waiting
+UI -> Router : POST …/rounds/start
+Svc -> Lifecycle : startRound(...)
 Lifecycle -> Events : publish after commit
-Events --> Students : Active (<= 2 s)
+Events --> Students : Active
 
-== Monitoring ==
+== P1 · Monitor (poll every 1 s while Active) ==
 Students -> Students : leader submits (Student Feature)
-Monitor --> UI : submitted Teams and order (<= 2 s)\n(teacher only; no drafts)
-Teacher -> UI : show answers (optional)
-UI -> Monitor : answers
-Monitor --> UI : per-blank answers
+loop every 1 s
+  UI -> Router : GET …/monitor
+  Router --> UI : submitted, order, answers (no drafts)
+end
+note right of UI : answers hidden until\nteacher presses 顯示答案
 
-== End round ==
-Teacher -> UI : end
-UI -> Control : end with expected state version
-Control -> Coord : endRound(input, teacher context) (single call)
-Coord -> Coord : check teacher, Session scope, round:end
-Coord -> Lifecycle : end with winner resolver
-Lifecycle -> Lifecycle : one write transaction
-Lifecycle -> Resolver : resolve winner (same transaction)
-Resolver --> Lifecycle : earliest accepted Submission or none
-Lifecycle -> Lifecycle : Ended + Result (or clear old Result), commit
+== P1 · End ==
+UI -> Router : POST …/rounds/end {expectedStateVersion}
+Router -> Coord : endRound(input, teacher ActorContext)
+Coord -> Lifecycle : endRoundWithWinnerResolver
+Lifecycle -> Lifecycle : one transaction: resolve winner,\nEnded + Result (or clear old), commit
 Lifecycle -> Events : publish after commit
 Events --> Students : Ended
-Coord --> Control : committed state
-alt conflict (stale state or wrong phase)
-  Control --> UI : conflict
-  UI -> Guard : reload latest state
+Coord --> Router : committed snapshot
+alt 409 STALE_STATE / INVALID_PHASE
+  Router --> UI : 409
+  UI -> Router : GET /sessions/:id (reload)
 end
-UI -> Monitor : results
-Monitor --> UI : full order, winner Team and answers / no winner
+UI -> Router : GET …/results
+Router --> UI : full order, winner / no winner
 
-== Write-back ==
-Teacher -> UI : write back winners
-UI -> WriteBack : build plan
-WriteBack -> WriteBack : all targets with winners\n+ previously written targets now without winner (restore original)
-WriteBack -> Gateway : read current target cells
-Gateway -> Sheets : read
-WriteBack --> UI : cells, current content, new content (marker kept + answer)
+== P3 · Write-back ==
+UI -> Router : POST …/write-back/preview
+Svc -> Gateway : readCells(target cells)
+Router --> UI : entries (write / restore) + planDigest
 Teacher -> UI : confirm
-UI -> WriteBack : confirm
-WriteBack -> Gateway : re-check cells
+UI -> Router : POST …/write-back/confirm {planDigest}
+Svc -> Gateway : readCells again
 alt any cell changed or missing
-  WriteBack --> UI : conflict list, nothing written
+  Router --> UI : 409 SHEET_CONFLICT, nothing written
 else unchanged
-  WriteBack -> Gateway : write all cells
-  Gateway -> Sheets : write
-  WriteBack --> UI : written
+  Svc -> Gateway : writeCells (one atomic batch)
+  Gateway -> Sheets : batchUpdate
+  Svc -> Svc : save lastWrittenContent
+  Router --> UI : written
 end
 
-== CSV export ==
-Teacher -> UI : export
-UI -> Guard : teacher-only request
-Guard --> UI : CSV (one row per Round per Team)
+== P4 · Export ==
+UI -> Router : GET …/export.csv
+Router --> UI : CSV (BOM, one row per Round × Team)
 @enduml
