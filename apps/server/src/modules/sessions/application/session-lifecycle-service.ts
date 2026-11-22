@@ -3,7 +3,13 @@ import type Database from 'better-sqlite3';
 import type { Result, RoundTargetReference, SessionStateSnapshot, UUID } from '@quiz/contracts/domain';
 import { HttpError } from '../../../errors/http-error.js';
 import { createFoundationRepositories } from '../../../persistence/repositories/index.js';
-import { createWaitingRound, endRoundWithResult } from './foundation-transactions.js';
+import {
+  createWaitingRound,
+  endRoundWithResult,
+  endRoundWithWinnerResolver,
+  type FoundationLifecycleEndInput,
+  type WinnerResolver,
+} from './foundation-transactions.js';
 import { SessionStateService } from './session-state-service.js';
 
 export interface SessionLifecycleOptions {
@@ -12,8 +18,12 @@ export interface SessionLifecycleOptions {
   publish?: (snapshot: SessionStateSnapshot) => void;
 }
 
+export interface FoundationLifecycleEndPort {
+  endRoundWithWinnerResolver(input: FoundationLifecycleEndInput, resolveWinner: WinnerResolver): SessionStateSnapshot;
+}
+
 /** Trusted server-to-server lifecycle primitive. Command authorization/UI belong to Teacher Feature. */
-export class SessionLifecycleService {
+export class SessionLifecycleService implements FoundationLifecycleEndPort {
   private readonly state: SessionStateService;
   private readonly now: () => string;
   private readonly createId: () => UUID;
@@ -55,6 +65,28 @@ export class SessionLifecycleService {
     if (!session.currentRoundId) throw new HttpError(409, 'INVALID_PHASE', 'There is no current Round to end.');
     endRoundWithResult(this.database, { roundId: session.currentRoundId, endedAt: this.now(), expectedStateVersion, result });
     return this.committedSnapshot(sessionId);
+  }
+
+  endRoundWithWinnerResolver(input: FoundationLifecycleEndInput, resolveWinner: WinnerResolver): SessionStateSnapshot {
+    const snapshot = endRoundWithWinnerResolver(this.database, input, resolveWinner, this.now());
+    const logFailure = (error: unknown) => {
+      console.error('Session End notification failed after commit.', {
+        sessionId: snapshot.sessionId,
+        stateVersion: snapshot.stateVersion,
+        requestId: input.requestId,
+        errorName: error instanceof Error ? error.name : 'Unknown error',
+      });
+    };
+    try {
+      const notification: unknown = this.options.publish?.(snapshot);
+      // Callers may return delivery work, but the synchronous End never waits for it.
+      if (notification && typeof (notification as { then?: unknown }).then === 'function') {
+        void Promise.resolve(notification).catch(logFailure);
+      }
+    } catch (error) {
+      logFailure(error);
+    }
+    return snapshot;
   }
 
   private committedSnapshot(sessionId: UUID): SessionStateSnapshot {

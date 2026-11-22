@@ -1,8 +1,19 @@
 import type Database from 'better-sqlite3';
-import { parseUUID, type Result, type Round, type RoundTargetReference, type Session, type UUID } from '@quiz/contracts/domain';
+import { parseUUID, type Result, type Round, type RoundTargetReference, type Session, type SessionStateSnapshot, type UUID } from '@quiz/contracts/domain';
 import { HttpError } from '../../../errors/http-error.js';
 import { validateQuestionGroupTarget, validateRoundTargetShape, validateSameSession } from '../domain/model-validation.js';
 import { createFoundationRepositories } from '../../../persistence/repositories/index.js';
+import { SessionStateService } from './session-state-service.js';
+
+/** Foundation owns this command shape independently of the calling feature. */
+export interface FoundationLifecycleEndInput {
+  readonly sessionId: UUID;
+  readonly roundId: UUID;
+  readonly expectedStateVersion: number;
+  readonly requestId: string;
+}
+
+export type WinnerResolver = (roundId: UUID) => Result | null;
 
 export interface CreateWaitingRoundInput {
   id: UUID;
@@ -29,6 +40,53 @@ export interface EndRoundResult {
   round: Round;
   session: Session;
   result: Result | null;
+}
+
+/**
+ * Owns the outer write lock. Existing End persistence executes on this connection
+ * as a savepoint, so its release cannot publish or escape a later outer rollback.
+ */
+export function endRoundWithWinnerResolver(
+  database: Database.Database,
+  input: FoundationLifecycleEndInput,
+  resolveWinner: WinnerResolver,
+  endedAt: string,
+): SessionStateSnapshot {
+  if (database.inTransaction) {
+    throw new Error('End must own the outer transaction before it can publish a committed snapshot.');
+  }
+  if (!parseUUID(input.sessionId) || !parseUUID(input.roundId)
+    || !Number.isSafeInteger(input.expectedStateVersion) || input.expectedStateVersion < 0
+    || typeof input.requestId !== 'string' || !input.requestId.trim()) {
+    throw new HttpError(400, 'INVALID_INPUT', 'A valid Session, Round, state version and request ID are required.');
+  }
+  const repositories = createFoundationRepositories(database);
+  return database.transaction(() => {
+    const session = repositories.sessions.findById(input.sessionId);
+    if (!session) throw new HttpError(404, 'SESSION_NOT_FOUND', 'The Session does not exist.');
+    const round = repositories.rounds.findById(input.roundId);
+    if (!round || round.sessionId !== input.sessionId) {
+      throw new HttpError(404, 'TARGET_NOT_FOUND', 'The Round does not exist in this Session.');
+    }
+    if (session.currentRoundId !== round.id || session.stateVersion !== input.expectedStateVersion) {
+      throw new HttpError(409, 'STALE_STATE', 'The Session or current Round has changed.');
+    }
+    if (round.phase !== 'Active') throw new HttpError(409, 'INVALID_PHASE', 'Only an Active Round can be ended.');
+
+    const result = resolveWinner(round.id);
+    if (result !== null && (typeof result !== 'object' || 'then' in result)) {
+      throw new Error('Winner resolver must return a synchronous Result or null.');
+    }
+    endRoundWithResult(database, {
+      roundId: round.id,
+      endedAt,
+      expectedStateVersion: input.expectedStateVersion,
+      result: result ?? undefined,
+    });
+    const snapshot = new SessionStateService(database).getSnapshot(session.id);
+    if (!snapshot) throw new Error('Session disappeared during its End transaction.');
+    return snapshot;
+  }).immediate();
 }
 
 export function createWaitingRound(

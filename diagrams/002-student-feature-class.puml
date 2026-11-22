@@ -50,10 +50,21 @@ class ActorContext <<Foundation>> {
 class StudentTrustedEndCoordinator <<Student adapter>> {
   endRound(input, actorContext): SessionStateSnapshot
 }
-interface FoundationEndLifecyclePort <<Foundation internal port proposal>> {
+interface FoundationLifecycleEndPort <<Foundation internal>> {
+  endRoundWithWinnerResolver(input: FoundationLifecycleEndInput, resolver): SessionStateSnapshot
+}
+class FoundationLifecycleEndInput <<Foundation input>> {
+  sessionId: UUID
+  roundId: UUID
+  expectedStateVersion: integer
+  requestId: string
+}
+class SessionLifecycleService <<Foundation>> {
   endRoundWithWinnerResolver(input, resolver): SessionStateSnapshot
 }
-interface WinnerResolver <<callback contract proposal>> {
+SessionLifecycleService ..|> FoundationLifecycleEndPort
+FoundationLifecycleEndPort ..> FoundationLifecycleEndInput
+interface WinnerResolver <<synchronous callback>> {
   resolve(roundId): Result | null
 }
 class StudentWinnerResolver <<implemented>> {
@@ -193,17 +204,27 @@ or winner=null. No losing submissions or acceptedOrder.
 Foundation ResultView is not expanded.
 end note
 
-StudentTrustedEndCoordinator ..> FoundationEndLifecyclePort : one internal End call
-FoundationEndLifecyclePort ..> WinnerResolver : invoke within same write transaction
-StudentWinnerResolver ..|> WinnerResolver : synchronous resolver; wiring pending
-StudentTrustedEndCoordinator ..> ActorContext : proposed round:end capability
+class TeacherServiceDependencies <<server integration>> {
+  database: Database
+  sessionLifecycle: SessionLifecycleService
+  endCoordinator: StudentTrustedEndCoordinator
+}
+TeacherServiceDependencies --> SessionLifecycleService : same instance
+TeacherServiceDependencies --> StudentTrustedEndCoordinator : same instance
+StudentTrustedEndCoordinator ..> FoundationLifecycleEndPort : injected lifecycle
+FoundationLifecycleEndPort ..> WinnerResolver : invoke within same write transaction
+StudentWinnerResolver ..|> WinnerResolver : synchronous resolver on shared Database
+StudentTrustedEndCoordinator ..> ActorContext : accepted round:end capability
 
-note bottom of FoundationEndLifecyclePort
+note bottom of FoundationLifecycleEndPort
 Coordinator, transaction port and WinnerResolver return synchronously;
-the callback receives Foundation's same SQLite connection/transaction.
-Foundation does not import Student. Commit precedes async Socket.IO dispatch;
-notification work is never awaited inside the transaction.
-Teacher issuance of round:end is pending T004.
-Coordinator core is implemented. Foundation callback wiring is pending T004.
+the callback uses Foundation's same captured SQLite connection/transaction.
+Foundation owns its input and imports no Student types.
+Check Session/current Round/Active/version after BEGIN IMMEDIATE, before callback.
+Reuse End/Result persistence on the same connection; snapshot is read in transaction.
+Commit precedes notification; delivery is not awaited.
+Log notification failures and return the committed snapshot.
+Composition creates the lifecycle, resolver and Coordinator once.
+Teacher Router factory receives the ready services; Teacher adapter acceptance pending.
 end note
 @enduml

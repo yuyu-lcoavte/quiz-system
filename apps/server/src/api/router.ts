@@ -10,6 +10,7 @@ export interface ApiRouterOptions {
   readonly database?: Database.Database;
   readonly activityCodeRateLimit?: ActivityCodeRateLimitOptions;
   readonly studentRouter?: ExpressRouter;
+  readonly teacherRouter?: ExpressRouter;
 }
 
 export function createApiRouter(options: ApiRouterOptions = {}) {
@@ -23,5 +24,6 @@ export function createApiRouter(options: ApiRouterOptions = {}) {
     }));
   }
   router.use('/student', options.studentRouter ?? Router());
+  if (options.teacherRouter) router.use('/teacher', options.teacherRouter);
   return router;
 }

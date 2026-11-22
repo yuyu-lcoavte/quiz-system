@@ -2,16 +2,15 @@ import { expect, it, vi } from 'vitest';
 import request from 'supertest';
 import type { ActorContext } from '@quiz/contracts/identity';
 import { DatabaseManager } from '../../apps/server/src/persistence/database.js';
-import { endRoundWithResult } from '../../apps/server/src/modules/sessions/application/foundation-transactions.js';
 import { SessionLifecycleService } from '../../apps/server/src/modules/sessions/application/session-lifecycle-service.js';
-import { SessionStateService } from '../../apps/server/src/modules/sessions/application/session-state-service.js';
-import { StudentTrustedEndCoordinator, type FoundationLifecycleEndPort } from '../../apps/server/src/modules/student/application/student-trusted-end-coordinator.js';
+import type { WinnerResolver } from '../../apps/server/src/modules/sessions/application/foundation-transactions.js';
+import { StudentTrustedEndCoordinator } from '../../apps/server/src/modules/student/application/student-trusted-end-coordinator.js';
 import { StudentWinnerResolver } from '../../apps/server/src/modules/student/application/winner-resolver.js';
 import { SubmissionService } from '../../apps/server/src/modules/student/application/submission-service.js';
 import { StudentIdentityService } from '../../apps/server/src/modules/student/application/student-identity-service.js';
 import { createStudentRepositories } from '../../apps/server/src/modules/student/persistence/index.js';
 import { draftFixture } from '../helpers/student-draft.js';
-import { ids, round, submission, TIME } from '../helpers/foundation.js';
+import { ids, question, questionGroup, round, submission, TIME } from '../helpers/foundation.js';
 import { cookieOf } from '../helpers/student.js';
 
 const teacher: ActorContext = { actorKind: 'teacher', actorId: 'test-teacher', sessionId: ids.session1, permissions: ['round:end'] };
@@ -24,23 +23,7 @@ async function setup() {
   const { database } = fixture;
   const publish = vi.fn();
   const resolver = new StudentWinnerResolver(database);
-  // Contract test double. Production Foundation still lacks the callback port.
-  // The existing persistence primitive runs as a savepoint of this outer transaction.
-  const port: FoundationLifecycleEndPort = {
-    endRoundWithWinnerResolver(command, resolveWinner) {
-      const snapshot = database.transaction(() => {
-        const state = new SessionStateService(database).getSnapshot(command.sessionId);
-        if (state?.currentRoundId !== command.roundId || state.stateVersion !== command.expectedStateVersion || state.phase !== 'Active') {
-          throw new Error('Invalid End scope in test port');
-        }
-        const candidate = resolveWinner(command.roundId);
-        endRoundWithResult(database, { roundId: command.roundId, expectedStateVersion: command.expectedStateVersion, endedAt: TIME, result: candidate ?? undefined });
-        return new SessionStateService(database).getSnapshot(command.sessionId)!;
-      }).immediate();
-      publish(snapshot);
-      return snapshot;
-    },
-  };
+  const port = new SessionLifecycleService(database, { now: () => TIME, publish });
   const coordinator = new StudentTrustedEndCoordinator(port, resolver);
   const submit = () => request(fixture.app).post(`${fixture.base}/rounds/${ids.round1}/submissions`)
     .set('Origin', origin).set('Cookie', cookieOf(fixture.a)).set('X-CSRF-Token', fixture.a.body.data.csrfToken).send({ answers });
@@ -167,4 +150,175 @@ it.each(['resolver', 'persistence'])('rolls back %s failure without publishing o
   expect(f.repositories.results.findByRound(ids.round1)).toBeNull();
   expect(f.repositories.results.findByRound(ids.round2)?.id).toBe(ids.result2);
   if (failure === 'resolver') expect((await f.submit()).status).toBe(200);
+});
+
+it.each([
+  ['missing Session', 404],
+  ['foreign Session', 404],
+  ['missing Round', 404],
+  ['not current', 409],
+  ['stale version', 409],
+  ['Waiting', 409],
+  ['Ended', 409],
+] as const)('rejects %s before resolving a winner or changing data', async (scenario, status) => {
+  const f = await setup();
+  const command = { ...input };
+  if (scenario === 'missing Session') command.sessionId = ids.result1;
+  if (scenario === 'foreign Session') command.sessionId = ids.session2;
+  if (scenario === 'missing Round') command.roundId = ids.round3;
+  if (scenario === 'not current') {
+    f.repositories.rounds.create({ ...round(ids.round2), phase: 'Active', startedAt: TIME });
+    f.database.prepare('UPDATE sessions SET current_round_id = ? WHERE id = ?').run(ids.round2, ids.session1);
+  }
+  if (scenario === 'stale version') command.expectedStateVersion++;
+  if (scenario === 'Waiting' || scenario === 'Ended') {
+    f.database.prepare('UPDATE rounds SET phase = ?, ended_at = ? WHERE id = ?')
+      .run(scenario, scenario === 'Ended' ? TIME : null, ids.round1);
+  }
+  const before = f.database.prepare('SELECT * FROM rounds ORDER BY id').all();
+  const resolve = vi.spyOn(f.resolver, 'resolveWinnerInTransaction');
+  expect(() => f.port.endRoundWithWinnerResolver(command, id => f.resolver.resolveWinnerInTransaction(id)))
+    .toThrow(expect.objectContaining({ status }));
+  expect(resolve).not.toHaveBeenCalled();
+  expect(f.publish).not.toHaveBeenCalled();
+  expect(f.database.prepare('SELECT * FROM rounds ORDER BY id').all()).toEqual(before);
+  expect(f.repositories.sessions.findById(ids.session1)?.stateVersion).toBe(0);
+});
+
+it('calls the real resolver on the locked connection and selects acceptedOrder rather than insertion/time order', async () => {
+  const f = await setup();
+  f.repositories.submissions.create({ ...submission(ids.submission1, ids.team1, ids.round1, 2), receivedAt: '2026-11-01T00:00:00.000Z' });
+  f.repositories.submissions.create({ ...submission(ids.submission2, ids.team2, ids.round1, 1), receivedAt: TIME });
+  const other = new DatabaseManager({ sqlitePath: f.database.name, timeoutMs: 0 });
+  try {
+    const connection = other.open();
+    const resolve = vi.fn((roundId: typeof ids.round1) => {
+      expect(f.database.inTransaction).toBe(true);
+      expect(() => connection.exec('BEGIN IMMEDIATE')).toThrow(expect.objectContaining({ code: 'SQLITE_BUSY' }));
+      return f.resolver.resolveWinnerInTransaction(roundId);
+    });
+    expect(f.port.endRoundWithWinnerResolver(input, resolve)).toMatchObject({ phase: 'Ended', changedAt: TIME, stateVersion: 1 });
+    expect(resolve).toHaveBeenCalledExactlyOnceWith(ids.round1);
+    expect(f.repositories.results.findByRound(ids.round1)?.winningSubmissionId).toBe(ids.submission2);
+  } finally {
+    other.close();
+  }
+});
+
+it.each(['question', 'questionGroup'] as const)('no-winner End clears only the reopened %s target', async kind => {
+  const f = await setup();
+  if (kind === 'questionGroup') {
+    f.repositories.questionGroups.create(questionGroup());
+    f.database.prepare('UPDATE questions SET question_group_id = ? WHERE id = ?').run(ids.group1, ids.question1);
+    f.database.prepare('UPDATE rounds SET question_id = NULL, question_group_id = ? WHERE id = ?').run(ids.group1, ids.round1);
+  }
+  const sameTarget = kind === 'question' ? { questionId: ids.question1 } : { questionGroupId: ids.group1 };
+  f.repositories.rounds.create({ ...round(ids.round2, ids.session1, sameTarget), phase: 'Ended', startedAt: TIME, endedAt: TIME });
+  f.repositories.submissions.create(submission(ids.submission2, ids.team1, ids.round2));
+  f.repositories.results.create({ id: ids.result2, roundId: ids.round2, winningSubmissionId: ids.submission2, createdAt: TIME });
+  f.repositories.questions.create(question(ids.question2));
+  f.repositories.rounds.create({ ...round(ids.round3, ids.session1, { questionId: ids.question2 }), phase: 'Ended', startedAt: TIME, endedAt: TIME });
+  f.repositories.submissions.create(submission(ids.submission1, ids.team2, ids.round3));
+  f.repositories.results.create({ id: ids.result1, roundId: ids.round3, winningSubmissionId: ids.submission1, createdAt: TIME });
+  f.repositories.questions.create(question(ids.questionOtherSession, ids.session2));
+  f.repositories.rounds.create({ ...round(ids.roundOtherSession, ids.session2, { questionId: ids.questionOtherSession }), phase: 'Ended', startedAt: TIME, endedAt: TIME });
+  f.repositories.submissions.create(submission(ids.blankOther, ids.teamOtherSession, ids.roundOtherSession));
+  f.repositories.results.create({ id: ids.blank2, roundId: ids.roundOtherSession, winningSubmissionId: ids.blankOther, createdAt: TIME });
+  expect(f.coordinator.endRound(input, teacher).phase).toBe('Ended');
+  expect(f.repositories.results.findByRound(ids.round1)).toBeNull();
+  expect(f.repositories.results.findByRound(ids.round2)).toBeNull();
+  expect(f.repositories.results.findByRound(ids.round3)?.id).toBe(ids.result1);
+  expect(f.repositories.results.findByRound(ids.roundOtherSession)?.id).toBe(ids.blank2);
+  expect(f.repositories.submissions.findFirstByRound(ids.round2)?.id).toBe(ids.submission2);
+});
+
+it('rejects publishing End inside a caller-owned transaction', async () => {
+  const f = await setup();
+  const resolve = vi.fn(() => null);
+  expect(() => f.database.transaction(() => f.port.endRoundWithWinnerResolver(input, resolve)).immediate())
+    .toThrow(/outer|transaction/i);
+  expect(resolve).not.toHaveBeenCalled();
+  expect(f.publish).not.toHaveBeenCalled();
+  expect(f.repositories.rounds.findById(ids.round1)?.phase).toBe('Active');
+});
+
+it('rejects an asynchronous resolver and rolls back its synchronous writes', async () => {
+  const f = await setup();
+  const asynchronous = async () => {
+    f.database.prepare('UPDATE sessions SET state_version = 99 WHERE id = ?').run(ids.session1);
+    return null;
+  };
+  expect(() => f.port.endRoundWithWinnerResolver(input, asynchronous as unknown as WinnerResolver))
+    .toThrow(/synchronous/i);
+  expect(f.repositories.sessions.findById(ids.session1)?.stateVersion).toBe(0);
+  expect(f.repositories.rounds.findById(ids.round1)?.phase).toBe('Active');
+  expect(f.publish).not.toHaveBeenCalled();
+});
+
+it('rolls back when the resolver was constructed on a different connection', async () => {
+  const f = await setup();
+  const other = new DatabaseManager({ sqlitePath: f.database.name });
+  try {
+    const wrong = new StudentWinnerResolver(other.open());
+    expect(() => f.port.endRoundWithWinnerResolver(input, id => wrong.resolveWinnerInTransaction(id)))
+      .toThrow(/shared Database instance/);
+    expect(f.repositories.rounds.findById(ids.round1)?.phase).toBe('Active');
+    expect(f.publish).not.toHaveBeenCalled();
+  } finally {
+    other.close();
+  }
+});
+
+it('logs a notification exception and returns the committed snapshot', async () => {
+  const f = await setup();
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  f.publish.mockImplementation(() => { throw new Error('test delivery failure'); });
+  try {
+    expect(f.coordinator.endRound(input, teacher)).toMatchObject({ phase: 'Ended', stateVersion: 1 });
+    expect(f.repositories.rounds.findById(ids.round1)?.phase).toBe('Ended');
+    expect(log).toHaveBeenCalledOnce();
+  } finally {
+    log.mockRestore();
+  }
+});
+
+it('returns synchronously without waiting for notification delivery', async () => {
+  const f = await setup();
+  let delivered = false;
+  let finish: () => void = () => {};
+  f.publish.mockImplementation(() => new Promise<void>(resolve => {
+    finish = () => { delivered = true; resolve(); };
+  }));
+  const snapshot = f.coordinator.endRound(input, teacher);
+  expect(snapshot).toMatchObject({ phase: 'Ended', stateVersion: 1 });
+  expect(delivered).toBe(false);
+  finish();
+});
+
+it('handles rejected asynchronous notification work after returning the committed snapshot', async () => {
+  const f = await setup();
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  f.publish.mockImplementation(() => Promise.reject(new Error('test asynchronous delivery failure')));
+  try {
+    const snapshot = f.coordinator.endRound(input, teacher);
+    expect(snapshot).toMatchObject({ phase: 'Ended', stateVersion: 1 });
+    await vi.waitFor(() => expect(log).toHaveBeenCalledOnce());
+    expect(f.repositories.sessions.findById(ids.session1)?.stateVersion).toBe(1);
+  } finally {
+    log.mockRestore();
+  }
+});
+
+it.each([
+  { expectedStateVersion: -1 },
+  { expectedStateVersion: 0.5 },
+  { requestId: ' ' },
+])('rejects malformed command metadata %j before invoking the resolver', async invalid => {
+  const f = await setup();
+  const resolve = vi.fn(() => null);
+  expect(() => f.port.endRoundWithWinnerResolver({ ...input, ...invalid }, resolve))
+    .toThrow(expect.objectContaining({ status: 400, code: 'INVALID_INPUT' }));
+  expect(resolve).not.toHaveBeenCalled();
+  expect(f.publish).not.toHaveBeenCalled();
+  expect(f.repositories.rounds.findById(ids.round1)?.phase).toBe('Active');
 });

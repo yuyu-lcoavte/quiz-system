@@ -1,7 +1,8 @@
-import type { Result, SessionStateSnapshot, UUID } from '@quiz/contracts/domain';
+import type { SessionStateSnapshot, UUID } from '@quiz/contracts/domain';
 import type { ActorContext } from '@quiz/contracts/identity';
 import { HttpError } from '../../../errors/http-error.js';
 import type { StudentWinnerResolver } from './winner-resolver.js';
+import type { FoundationLifecycleEndPort } from '../../sessions/application/session-lifecycle-service.js';
 
 export interface StudentEndRoundInput {
   readonly sessionId: UUID;
@@ -10,15 +11,10 @@ export interface StudentEndRoundInput {
   readonly requestId: string;
 }
 
-/** Foundation owns the outer immediate transaction and publishes after it commits. */
-export interface FoundationLifecycleEndPort {
-  endRoundWithWinnerResolver(
-    input: StudentEndRoundInput,
-    resolveWinner: (roundId: UUID) => Result | null,
-  ): SessionStateSnapshot;
-}
+/** Preserve the internal import path while the canonical Port remains Foundation-owned. */
+export type { FoundationLifecycleEndPort } from '../../sessions/application/session-lifecycle-service.js';
 
-/** Internal adapter for trusted server callers. Production wiring awaits T004 and T044. */
+/** Internal adapter composed by the server; trusted Teacher issuance belongs to Teacher Feature. */
 export class StudentTrustedEndCoordinator {
   constructor(
     private readonly lifecycle: FoundationLifecycleEndPort,
