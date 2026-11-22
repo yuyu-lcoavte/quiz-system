@@ -97,7 +97,7 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 - [X] T045 [US1] 【需與學生端負責人協調】 Update `apps/web/src/app/router.tsx`: `/teacher/login` → `TeacherLoginPage`, `/teacher/dashboard` → `TeacherDashboardPage`, add `/teacher/sessions/:sessionId` → `TeacherSessionPage`.
 - [X] T046 [US1] 【需與學生端負責人協調】 Update the shared route tests that assert the Teacher placeholders, `apps/web/src/pages/placeholders.test.tsx` and `apps/web/src/app/router.test.tsx`, to expect the real Teacher pages (keep the Student assertions unchanged). **Done 2026-11-22**: no edit needed — the Teacher pages keep the headings 「老師登入入口」「老師管理入口」, the 「目前模組：老師端」 label and the home link, so both shared tests pass unchanged against the real pages.
 - [X] T047 [US1] Write the US1 section of `tests/manual/teacher-feature.md`: seed demo, login/logout, create activity, two Student browsers, next/start/end/reopen, 2-second checks, Socket and cookie spot checks.
-- [ ] T048 [US1] Run `npm.cmd run check`; run the US1 manual section with two Student browsers; record both in the quickstart Validation log and `tests/manual/teacher-feature.md`.
+- [X] T048 [US1] Run `npm.cmd run check`; run the US1 manual section with two Student browsers; record both in the quickstart Validation log and `tests/manual/teacher-feature.md`. **Done 2026-11-22**: manual US1 16/17 pass; 1.9 (Teacher winner display) deferred to US2 step 2.4 as FR-024 scope.
 
 **Checkpoint**: P1 control works end-to-end without Google Sheets.
 
