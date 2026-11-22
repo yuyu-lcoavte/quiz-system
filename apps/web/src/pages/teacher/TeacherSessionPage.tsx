@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { TargetStatusView, TeacherSessionView } from '@quiz/contracts';
 import { parseUUID, type UUID } from '@quiz/contracts/domain';
+import { ImportWizard } from '../../modules/teacher/ImportWizard.js';
 import { MonitorPanel } from '../../modules/teacher/MonitorPanel.js';
 import { ResultsPanel } from '../../modules/teacher/ResultsPanel.js';
 import { RoundControlPanel } from '../../modules/teacher/RoundControlPanel.js';
@@ -22,6 +23,7 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const latestVersion = useRef(-1);
+  const [serviceAccountEmail, setServiceAccountEmail] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!sessionId) return;
@@ -35,6 +37,12 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
   }, [api, sessionId]);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  useEffect(() => {
+    let active = true;
+    api.me().then((me) => { if (active) setServiceAccountEmail(me.serviceAccountEmail); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [api]);
 
   useEffect(() => {
     if (!sessionId) return undefined;
@@ -98,6 +106,21 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
           <div>
             <h2 className="text-xl font-semibold">題目</h2>
             <TargetList targets={view.targets} canSelect={canSelect} busy={busy} onSelect={select} />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">匯入 Guided Notes</h2>
+            {view.source && (
+              <p className="mt-1 text-sm text-slate-600">已匯入：分頁「{view.source.sheetTitle}」（{new Date(view.source.importedAt).toLocaleString('zh-TW')}）</p>
+            )}
+            <div className="mt-2">
+              <ImportWizard
+                serviceAccountEmail={serviceAccountEmail}
+                locked={view.state.currentRoundId !== null}
+                preview={(url) => api.importPreview(sessionId, url)}
+                confirm={(url, digest) => api.importConfirm(sessionId, url, digest)}
+                onImported={() => { void reload(); }}
+              />
+            </div>
           </div>
         </>
       )}
