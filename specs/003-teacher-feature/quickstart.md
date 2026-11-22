@@ -25,6 +25,18 @@ Run from the repository root on Windows (PowerShell, `npm.cmd`). This guide desc
    - Existing Student variables (`STUDENT_CSRF_SECRET`, `STUDENT_ALLOWED_ORIGINS`) as before.
 4. Share each test spreadsheet with the service-account email shown on the import page (Editor access, needed for write-back).
 
+## Development demo data (P1 without Google Sheets)
+
+```powershell
+npm.cmd run teacher:seed-demo
+```
+
+Creates, in the local database configured by `SQLITE_PATH`, one activity with 2 Teams (`第1組`, `第2組`) and questions shaped like the `docs/examples/` question-group template: numbers 1–4, where 1 and 2 are groups of two questions (blanks `（1）`, `（2）`) and 3 and 4 are single questions. It prints the activity code.
+
+- The data lives only in `apps/server/src/modules/teacher/dev/demo-guided-notes.dev.ts`, marked development-only. The Guided Notes import flow never reads it (checked by `tests/unit/teacher-seed-demo.test.ts`).
+- The command refuses to run when `NODE_ENV=production`.
+- The seeded activity has no Google Sheets source, so write-back returns 409 `NOT_IMPORTED` for it; use an imported activity to test P3.
+
 ## Automated checks
 
 ```powershell
@@ -45,7 +57,7 @@ Expected: typecheck, all Vitest suites (Foundation, Student and the new `teacher
 
 ## Manual end-to-end (demo script)
 
-Start the app with `npm.cmd run dev`. Use three separate browser profiles or incognito windows: Teacher, Team 1 student, Team 2 student.
+Start the app with `npm.cmd run dev`. For a P1-only run, seed the demo activity first (see above) and skip steps 3 and 6. Use three separate browser profiles or incognito windows: Teacher, Team 1 student, Team 2 student.
 
 1. **Login**: open `http://127.0.0.1:5173/teacher/login`, wrong password shows an error, correct password opens the dashboard.
 2. **Create activity**: 2 Teams → note the activity code; students join `第1組` and `第2組` from the dropdown.
