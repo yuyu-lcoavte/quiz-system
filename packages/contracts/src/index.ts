@@ -5,3 +5,4 @@ export * from './identity.js';
 export * from './realtime.js';
 export * from './student.js';
 export * from './student-realtime.js';
+export * from './teacher.js';

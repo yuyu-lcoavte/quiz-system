@@ -81,3 +81,12 @@ Check that each `.puml` has a PNG beside it and the three `003-teacher-feature-*
 ```powershell
 git restore -- diagrams/002-student-feature-*.png diagrams/foundation-*.png
 ```
+
+## Validation log
+
+Actual results only; anything not run is listed as not run.
+
+| Date | Phase | Command | Result |
+|---|---|---|---|
+| 2026-11-22 | Baseline (before Teacher code) | `npm.cmd run check` | Pass: typecheck, 47 test files / 231 tests, build. |
+| 2026-11-22 | Phase 1 (T001–T004) | `npm.cmd run check` | Pass: typecheck, 48 test files / 238 tests (+7 `teacher-contracts`), build. `teacher-contracts.test.ts` first failed because `teacher.ts` did not exist, then passed. |

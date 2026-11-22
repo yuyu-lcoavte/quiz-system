@@ -25,11 +25,11 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 
 **Purpose**: Teacher DTO contracts and environment template. No server behaviour yet.
 
-- [ ] T001 [P] Write contract validator tests in `tests/unit/teacher-contracts.test.ts`: `teamCount` must be an integer "1–20"; `expectedStateVersion` a non-negative safe integer; `url` a non-empty string of at most 2048 characters; `previewDigest`/`planDigest` 64 lowercase hex characters; unknown fields ignored.
-- [ ] T002 [P] Create `packages/contracts/src/teacher.ts` with the Teacher DTOs and error-code union from `specs/003-teacher-feature/contracts/teacher-http-api.md` (`TeacherMeView`, `ActivitySummary`, `TeacherSessionView`, `TargetStatusView` with status `'NotOpened'|'Waiting'|'Active'|'Ended'`, monitor, results, import preview, write-back plan) and the request-body parsers tested in T001.
-- [ ] T003 【需與學生端負責人協調】 Add `export * from './teacher.js';` to `packages/contracts/src/index.ts` (shared package entry; additive one line).
-- [ ] T004 [P] 【需與學生端負責人協調】 Create root `.env.example` with placeholder (non-secret) values for every project variable: existing `PORT`, `SQLITE_PATH`, `STUDENT_ALLOWED_ORIGINS`, `STUDENT_CSRF_SECRET`, activity-code limits, and new `TEACHER_PASSWORD_HASH`, `TEACHER_SESSION_SECRET`, `TEACHER_ALLOWED_ORIGINS`, `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` (comment: path must be outside the repository). Confirm `.gitignore` still ignores `.env` and `.env.*` but not `.env.example`.
-- [ ] T005 Run `npm.cmd run check` and record the result under a new "Validation log" heading in `specs/003-teacher-feature/quickstart.md`.
+- [X] T001 [P] Write contract validator tests in `tests/unit/teacher-contracts.test.ts`: `teamCount` must be an integer "1–20"; `expectedStateVersion` a non-negative safe integer; `url` a non-empty string of at most 2048 characters; `previewDigest`/`planDigest` 64 lowercase hex characters; unknown fields ignored.
+- [X] T002 [P] Create `packages/contracts/src/teacher.ts` with the Teacher DTOs and error-code union from `specs/003-teacher-feature/contracts/teacher-http-api.md` (`TeacherMeView`, `ActivitySummary`, `TeacherSessionView`, `TargetStatusView` with status `'NotOpened'|'Waiting'|'Active'|'Ended'`, monitor, results, import preview, write-back plan) and the request-body parsers tested in T001.
+- [X] T003 【需與學生端負責人協調】 Add `export * from './teacher.js';` to `packages/contracts/src/index.ts` (shared package entry; additive one line).
+- [X] T004 [P] 【需與學生端負責人協調】 Create root `.env.example` with placeholder (non-secret) values for every project variable: existing `PORT`, `SQLITE_PATH`, `STUDENT_ALLOWED_ORIGINS`, `STUDENT_CSRF_SECRET`, activity-code limits, and new `TEACHER_PASSWORD_HASH`, `TEACHER_SESSION_SECRET`, `TEACHER_ALLOWED_ORIGINS`, `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` (comment: path must be outside the repository). Confirm `.gitignore` still ignores `.env` and `.env.*` but not `.env.example`.
+- [X] T005 Run `npm.cmd run check` and record the result under a new "Validation log" heading in `specs/003-teacher-feature/quickstart.md`.
 
 **Checkpoint**: contracts build; check passes.
 
