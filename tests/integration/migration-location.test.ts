@@ -28,7 +28,7 @@ describe('migration directory resolution', () => {
 
     expect(result.error).toBeUndefined();
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stdout.trim()).toBe('001-foundation.sql,002-student-feature.sql,003-student-draft-mutations.sql,004-student-team-join-order.sql,005-student-leader-online-recheck.sql');
+    expect(result.stdout.trim()).toBe('001-foundation.sql,002-student-feature.sql,003-student-draft-mutations.sql,004-student-team-join-order.sql,005-student-leader-online-recheck.sql,006-teacher-feature.sql');
   });
 
   it('resolves source and compiled module layouts without depending on process.cwd()', () => {
