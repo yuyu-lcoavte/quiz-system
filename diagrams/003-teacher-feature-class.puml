@@ -1,0 +1,192 @@
+@startuml
+title Teacher Feature — Class Diagram (Specify level)
+hide empty methods
+skinparam classAttributeIconSize 0
+
+package "Shared Foundation (existing)" <<Frame>> {
+  class Session {
+    id
+    activityCode
+    currentRoundId
+    stateVersion
+  }
+  class Team {
+    id
+    name
+  }
+  class Round {
+    id
+    phase : Waiting | Active | Ended
+    startedAt
+    endedAt
+  }
+  class Question {
+    id
+    displayNumber
+    position
+  }
+  class Blank {
+    id
+    label
+    position
+  }
+  class QuestionGroup {
+    id
+    label
+    position
+  }
+  class Submission {
+    id
+    receivedAt
+    acceptedOrder
+  }
+  class SubmissionAnswer {
+    value
+  }
+  class Result {
+    id
+    createdAt
+  }
+  class ActorContext {
+    actorKind
+    actorId
+    sessionId
+    permissions
+  }
+}
+
+package "Teacher Feature (new)" <<Frame>> {
+  class TeacherCredential {
+    passwordHash <<secret config>>
+  }
+  class TeacherLoginSession {
+    issuedAt
+    expiresAt
+    revoked
+  }
+  class TeacherActorContextFactory {
+    forSession(sessionId) : ActorContext
+  }
+  class ActivityManager {
+    createActivity(teamCount)
+    listActivities()
+  }
+  class RoundController {
+    selectTarget(target)
+    start()
+    end()
+    next()
+    reopen(target)
+  }
+  class TargetStatus {
+    target
+    status : NotOpened | Waiting | Active | Ended
+    roundCount
+  }
+  class GuidedNotesSource {
+    spreadsheetRef
+    sheetTab : from URL, else first tab
+    importedAt
+  }
+  class ImportPreview {
+    questionNumberCount
+    errors
+    warnings
+  }
+  class ParsedTarget {
+    questionNumber
+    isGroup
+  }
+  class ParsedQuestion {
+    rowLabel
+  }
+  class BlankCellMapping {
+    cellAddress
+    originalContent
+    marker
+    lastWrittenContent
+  }
+  class WriteBackPlan {
+    createdAt
+  }
+  class WriteBackEntry {
+    cellAddress
+    currentContent
+    newContent
+    kind : write winner | restore original
+    conflict
+  }
+  class TeacherMonitorView {
+    teamStatus : submitted / not submitted
+    order
+    answers
+    answersVisible : hidden by default while Active
+  }
+  class TeacherResultView {
+    fullOrder
+    winnerTeam
+    winnerAnswers
+    noWinner
+  }
+  class ActivityRecordRow {
+    questionNumber
+    roundNumber
+    teamName
+    answers
+    order
+    isWinner
+    submittedAt
+  }
+}
+
+package "Student Feature (existing)" <<Frame>> {
+  class StudentTrustedEndCoordinator {
+    endRound(input, actor)
+  }
+  class StudentWinnerResolver {
+    resolveWinnerInTransaction(roundId)
+  }
+}
+
+Session "1" *-- "0..*" Team
+Session "1" *-- "0..*" Round
+Session "1" *-- "0..*" Question
+Session "1" *-- "0..*" QuestionGroup
+QuestionGroup "0..1" o-- "0..*" Question
+Question "1" *-- "0..*" Blank
+Round "0..*" --> "0..1" Question : target
+Round "0..*" --> "0..1" QuestionGroup : target
+Team "1" -- "0..*" Submission
+Round "1" -- "0..*" Submission
+Submission "1" *-- "0..*" SubmissionAnswer
+SubmissionAnswer "0..*" --> "1" Blank
+Round "1" -- "0..1" Result
+Result --> "1" Submission : winner
+
+TeacherCredential "1" -- "0..*" TeacherLoginSession
+TeacherLoginSession ..> TeacherActorContextFactory : proves teacher
+TeacherActorContextFactory ..> ActorContext : creates per Session
+ActivityManager ..> Session : creates
+ActivityManager ..> Team : creates Team 1..N
+RoundController ..> Round : select / start / next / reopen
+RoundController ..> StudentTrustedEndCoordinator : end (single call)
+StudentTrustedEndCoordinator ..> StudentWinnerResolver
+RoundController "1" --> "0..*" TargetStatus
+Session "1" -- "0..1" GuidedNotesSource
+GuidedNotesSource "1" -- "0..1" ImportPreview
+ImportPreview "1" *-- "1..*" ParsedTarget
+ParsedTarget "1" *-- "1..*" ParsedQuestion
+ParsedQuestion "1" *-- "1..*" BlankCellMapping
+BlankCellMapping "1" -- "1" Blank : after confirm
+WriteBackPlan "1" *-- "1..*" WriteBackEntry
+WriteBackEntry --> BlankCellMapping
+WriteBackPlan ..> Result : winners only
+TeacherMonitorView ..> Submission : read only
+TeacherResultView ..> Result
+ActivityRecordRow ..> Round
+ActivityRecordRow ..> Team
+ActivityRecordRow ..> Submission
+
+note "ParsedTarget with isGroup = true becomes a QuestionGroup;\nmultiple markers in one answer cell = multiple Blanks of one Question" as N1
+N1 .. ParsedTarget
+@enduml

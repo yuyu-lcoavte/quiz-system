@@ -1,0 +1,91 @@
+@startuml
+title Teacher Feature — Component Diagram (Specify level)
+left to right direction
+skinparam componentStyle rectangle
+
+actor Teacher
+actor Student
+cloud "Google Sheets\n(online Guided Notes)" as Sheets
+
+package "Shared Web Application" {
+  component "Teacher Pages\nlogin / dashboard / import / monitor\nresults / write-back / export" as TeacherUI
+  component "Student Pages\n(Student Feature)" as StudentUI
+  component "Shared Session State Client\n(Foundation)" as StateClient
+}
+
+package "Shared Backend" {
+  package "Teacher Feature Module" as TeacherModule {
+    component "Teacher Authentication\npassword check, login session, logout" as Auth
+    component "Teacher Access Guard\nteacher-only entry points\nper-Session Teacher ActorContext\norigin and CSRF checks" as Guard
+    component "Teacher Realtime Identity\ncookie + origin check\nauthorize session watch" as RtGuard
+    component "Activity Management\nactivity code, Team creation" as Activity
+    component "Round Control\nselect target, start, end,\nnext, reopen, conflict handling" as Control
+    component "Teacher Monitor and Result Projection\nsubmissions, order, answers, winner" as Monitor
+    component "Guided Notes Import\nsheet reader, structure parser,\npreview, confirm" as Import
+    component "Answer Write-back\nplan, confirm, conflict check" as WriteBack
+    component "Activity Record Export\nCSV" as Export
+    component "Google Sheets Gateway\nservice account (secret config)" as Gateway
+  }
+
+  package "Student Feature Module" as StudentModule {
+    component "Student Trusted End Coordinator" as Coordinator
+    component "Student Winner Resolver" as Resolver
+    component "Submission Service\nacceptedOrder" as Submission
+  }
+
+  package "Shared Foundation Module" as Foundation {
+    component "Session Lifecycle\nselect / start / end transactions" as Lifecycle
+    component "Session Query\nstate / current target / results" as Query
+    component "Session State Events\nsession room broadcast" as Events
+    component "Canonical Repositories" as Repos
+  }
+
+  database "Shared Database\nFoundation + Student + Teacher\nadditive tables" as DB
+}
+
+Teacher --> TeacherUI
+Student --> StudentUI
+TeacherUI --> StateClient
+StudentUI --> StateClient
+
+TeacherUI --> Auth : login / logout
+TeacherUI --> Guard : teacher-only operations
+StateClient --> RtGuard : teacher session watch
+StateClient --> Events : state snapshots
+
+Guard --> Activity
+Guard --> Control
+Guard --> Monitor
+Guard --> Import
+Guard --> WriteBack
+Guard --> Export
+RtGuard --> Events : authorized watch only
+
+Activity --> Repos
+Control --> Lifecycle : select / start / next / reopen
+Control --> Coordinator : end round (single call)
+Coordinator --> Lifecycle : same-transaction end
+Lifecycle --> Resolver : synchronous winner callback
+Lifecycle --> Events : publish after commit
+Monitor --> Query
+Monitor --> Repos : submissions / answers (read only)
+Import --> Gateway
+Import --> Repos : questions / blanks / groups
+WriteBack --> Gateway
+WriteBack --> Repos : results / blank cell mappings
+Export --> Repos
+Gateway --> Sheets : read / write online sheet
+Submission --> Repos
+Repos --> DB
+Auth --> DB : login session state
+
+note bottom of Guard
+  Teacher identity only on teacher-only entry points;
+  shared Session reads keep Student identity.
+  Rules: student-teacher-decisions.md section 5 (T004).
+end note
+note bottom of Gateway
+  Service account key only in backend secret
+  configuration; never in code, docs or repository.
+end note
+@enduml
