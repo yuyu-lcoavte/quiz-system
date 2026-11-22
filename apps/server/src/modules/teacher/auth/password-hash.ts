@@ -25,8 +25,9 @@ export async function verifyPassword(password: string, encoded: string): Promise
   const parts = encoded.split('$');
   if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
   const [n, r, p] = parts.slice(1, 4).map(Number);
-  // Only parameters this module produces, so a crafted hash cannot request huge memory/CPU.
-  if (n !== N || r !== R || p !== P) return false;
+  // Bounded parameters: N is a power of two from 2^10 up to what this module produces (2^15), r/p fixed,
+  // so a crafted hash cannot request huge memory/CPU. Lower N exists only for fast automated tests.
+  if (!Number.isInteger(n) || n < 1024 || n > N || (n & (n - 1)) !== 0 || r !== R || p !== P) return false;
   const salt = Buffer.from(parts[4], 'base64');
   const expected = Buffer.from(parts[5], 'base64');
   if (salt.length === 0 || expected.length === 0) return false;

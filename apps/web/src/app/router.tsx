@@ -4,8 +4,9 @@ import { HomePage } from '../pages/HomePage.js';
 import { NotFoundPage } from '../pages/NotFoundPage.js';
 import { StudentJoinPlaceholder } from '../pages/StudentJoinPlaceholder.js';
 import { StudentSessionPlaceholder } from '../pages/StudentSessionPlaceholder.js';
-import { TeacherDashboardPlaceholder } from '../pages/TeacherDashboardPlaceholder.js';
-import { TeacherLoginPlaceholder } from '../pages/TeacherLoginPlaceholder.js';
+import { TeacherDashboardPage } from '../pages/teacher/TeacherDashboardPage.js';
+import { TeacherLoginPage } from '../pages/teacher/TeacherLoginPage.js';
+import { TeacherSessionPage } from '../pages/teacher/TeacherSessionPage.js';
 
 export const appRoutes: RouteObject[] = [
   {
@@ -13,8 +14,9 @@ export const appRoutes: RouteObject[] = [
     element: <AppLayout />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'teacher/login', element: <TeacherLoginPlaceholder /> },
-      { path: 'teacher/dashboard', element: <TeacherDashboardPlaceholder /> },
+      { path: 'teacher/login', element: <TeacherLoginPage /> },
+      { path: 'teacher/dashboard', element: <TeacherDashboardPage /> },
+      { path: 'teacher/sessions/:sessionId', element: <TeacherSessionPage /> },
       { path: 'student/join', element: <StudentJoinPlaceholder /> },
       { path: 'student/session/:sessionId', element: <StudentSessionPlaceholder /> },
       { path: '*', element: <NotFoundPage /> },

@@ -16,12 +16,12 @@ export const TEACHER_TEST_ORIGIN = 'http://127.0.0.1:5173';
 
 let cachedHash: string | undefined;
 
-/** Same format as `npm run teacher:hash-password`, with a fixed salt so it is computed once per test run. */
+/** Same format as `npm run teacher:hash-password` but N=1024 (fast tests) and a fixed salt; production hashes use N=32768. */
 export function teacherTestPasswordHash(): string {
   if (!cachedHash) {
     const salt = Buffer.from('teacher-test-salt');
-    const key = scryptSync(TEACHER_TEST_PASSWORD, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
-    cachedHash = `scrypt$32768$8$1$${salt.toString('base64')}$${key.toString('base64')}`;
+    const key = scryptSync(TEACHER_TEST_PASSWORD, salt, 64, { N: 1024, r: 8, p: 1 });
+    cachedHash = `scrypt$1024$8$1$${salt.toString('base64')}$${key.toString('base64')}`;
   }
   return cachedHash;
 }
