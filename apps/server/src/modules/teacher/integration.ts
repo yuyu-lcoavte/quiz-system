@@ -4,11 +4,12 @@ import { TeacherLoginSessionService } from './auth/login-session-service.js';
 import { createTeacherSocketIdentity, type TeacherSocketIdentity } from './auth/teacher-socket-identity.js';
 import type { TeacherConfig } from './config.js';
 import { createTeacherRepositories } from './persistence/index.js';
+import { GoogleSheetsGateway } from './sheets/google-sheets-gateway.js';
 import type { SheetsGateway } from './sheets/sheets-gateway.js';
 
-/** Replaced in the Google gateway step; until then Sheets stays unconfigured. */
-function createConfiguredSheetsGateway(_config: TeacherConfig): SheetsGateway | null {
-  return null;
+/** Google Sheets only when GOOGLE_SERVICE_ACCOUNT_KEY_FILE is set (path already checked to be outside the repo). */
+function createConfiguredSheetsGateway(config: TeacherConfig): SheetsGateway | null {
+  return config.serviceAccountKeyFile ? new GoogleSheetsGateway({ keyFile: config.serviceAccountKeyFile }) : null;
 }
 
 export interface TeacherIntegrationOverrides {
