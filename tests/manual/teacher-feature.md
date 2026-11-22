@@ -50,7 +50,7 @@ Each person needs its own cookie jar, so use three separate browsers or profiles
 | 1.6 | Teacher: 下一題 | Target 1 等待中; both students show Waiting within 2 s | Pass (2026-11-22) |
 | 1.7 | Teacher: 開始搶答 | Both students see question group 1 (two blanks) within 2 s | Pass (2026-11-22) |
 | 1.8 | 第2組 fills both blanks and submits, then 第1組 submits | Both submissions accepted | Pass (2026-11-22) |
-| 1.9 | Teacher: 結束搶答 | Both students see Ended and the result shows 第2組 as winner within 2 s | Fail → 留待 US2 驗證 (2026-11-22): the Teacher page shows no winner after End (the student-side view was not reported separately); Teacher result display is FR-024 / US2 ResultsPanel, moved to US2 step 2.4 |
+| 1.9 | Teacher: 結束搶答 | Both students see Ended and the result shows 第2組 as winner within 2 s | Student side Pass (2026-11-22): both Teams showed 已結束 and 第2組 as winner. Teacher-side winner display was missing in US1 (FR-024, US2 scope) → verified Pass in US2 step 2.4 (2026-11-22) |
 | 1.10 | Teacher: on target 1 click 重新開題, then 開始, then 結束 without submissions | New round; target 1 roundCount 2; students see no winner | Pass (2026-11-22) |
 | 1.11 | Teacher: open the same activity in a second tab, press 下一題 in tab A, then 下一題 in tab B (old version) | Tab B shows 「狀態已更新…」 and reloads the latest state; no extra round | Pass (2026-11-22) |
 | 1.12 | Teacher: press F5 in the middle of a Waiting or Active round | Page restores the same code, phase and target statuses | Pass (2026-11-22) |
@@ -63,16 +63,23 @@ Each person needs its own cookie jar, so use three separate browsers or profiles
 Notes / problems found:
 
 - 2026-11-22 run by the Teacher Feature owner (Teacher in Chrome, 第1組 in Chrome Incognito, 第2組 in another browser): 16 of 17 passed.
-- 1.9: not a US1 defect. The US1 session page has no results view; showing the winner and full order after End is FR-024, delivered by US2 (ResultsPanel). Re-checked as US2 step 2.4.
+- 1.9: not a US1 defect. The US1 session page had no results view; showing the winner and full order after End is FR-024, delivered by US2 (ResultsPanel). Students: both Teams showed 已結束 and 第2組 as winner. Teacher side verified in US2 step 2.4.
 
 ## US2 — 老師監看與結果
 
 | # | Steps | Expected | Result |
 |---|---|---|---|
-| 2.1 | Teacher: open a target and 開始搶答 (seeded activity) | 作答狀況 lists 第1組、第2組 as 未送出, order —, answers empty | Not run |
-| 2.2 | 第2組 submits | Within 2 s the Teacher page shows 第2組 已送出, 第 1 名, answer column 「（已隱藏）」 | Not run |
-| 2.3 | Teacher presses 顯示答案, then 隱藏答案; 第1組 types in its draft without submitting | Answers appear only after 顯示答案 and hide again; 第1組's draft text never appears; 第1組 still 未送出 | Not run |
-| 2.4 | (moved from US1.9) After 第2組 then 第1組 submit, Teacher presses 結束搶答 | Teacher page shows the full order (第2組 1st, 第1組 2nd), the winner 第2組 and its answers | Not run |
-| 2.5 | Teacher: reopen a target, 開始, 結束 without submissions | Results show 「無勝者」 | Not run |
-| 2.6 | Students during Active (DevTools → Network on a student page) | No request returns another Team's submission, order or answers | Not run |
-| 2.7 | Teacher: press F5 while Active after one submission, and again after End | Monitor and results show the same data as before the refresh | Not run |
+| 2.1 | Teacher: open a target and 開始搶答 (seeded activity) | 作答狀況 lists 第1組、第2組 as 未送出, order —, answers empty | Pass (2026-11-22) |
+| 2.2 | 第2組 submits | Within 2 s the Teacher page shows 第2組 已送出, 第 1 名, answer column 「（已隱藏）」 | Pass (2026-11-22) |
+| 2.3 | Teacher presses 顯示答案, then 隱藏答案; 第1組 types in its draft without submitting | Answers appear only after 顯示答案 and hide again; 第1組's draft text never appears; 第1組 still 未送出 | Pass (2026-11-22) |
+| 2.4 | (moved from US1.9) After 第2組 then 第1組 submit, Teacher presses 結束搶答 | Teacher page shows the full order (第2組 1st, 第1組 2nd), the winner 第2組 and its answers | Pass (2026-11-22) |
+| 2.5 | Teacher: reopen a target, 開始, 結束 without submissions | Results show 「無勝者」 | Pass (2026-11-22) |
+| 2.6 | Students during Active (DevTools → Network on a student page) | No request returns another Team's submission, order or answers | Pass (2026-11-22) |
+| 2.7 | Teacher: press F5 while Active after one submission, and again after End | Monitor and results show the same data as before the refresh | Pass (2026-11-22) |
+
+Notes / problems found (US2):
+
+- 2026-11-22 run by the Teacher Feature owner with the same three browsers: 2.1–2.7 all passed.
+- 2.4: after End the Teacher page showed the full order (第2組 1st, 第1組 2nd), winner 第2組 and its answers 「（1）1；（2）11」.
+- 2.6: after 第2組 submitted, 第1組's Network panel (current-target, draft responses and Socket messages) showed only the question structure and 第1組's own draft, no data from 第2組.
+- Issue found: after End the 作答狀況 table still showed 「（已隱藏）」, contrary to FR-022 (answers always shown after End). Fixed the same day: MonitorPanel now always shows answers once Ended and hides the toggle; covered by two new tests in `tests/web/teacher-monitor-panel.test.tsx`. The fix itself has not been re-checked by hand.

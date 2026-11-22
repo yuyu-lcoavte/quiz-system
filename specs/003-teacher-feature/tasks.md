@@ -119,7 +119,7 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 - [X] T051 [US2] Implement `apps/server/src/modules/teacher/monitor/teacher-result-projection.ts` (monitor for current Round; results for any Round of the Session; round number = ordinal among Rounds of the same target by `created_at`).
 - [X] T052 [US2] Implement `apps/server/src/api/teacher/monitor-controller.ts` (`GET /sessions/:sessionId/monitor`, `GET /sessions/:sessionId/results?roundId=`) and register it. T049 passes.
 - [X] T053 [US2] Implement `apps/web/src/modules/teacher/MonitorPanel.tsx` and `apps/web/src/modules/teacher/ResultsPanel.tsx`, and add them to `TeacherSessionPage.tsx`. T050 passes.
-- [ ] T054 [US2] Add the US2 section to `tests/manual/teacher-feature.md`; run `npm.cmd run check` and the manual section; record results.
+- [X] T054 [US2] Add the US2 section to `tests/manual/teacher-feature.md`; run `npm.cmd run check` and the manual section; record results. **Done 2026-11-22**: manual US2 2.1–2.7 pass; follow-up fix for answers after End (FR-022) verified by automated tests on 2026-11-23.
 
 **Checkpoint**: P1 (US1 + US2) complete — demoable with seeded data.
 

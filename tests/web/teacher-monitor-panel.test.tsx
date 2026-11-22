@@ -59,6 +59,23 @@ describe('MonitorPanel', () => {
   });
 });
 
+describe('MonitorPanel after End', () => {
+  it('always shows answers once the Round has Ended (FR-022) and offers no hide toggle', async () => {
+    render(<MonitorPanel phase="Ended" roundId={ids.round1 as UUID} load={async () => ({ ...monitor, phase: 'Ended' })} />);
+    expect(await screen.findByText(/SECRET-B/)).toBeTruthy();
+    expect(screen.queryByText('（已隱藏）')).toBeNull();
+    expect(screen.queryByRole('button', { name: '顯示答案' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '隱藏答案' })).toBeNull();
+  });
+
+  it('reveals hidden answers when the phase changes from Active to Ended', async () => {
+    const { rerender } = render(<MonitorPanel phase="Active" roundId={ids.round1 as UUID} load={async () => monitor} />);
+    expect(await screen.findByText('（已隱藏）')).toBeTruthy();
+    rerender(<MonitorPanel phase="Ended" roundId={ids.round1 as UUID} load={async () => ({ ...monitor, phase: 'Ended' })} />);
+    expect(await screen.findByText(/SECRET-B/)).toBeTruthy();
+  });
+});
+
 describe('ResultsPanel', () => {
   it('always shows the full order, the winner and answers after Ended', async () => {
     render(<ResultsPanel phase="Ended" roundId={ids.round1 as UUID} load={async () => result} />);

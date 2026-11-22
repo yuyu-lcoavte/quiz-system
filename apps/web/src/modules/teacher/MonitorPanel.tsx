@@ -45,13 +45,19 @@ export function MonitorPanel({ phase, roundId, load }: MonitorPanelProps) {
 
   useEffect(() => { setShowAnswers(false); }, [roundId]);
 
+  // FR-022: hidden only while answering is in progress; once Ended, answers are always shown.
+  const ended = phase === 'Ended';
+  const answersVisible = ended || showAnswers;
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">作答狀況</h2>
-        <button type="button" className={secondaryButton} onClick={() => setShowAnswers((value) => !value)}>
-          {showAnswers ? '隱藏答案' : '顯示答案'}
-        </button>
+        {!ended && (
+          <button type="button" className={secondaryButton} onClick={() => setShowAnswers((value) => !value)}>
+            {showAnswers ? '隱藏答案' : '顯示答案'}
+          </button>
+        )}
       </div>
       {error && <p role="alert" className="mt-2 text-red-700">{error}</p>}
       {view && (
@@ -65,7 +71,7 @@ export function MonitorPanel({ phase, roundId, load }: MonitorPanelProps) {
                 <td className="py-2 font-semibold">{team.teamName}</td>
                 <td>{team.submitted ? '已送出' : '未送出'}</td>
                 <td>{team.acceptedOrder === null ? '—' : `第 ${team.acceptedOrder} 名`}</td>
-                <td>{!team.submitted ? '' : showAnswers
+                <td>{!team.submitted ? '' : answersVisible
                   ? team.answers.map((answer) => `${answer.label ?? ''}${answer.value}`).join('；')
                   : '（已隱藏）'}</td>
               </tr>
