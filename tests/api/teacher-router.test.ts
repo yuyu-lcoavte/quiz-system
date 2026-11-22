@@ -4,7 +4,7 @@ import { createHttpServer, type TeacherServiceDependencies } from '../../apps/se
 import { createTeacherIntegration } from '../../apps/server/src/modules/teacher/integration.js';
 import { parseTeacherConfig } from '../../apps/server/src/modules/teacher/config.js';
 import { createFoundationTestContext, ids, session } from '../helpers/foundation.js';
-import { createTeacherTestServer, TEACHER_TEST_PASSWORD } from '../helpers/teacher.js';
+import { createTeacherTestServer, loginAsTeacher, TEACHER_TEST_PASSWORD } from '../helpers/teacher.js';
 
 describe('Teacher router composition', () => {
   it('builds the router from the reserved services hook and does not install a global actor resolver', () => {
@@ -23,9 +23,12 @@ describe('Teacher router composition', () => {
     expect(received?.endCoordinator).toBeDefined();
   });
 
-  it('mounts under /api/v1/teacher and answers unknown Teacher paths with the shared 404 envelope', async () => {
-    const { app } = createTeacherTestServer();
-    const response = await request(app).get('/api/v1/teacher/does-not-exist');
+  it('mounts under /api/v1/teacher: unknown paths need login first, then get the shared 404 envelope', async () => {
+    const server = createTeacherTestServer();
+    const anonymous = await request(server.app).get('/api/v1/teacher/does-not-exist');
+    expect(anonymous.status).toBe(401);
+    const { cookie } = await loginAsTeacher(server);
+    const response = await request(server.app).get('/api/v1/teacher/does-not-exist').set('Cookie', cookie);
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe('TARGET_NOT_FOUND');
   });
