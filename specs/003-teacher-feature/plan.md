@@ -123,9 +123,11 @@ The reserved hook covers routing and services. These **shared files** still need
 
 | File | Change | Reason |
 |---|---|---|
-| `apps/server/package.json` | `dev` script → `tsx watch src/main.ts`; add `googleapis` dependency; add `teacher:hash-password` script | The current entry `src/app.ts` starts the server without Teacher integration (R2); Sheets access (R11). |
-| `package.json` (root) | add `teacher:hash-password` forwarding to the server workspace | Requested npm command for generating the hash. |
+| `apps/server/package.json` (+ `package-lock.json`) | `dev` script → `tsx watch src/main.ts`; add `googleapis` dependency; add `teacher:hash-password` and `teacher:seed-demo` scripts | The current entry `src/app.ts` starts the server without Teacher integration (R2); Sheets access (R11); development demo data for P1. |
+| `package.json` (root) | add `teacher:hash-password` and `teacher:seed-demo` forwarding to the server workspace | Requested npm commands. |
 | `apps/web/src/app/router.tsx` | replace the two Teacher placeholder elements; add `/teacher/sessions/:sessionId` | Teacher pages (R14). |
+| `apps/web/src/pages/placeholders.test.tsx`, `apps/web/src/app/router.test.tsx` | expect the real Teacher pages instead of placeholders | These shared tests assert the Teacher placeholder text. |
+| `tests/integration/migration-location.test.ts` | add `006-teacher-feature.sql` to the expected list | The shared test hard-codes migrations 001–005. |
 | `packages/contracts/src/index.ts` | add `export * from './teacher.js';` | Teacher DTOs (R15). |
 | `.env.example` (root, new) | placeholder values for all variables | Requested; no real values. |
 
