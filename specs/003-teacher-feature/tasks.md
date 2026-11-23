@@ -165,15 +165,15 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 
 ### Tests for User Story 4
 
-- [ ] T068 [P] [US4] Write `tests/unit/teacher-cell-composer.test.ts`: `（1）` + `CPU` → `（1）CPU`; empty cell → answer; marker-less non-empty original → answer; two markers in one cell each followed by its answer; half-width markers; restore returns the original.
-- [ ] T069 [P] [US4] Write `tests/api/teacher-write-back.test.ts`: preview covers every target with a winner plus restore entries for previously written targets now without a winner; untouched targets absent; expected content = `last_written_content ?? original_content`; confirm writes once and updates `last_written_content`; after a reopen produces a new winner, the next write-back replaces the previously written answer (`（1）CPU` → `（1）GPU`, not appended); a changed or missing cell → 409 `SHEET_CONFLICT` with `details.cells`, nothing written; results changed after preview → 409 `STALE_STATE`; nothing to write → 409 `NOTHING_TO_WRITE`; seeded (not imported) activity → 409 `NOT_IMPORTED`.
+- [X] T068 [P] [US4] Write `tests/unit/teacher-cell-composer.test.ts`: `（1）` + `CPU` → `（1）CPU`; empty cell → answer; marker-less non-empty original → answer; two markers in one cell each followed by its answer; half-width markers; restore returns the original.
+- [X] T069 [P] [US4] Write `tests/api/teacher-write-back.test.ts`: preview covers every target with a winner plus restore entries for previously written targets now without a winner; untouched targets absent; expected content = `last_written_content ?? original_content`; confirm writes once and updates `last_written_content`; after a reopen produces a new winner, the next write-back replaces the previously written answer (`（1）CPU` → `（1）GPU`, not appended); a changed or missing cell → 409 `SHEET_CONFLICT` with `details.cells`, nothing written; results changed after preview → 409 `STALE_STATE`; nothing to write → 409 `NOTHING_TO_WRITE`; seeded (not imported) activity → 409 `NOT_IMPORTED`.
 
 ### Implementation for User Story 4
 
-- [ ] T070 [P] [US4] Implement the pure `apps/server/src/modules/teacher/write-back/cell-composer.ts` to pass T068. Starts only after gate T055.
-- [ ] T071 [US4] Implement `apps/server/src/modules/teacher/write-back/write-back-service.ts` (plan from current results and blank-cell rows, `planDigest`, re-read, compare, one `writeCells` batch, then update `last_written_content`/`last_written_at`).
-- [ ] T072 [US4] Implement `apps/server/src/api/teacher/write-back-controller.ts` (`POST write-back/preview`, `POST write-back/confirm`) and register it. T069 passes.
-- [ ] T073 [US4] Implement `apps/web/src/modules/teacher/WriteBackDialog.tsx` (entry table with current → new content and write/restore kind, confirm, conflict list) and add it to `TeacherSessionPage.tsx`.
+- [X] T070 [P] [US4] Implement the pure `apps/server/src/modules/teacher/write-back/cell-composer.ts` to pass T068. Starts only after gate T055.
+- [X] T071 [US4] Implement `apps/server/src/modules/teacher/write-back/write-back-service.ts` (plan from current results and blank-cell rows, `planDigest`, re-read, compare, one `writeCells` batch, then update `last_written_content`/`last_written_at`).
+- [X] T072 [US4] Implement `apps/server/src/api/teacher/write-back-controller.ts` (`POST write-back/preview`, `POST write-back/confirm`) and register it. T069 passes.
+- [X] T073 [US4] Implement `apps/web/src/modules/teacher/WriteBackDialog.tsx` (entry table with current → new content and write/restore kind, confirm, conflict list) and add it to `TeacherSessionPage.tsx`.
 - [ ] T074 [US4] Add the US4 section to `tests/manual/teacher-feature.md` (real sheet write, marker kept, conflict after a manual edit, restore after a no-winner reopen); run `npm.cmd run check` and the manual section; record results.
 
 **Checkpoint**: P3 complete.

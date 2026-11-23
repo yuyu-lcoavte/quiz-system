@@ -109,3 +109,22 @@ Notes / problems found (US3):
 - Preview time (pressing 預覽 → table shown): about 2 s each for 3.3, 3.4 and 3.5 (plan goal ≤ 5 s).
 - 3.4: after inserting 2 rows above and 1 column to the left, adding question 5 and the answer cell 「（1）＿＿（2）＿＿」, all cell addresses followed the new layout and question 5 was a single question with two blanks.
 - 3.12: two Teams answered an imported group question; result 「（1）1111；（2）22」, winner 第2組.
+
+## US4 — 答案寫回 Guided Notes
+
+Use a fresh copy of the question-group Google Sheet (shared with the service account as Editor), imported into a new activity, with two student browsers.
+
+| # | Steps | Expected | Result |
+|---|---|---|---|
+| 4.1 | Before any round ends, press 寫回 Guided Notes | 「目前沒有需要寫回的答案。」 | Not run |
+| 4.2 | Play target 1 (group): 第2組 submits （1）CPU、（2）OS; end. Play target 3: 第1組 submits 42; end. Press 寫回 Guided Notes | The list shows G5 （1）→（1）CPU, G6 （2）→（2）OS, G11 （空白）→42, all 寫入; targets 2 and 4 are not listed; nothing changed in the sheet yet | Not run |
+| 4.3 | Press 確認寫入 | 「已寫入 3 格。」; in Google Sheets G5 = （1）CPU, G6 = （2）OS, G11 = 42; markers kept | Not run |
+| 4.4 | Reopen target 1, 第1組 submits （1）GPU、（2）RAM, end, write back | G5 （1）CPU→（1）GPU, G6 （2）OS→（2）RAM; after confirming the sheet shows （1）GPU / （2）RAM (not appended) | Not run |
+| 4.5 | Reopen target 3, end with no submission, write back | G11 42→（空白）, 還原; after confirming G11 is empty again | Not run |
+| 4.6 | Make a new winner, press 寫回 Guided Notes, then edit one listed cell by hand in Google Sheets, then press 確認寫入 | 「試算表中有儲存格已被修改，這次沒有寫入任何儲存格。（儲存格：…）」; no listed cell changed | Not run |
+| 4.7 | Remove the service account from the sheet's sharing, then write back | 「試算表尚未共用給系統的服務帳號…」 | Not run |
+| 4.8 | Seeded demo activity (`teacher:seed-demo`): look for 寫回 Guided Notes | Not shown (the activity was not imported) | Not run |
+
+Notes / problems found (US4):
+
+- (not run yet)

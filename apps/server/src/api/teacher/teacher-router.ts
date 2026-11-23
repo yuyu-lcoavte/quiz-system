@@ -19,6 +19,8 @@ import { createTeacherCsrfMiddleware } from './middleware/teacher-csrf.js';
 import { createTeacherOriginMiddleware } from './middleware/teacher-origin.js';
 import { createTeacherSessionScopeMiddleware } from './middleware/session-scope.js';
 import { createTeacherImportController } from './import-controller.js';
+import { createTeacherWriteBackController } from './write-back-controller.js';
+import { WriteBackService } from '../../modules/teacher/write-back/write-back-service.js';
 import { GuidedNotesImportService } from '../../modules/teacher/guided-notes/import-service.js';
 import type { SheetsGateway } from '../../modules/teacher/sheets/sheets-gateway.js';
 
@@ -70,6 +72,9 @@ export function createTeacherRouter(context: TeacherRouterContext): Router {
     new GuidedNotesImportService(context.services.database, context.repositories, context.sheetsGateway, context.now),
     activityService,
   );
+  const writeBack = createTeacherWriteBackController(
+    new WriteBackService(context.services.database, context.repositories, context.sheetsGateway, context.now),
+  );
   const rounds = createTeacherRoundController(new RoundControlService(context.services));
   const monitor = createTeacherMonitorController(new TeacherResultProjection(context.services.database));
 
@@ -85,6 +90,8 @@ export function createTeacherRouter(context: TeacherRouterContext): Router {
   router.get('/sessions/:sessionId/results', monitor.results);
   router.post('/sessions/:sessionId/import/preview', imports.preview);
   router.post('/sessions/:sessionId/import/confirm', imports.confirm);
+  router.post('/sessions/:sessionId/write-back/preview', writeBack.preview);
+  router.post('/sessions/:sessionId/write-back/confirm', writeBack.confirm);
 
   return router;
 }

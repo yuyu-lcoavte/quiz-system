@@ -14,7 +14,7 @@ function rows(statusOfSecond: TargetStatusView['status']) {
     targets={[target('1', 'Ended', ids.question1), target('2', statusOfSecond, ids.question2), target('3', 'NotOpened', ids.question3)]}
     canSelect={statusOfSecond === 'Ended'} busy={false} onSelect={() => undefined}
   />);
-  return screen.getAllByRole('row').slice(1);
+  return screen.getAllByRole('row').slice(1) as HTMLTableRowElement[];
 }
 
 describe('TargetList current-round highlight', () => {

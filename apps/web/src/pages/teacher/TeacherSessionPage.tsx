@@ -7,6 +7,7 @@ import { MonitorPanel } from '../../modules/teacher/MonitorPanel.js';
 import { ResultsPanel } from '../../modules/teacher/ResultsPanel.js';
 import { RoundControlPanel } from '../../modules/teacher/RoundControlPanel.js';
 import { TargetList } from '../../modules/teacher/TargetList.js';
+import { WriteBackDialog } from '../../modules/teacher/WriteBackDialog.js';
 import { displayError, isConflict, TeacherApiError } from '../../modules/teacher/teacher-api-client.js';
 import { secondaryButton, useTeacherApi } from '../../modules/teacher/use-teacher-api.js';
 import { createSessionStateClient, type SessionStateClient } from '../../services/session-state-client.js';
@@ -111,6 +112,14 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
             <h2 className="text-xl font-semibold">匯入 Guided Notes</h2>
             {view.source && (
               <p className="mt-1 text-sm text-slate-600">已匯入：分頁「{view.source.sheetTitle}」（{new Date(view.source.importedAt).toLocaleString('zh-TW')}）</p>
+            )}
+            {view.source && (
+              <div className="mt-2">
+                <WriteBackDialog
+                  preview={() => api.writeBackPreview(sessionId)}
+                  confirm={(digest) => api.writeBackConfirm(sessionId, digest)}
+                />
+              </div>
             )}
             <div className="mt-2">
               <ImportWizard
