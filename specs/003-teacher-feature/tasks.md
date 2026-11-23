@@ -188,15 +188,15 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 
 ### Tests for User Story 5
 
-- [ ] T075 [P] [US5] Write `tests/unit/teacher-csv.test.ts`: UTF-8 BOM, CRLF, RFC 4180 quoting of commas/quotes/newlines, cells starting with `=`, `+`, `-`, `@` prefixed with `'`, `是`/`否`, time `YYYY-MM-DD HH:mm:ss` in `Asia/Taipei`.
-- [ ] T076 [P] [US5] Write `tests/api/teacher-export.test.ts`: header `題號,第幾輪,組別,答案,順位,是否勝出,送出時間`; one row per Round × Team; reopened target lists both rounds with different `第幾輪`; non-submitter has empty answer/order/time and `否`; answers joined like `（1）CPU；（2）OS`; `Content-Disposition` filename `activity-<code>.csv`; unauthenticated → 401.
+- [X] T075 [P] [US5] Write `tests/unit/teacher-csv.test.ts`: UTF-8 BOM, CRLF, RFC 4180 quoting of commas/quotes/newlines, cells starting with `=`, `+`, `-`, `@` prefixed with `'`, `是`/`否`, time `YYYY-MM-DD HH:mm:ss` in `Asia/Taipei`.
+- [X] T076 [P] [US5] Write `tests/api/teacher-export.test.ts`: header `題號,第幾輪,組別,答案,順位,是否勝出,送出時間`; one row per Round × Team; reopened target lists both rounds with different `第幾輪`; non-submitter has empty answer/order/time and `否`; answers joined like `（1）CPU；（2）OS`; `Content-Disposition` filename `activity-<code>.csv`; unauthenticated → 401.
 
 ### Implementation for User Story 5
 
-- [ ] T077 [P] [US5] Implement the pure `apps/server/src/modules/teacher/export/csv-writer.ts` to pass T075.
-- [ ] T078 [US5] Implement `apps/server/src/modules/teacher/export/activity-record-service.ts` (rows from Rounds × Teams using `teacher-result-projection.ts`).
-- [ ] T079 [US5] Implement `apps/server/src/api/teacher/export-controller.ts` (`GET /sessions/:sessionId/export.csv`) and register it. T076 passes.
-- [ ] T080 [US5] Add an export button in `apps/web/src/modules/teacher/ExportButton.tsx` and place it on `TeacherSessionPage.tsx`.
+- [X] T077 [P] [US5] Implement the pure `apps/server/src/modules/teacher/export/csv-writer.ts` to pass T075.
+- [X] T078 [US5] Implement `apps/server/src/modules/teacher/export/activity-record-service.ts` (rows from Rounds × Teams using `teacher-result-projection.ts`).
+- [X] T079 [US5] Implement `apps/server/src/api/teacher/export-controller.ts` (`GET /sessions/:sessionId/export.csv`) and register it. T076 passes.
+- [X] T080 [US5] Add an export button in `apps/web/src/modules/teacher/ExportButton.tsx` and place it on `TeacherSessionPage.tsx`.
 - [ ] T081 [US5] Add the US5 section to `tests/manual/teacher-feature.md` (open in Excel and Google Sheets); run `npm.cmd run check` and the manual section; record results.
 
 **Checkpoint**: All five stories complete.

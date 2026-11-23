@@ -8,6 +8,15 @@ interface RoundRow {
   phase: RoundPhase; created_at: string;
 }
 interface SubmissionRow { id: string; team_id: string; team_name: string; accepted_order: number; received_at: string }
+export interface RoundRecord {
+  readonly roundId: UUID;
+  readonly number: string;
+  /** 1-based ordinal among Rounds of the same target (第幾輪). */
+  readonly roundNumber: number;
+  readonly phase: RoundPhase;
+  readonly submissions: TeacherSubmissionView[];
+  readonly winnerTeamId: UUID | null;
+}
 interface AnswerRow { submission_id: string; blank_id: string; label: string | null; value: string }
 
 /**
@@ -23,6 +32,7 @@ export class TeacherResultProjection {
   private readonly result;
   private readonly roundsOfTarget;
   private readonly targetNumber;
+  private readonly allRounds;
 
   constructor(database: Database.Database) {
     this.session = database.prepare('SELECT current_round_id FROM sessions WHERE id = ?');
@@ -37,6 +47,8 @@ export class TeacherResultProjection {
     this.result = database.prepare('SELECT winning_submission_id FROM results WHERE round_id = ?');
     this.roundsOfTarget = database.prepare(`SELECT id FROM rounds WHERE session_id = ?
       AND (question_id = ? OR question_group_id = ?) ORDER BY created_at, rowid`);
+    this.allRounds = database.prepare(`SELECT id, session_id, question_id, question_group_id, phase, created_at
+      FROM rounds WHERE session_id = ? ORDER BY created_at, rowid`);
     this.targetNumber = database.prepare(`SELECT COALESCE(
       (SELECT display_number FROM questions WHERE id = ?), (SELECT label FROM question_groups WHERE id = ?)) AS number`);
   }
@@ -87,6 +99,35 @@ export class TeacherResultProjection {
       submissions: submissions.map(({ id: _id, ...view }) => view),
       winner: winner ? { teamId: winner.teamId, teamName: winner.teamName, answers: winner.answers } : null,
     };
+  }
+
+  /**
+   * Every Round of the Session in the order they were created, with submissions and the winner
+   * (Ended Rounds only; same rule as `results`). Used by the CSV export.
+   */
+  rounds(sessionId: UUID): RoundRecord[] {
+    const rows = this.allRounds.all(sessionId) as RoundRow[];
+    const ordinal = new Map<string, number>();
+    return rows.map((round) => {
+      const targetId = (round.question_id ?? round.question_group_id) as string;
+      const roundNumber = (ordinal.get(targetId) ?? 0) + 1;
+      ordinal.set(targetId, roundNumber);
+      const submissions = this.submissionsOf(round.id as UUID);
+      let winnerTeamId: UUID | null = null;
+      if (round.phase === 'Ended') {
+        const stored = this.result.get(round.id) as { winning_submission_id: string } | undefined;
+        const winnerId = stored?.winning_submission_id ?? submissions[0]?.id;
+        winnerTeamId = submissions.find((submission) => submission.id === winnerId)?.teamId ?? null;
+      }
+      return {
+        roundId: round.id as UUID,
+        number: (this.targetNumber.get(targetId, targetId) as { number: string | null }).number ?? '',
+        roundNumber,
+        phase: round.phase,
+        submissions: submissions.map(({ id: _id, ...view }) => view),
+        winnerTeamId,
+      };
+    });
   }
 
   private currentRound(sessionId: UUID): RoundRow | undefined {

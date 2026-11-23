@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { TargetStatusView, TeacherSessionView } from '@quiz/contracts';
 import { parseUUID, type UUID } from '@quiz/contracts/domain';
+import { ExportButton } from '../../modules/teacher/ExportButton.js';
 import { ImportWizard } from '../../modules/teacher/ImportWizard.js';
 import { MonitorPanel } from '../../modules/teacher/MonitorPanel.js';
 import { ResultsPanel } from '../../modules/teacher/ResultsPanel.js';
@@ -81,7 +82,10 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
           <p className="text-sm font-semibold text-indigo-700">目前模組：老師端</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">活動管理</h1>
         </div>
-        <Link to="/teacher/dashboard" className={secondaryButton}>返回活動清單</Link>
+        <div className="flex flex-wrap gap-3">
+          {sessionId && <ExportButton sessionId={sessionId} />}
+          <Link to="/teacher/dashboard" className={secondaryButton}>返回活動清單</Link>
+        </div>
       </div>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {!view && !error && <p className="text-slate-600">讀取中…</p>}

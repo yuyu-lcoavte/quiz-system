@@ -136,3 +136,23 @@ Notes / problems found (US4):
   - 4.6: editing a listed cell by hand before confirming showed the conflict message and wrote nothing; after putting that cell back, write-back succeeded.
   - 4.7: after removing the share, write-back showed the not-shared message.
   - 4.8: the seed-demo activity has no 寫回 Guided Notes button.
+
+## US5 — CSV 匯出
+
+Use an activity that has a reopened target and at least one Team that did not submit in some round.
+
+| # | Steps | Expected | Result |
+|---|---|---|---|
+| 5.1 | Teacher: press 匯出 CSV on the activity page | A file `activity-<活動代號>.csv` downloads | Not run |
+| 5.2 | Open the file in Excel (double-click) | Chinese shows correctly; columns 題號, 第幾輪, 組別, 答案, 順位, 是否勝出, 送出時間; rows = rounds × teams | Not run |
+| 5.3 | Import the file into Google Sheets (File → Import) | Same content, Chinese correct | Not run |
+| 5.4 | Check a reopened target | Its rounds appear with 第幾輪 1, 2…; each round has its own winner (是) | Not run |
+| 5.5 | Check a Team that did not submit | 答案, 順位, 送出時間 empty; 是否勝出 否 | Not run |
+| 5.6 | Check a group question row | 答案 like 「（1）CPU；（2）OS」 | Not run |
+| 5.7 | Check 送出時間 against the clock in class | Taiwan local time, `YYYY-MM-DD HH:mm:ss` | Not run |
+| 5.8 | Have a student answer 「=1+1」, then export | The cell shows the text `=1+1` (prefixed with '), not the number 2 | Not run |
+| 5.9 | Student browser: open `/api/v1/teacher/sessions/<id>/export.csv` | 401, no file | Not run |
+
+Notes / problems found (US5):
+
+- (not run yet)
