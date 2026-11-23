@@ -92,7 +92,7 @@ Setup (once): Google Cloud project with the Google Sheets API enabled; a service
 |---|---|---|---|
 | 3.1 | Teacher: create a new activity, open it, look at 匯入 Guided Notes | The service-account email and the three sharing steps are shown; no key content anywhere | Pass (2026-11-23) |
 | 3.2 | Paste the question-group sheet URL **before** sharing it, press 預覽 | 「試算表尚未共用給系統的服務帳號…」 | Pass (2026-11-23) |
-| 3.3 | Share the sheet with the service-account email as Editor, press 預覽 again | 分頁「學習單」・共 4 題; 1 and 2 are 題組（2 題） showing label → fill cell: G5（1）→H5、G6（2）→H6 / G8（1）→H8、G9（2）→H9; 3 and 4 單題 G11 / G13. Record the time from pressing 預覽 to the table appearing (plan goal ≤ 5 s) (updated 2026-11-23 for the Q16 fill-cell clarification) | Pass (2026-11-23, about 2 s) under the earlier expectation (G5（1）、G6（2）); re-check needed with the new fill-cell display |
+| 3.3 | Share the sheet with the service-account email as Editor, press 預覽 again | 分頁「學習單」・共 4 題; 1 and 2 are 題組（2 題） showing label → fill cell: G5（1）→H5、G6（2）→H6 / G8（1）→H8、G9（2）→H9; 3 and 4 單題 G11 / G13. Record the time from pressing 預覽 to the table appearing (plan goal ≤ 5 s) (updated 2026-11-23 for the Q16 fill-cell clarification) | Pass (2026-11-23 re-run with a fresh copy, new expectation): preview showed G5（1）→H5、G6（2）→H6、G8→H8、G9→H9. Earlier run: about 2 s under the old expectation |
 | 3.4 | On the modified copy: insert two rows and one column above/left of the header, add a 5th question, put 「（1）＿＿（2）＿＿」 in one answer cell; preview | Numbers and cell addresses follow the new layout; the two-marker question is 單題 with two cells listed; time: about 2 s | Pass (2026-11-23) |
 | 3.5 | Preview the single-question sheet | 共 6 題, all 單題, answer cells G5, G7, …, G15; time: about 2 s | Pass (2026-11-23) |
 | 3.6 | Confirm the question-group import | Target list shows 1–4 with 題組/單題 and 未開放; dashboard shows 已匯入 | Pass (2026-11-23) |
@@ -116,16 +116,23 @@ Use a fresh copy of the question-group Google Sheet (shared with the service acc
 
 | # | Steps | Expected | Result |
 |---|---|---|---|
-| 4.1 | Before any round ends, press 寫回 Guided Notes | 「目前沒有需要寫回的答案。」 | Pass (2026-11-23) |
-| 4.2 | Play target 1 (group): 第2組 submits （1）CPU、（2）OS; end. Play target 3: 第1組 submits 42; end. Press 寫回 Guided Notes | The list shows H5 （空白）→CPU, H6 （空白）→OS, G11 （空白）→42, all 寫入; G5/G6 (（1）/（2）) are not listed; targets 2 and 4 are not listed; nothing changed in the sheet yet (updated 2026-11-23) | Pass (2026-11-23) under the earlier expectation (G5 （1）→（1）CPU, G6 （2）→（2）OS, G11 →42); re-check with the fill-cell expectation |
-| 4.3 | Press 確認寫入 | 「已寫入 3 格。」; in Google Sheets H5 = CPU, H6 = OS, G11 = 42; G5 （1） and G6 （2） unchanged (updated 2026-11-23) | Fail (2026-11-23): wrote G5 「（1）CPU」, G6 「（2）OS」, G11 「42」 — matched the document at the time but not the template's fill cells (H5/H6); led to the Q16 fill-cell clarification (T088–T091); re-run needed |
-| 4.4 | Reopen target 1, 第1組 submits （1）GPU、（2）RAM, end, write back | H5 CPU→GPU, H6 OS→RAM; after confirming the sheet shows GPU / RAM in H5/H6 (replaced, not appended); G5/G6 unchanged (updated 2026-11-23) | Not run |
-| 4.5 | Reopen target 3, end with no submission, write back | G11 42→（空白）, 還原; after confirming G11 is empty again | Not run |
-| 4.6 | Make a new winner, press 寫回 Guided Notes, then edit one listed cell by hand in Google Sheets, then press 確認寫入 (with fill cells, edit H5 or H6) | 「試算表中有儲存格已被修改，這次沒有寫入任何儲存格。（儲存格：…）」; no listed cell changed | Not run |
-| 4.7 | Remove the service account from the sheet's sharing, then write back | 「試算表尚未共用給系統的服務帳號…」 | Not run |
-| 4.8 | Seeded demo activity (`teacher:seed-demo`): look for 寫回 Guided Notes | Not shown (the activity was not imported) | Not run |
+| 4.1 | Before any round ends, press 寫回 Guided Notes | 「目前沒有需要寫回的答案。」 | Pass (2026-11-23, re-imported fresh copy) |
+| 4.2 | Play target 1 (group): 第2組 submits （1）CPU、（2）OS; end. Play target 3: 第1組 submits 42; end. Press 寫回 Guided Notes | The list shows H5 （空白）→CPU, H6 （空白）→OS, G11 （空白）→42, all 寫入; G5/G6 (（1）/（2）) are not listed; targets 2 and 4 are not listed; nothing changed in the sheet yet (updated 2026-11-23) | Pass (2026-11-23, re-imported fresh copy) |
+| 4.3 | Press 確認寫入 | 「已寫入 3 格。」; in Google Sheets H5 = CPU, H6 = OS, G11 = 42; G5 （1） and G6 （2） unchanged (updated 2026-11-23) | Pass (2026-11-23, re-imported fresh copy) |
+| 4.4 | Reopen target 1, 第1組 submits （1）GPU、（2）RAM, end, write back | H5 CPU→GPU, H6 OS→RAM; after confirming the sheet shows GPU / RAM in H5/H6 (replaced, not appended); G5/G6 unchanged (updated 2026-11-23) | Pass (2026-11-23, re-imported fresh copy) |
+| 4.5 | Reopen target 3, end with no submission, write back | G11 42→（空白）, 還原; after confirming G11 is empty again | Pass (2026-11-23, re-imported fresh copy) |
+| 4.6 | Make a new winner, press 寫回 Guided Notes, then edit one listed cell by hand in Google Sheets, then press 確認寫入 (with fill cells, edit H5 or H6) | 「試算表中有儲存格已被修改，這次沒有寫入任何儲存格。（儲存格：…）」; no listed cell changed | Pass (2026-11-23, re-imported fresh copy) |
+| 4.7 | Remove the service account from the sheet's sharing, then write back | 「試算表尚未共用給系統的服務帳號…」 | Pass (2026-11-23, re-imported fresh copy) |
+| 4.8 | Seeded demo activity (`teacher:seed-demo`): look for 寫回 Guided Notes | Not shown (the activity was not imported) | Pass (2026-11-23, re-imported fresh copy) |
 
 Notes / problems found (US4):
 
 - 2026-11-23 first run: 4.1 and 4.2 passed. 4.3 wrote G5 「（1）CPU」, G6 「（2）OS」, G11 「42」. That matched the document at the time, but in the template the group answer area spans two columns (「作答」 header G4:H4): G holds the label 「（1）」 and H is the empty fill cell. This triggered the Q16 clarification (shared requirements, spec FR-028/FR-034, parser contract) and tasks T088–T091: answers now go into the empty cell right of a single marker inside the 「作答」 range; the marker cell is unchanged; two markers in one cell or a non-empty right cell keep the old "append after marker" behaviour; restore empties the fill cell.
-- 4.4–4.8 not run yet; 3.3, 4.2 and 4.3 need a re-run with the new expectations. Before re-running, clear the G5/G6 「（1）CPU」/「（2）OS」 text from the earlier run (or use a fresh copy) and re-import, because the earlier import stored G5/G6 as the blank cells.
+- 2026-11-23 re-run with a fresh copy re-imported after the fix: 3.3 and 4.1–4.8 all passed.
+  - 3.3: preview showed G5（1）→H5、G6（2）→H6、G8→H8、G9→H9.
+  - 4.3: H5 「CPU」, H6 「OS」, G11 「42」; G5/G6 「（1）」「（2）」 unchanged.
+  - 4.4: after reopen H5/H6 were replaced by 「GPU」「RAM」, not appended.
+  - 4.5: reopen with no submission restored G11 to empty.
+  - 4.6: editing a listed cell by hand before confirming showed the conflict message and wrote nothing; after putting that cell back, write-back succeeded.
+  - 4.7: after removing the share, write-back showed the not-shared message.
+  - 4.8: the seed-demo activity has no 寫回 Guided Notes button.

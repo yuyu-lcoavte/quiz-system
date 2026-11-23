@@ -174,7 +174,7 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 - [X] T071 [US4] Implement `apps/server/src/modules/teacher/write-back/write-back-service.ts` (plan from current results and blank-cell rows, `planDigest`, re-read, compare, one `writeCells` batch, then update `last_written_content`/`last_written_at`).
 - [X] T072 [US4] Implement `apps/server/src/api/teacher/write-back-controller.ts` (`POST write-back/preview`, `POST write-back/confirm`) and register it. T069 passes.
 - [X] T073 [US4] Implement `apps/web/src/modules/teacher/WriteBackDialog.tsx` (entry table with current → new content and write/restore kind, confirm, conflict list) and add it to `TeacherSessionPage.tsx`.
-- [ ] T074 [US4] Add the US4 section to `tests/manual/teacher-feature.md` (real sheet write, marker kept, conflict after a manual edit, restore after a no-winner reopen); run `npm.cmd run check` and the manual section; record results.
+- [X] T074 [US4] Add the US4 section to `tests/manual/teacher-feature.md` (real sheet write, marker kept, conflict after a manual edit, restore after a no-winner reopen); run `npm.cmd run check` and the manual section; record results. **Done 2026-11-23**: first run found the fill-cell issue (T088–T091); re-run with a fresh re-imported copy: 4.1–4.8 pass.
 
 **Checkpoint**: P3 complete.
 
