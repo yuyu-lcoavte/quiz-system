@@ -210,6 +210,7 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 - [ ] T084 Compare the implementation with `diagrams/003-teacher-feature-component.puml`, `-class.puml`, `-sequence.puml`; update the diagrams for any difference; run `java -jar plantuml.jar "./diagrams/*.puml"`, check each `.puml` has a readable PNG, then `git restore -- diagrams/002-student-feature-*.png diagrams/foundation-*.png`. Record the comparison in `specs/003-teacher-feature/quickstart.md`.
 - [ ] T085 Run the full demo in `tests/manual/teacher-feature.md` with three browser profiles (Teacher, two Teams), within 5 minutes (SC-009). Also time SC-001 separately: from submitting the login form to the first round becoming Active (login → create activity → import → next → start), target 3 minutes; record the measured time. Record actual results and anything not run.
 - [ ] T086 Final `npm.cmd run check`; record TypeScript, test and build results, including Foundation and Student regression suites, in the quickstart Validation log.
+- [X] T087 Highlight the current-round target in `apps/web/src/modules/teacher/TargetList.tsx`: the Waiting or Active row is bold with a light background (`bg-indigo-50`), shows 「▶」 before the number and has `aria-current="true"`; other rows unchanged. Test in `tests/web/teacher-target-list.test.tsx`. **Done 2026-11-23** (requested after the US3 manual run).
 
 ---
 

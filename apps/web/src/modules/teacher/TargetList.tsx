@@ -23,9 +23,15 @@ export function TargetList({ targets, canSelect, busy, onSelect }: TargetListPro
         {targets.map((target) => {
           const id = target.target.kind === 'question' ? target.target.questionId : target.target.questionGroupId;
           const action = target.status === 'NotOpened' ? '開放' : target.status === 'Ended' ? '重新開題' : null;
+          // Only the current Round's target can be Waiting or Active.
+          const current = target.status === 'Waiting' || target.status === 'Active';
           return (
-            <tr key={id} className="border-b border-slate-100">
-              <td className="py-2 font-semibold">{target.number}</td>
+            <tr
+              key={id}
+              aria-current={current ? 'true' : undefined}
+              className={current ? 'border-b border-slate-100 bg-indigo-50 font-bold' : 'border-b border-slate-100'}
+            >
+              <td className="py-2 font-semibold">{current ? `▶ ${target.number}` : target.number}</td>
               <td>{target.kind === 'questionGroup' ? `題組（${target.questionCount} 題）` : `單題（${target.blankCount} 格）`}</td>
               <td>{PHASE_LABELS[target.status]}</td>
               <td>{target.roundCount}</td>
