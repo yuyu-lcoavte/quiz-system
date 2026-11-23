@@ -46,7 +46,7 @@ Valid when `revoked_at IS NULL AND expires_at > now`. Expired rows may be delete
 |---|---|
 | `blank_id` TEXT PK, FK → `blanks(id)` | One mapping per Blank. |
 | `session_id` TEXT, FK → `teacher_sheet_sources(session_id)` | Scope check. |
-| `cell_a1` TEXT | Cell address without sheet name, e.g. `G5`. |
+| `cell_a1` TEXT | Cell the answer is written to, without sheet name: the fill cell (e.g. `H5`) when the template has one, else the marker cell (e.g. `G5`). |
 | `original_content` TEXT | Cell text at import. |
 | `marker` TEXT NULL | Marker text, or null when the cell had none. |
 | `marker_index` INTEGER | Order of this marker in the cell (0 when no marker). |

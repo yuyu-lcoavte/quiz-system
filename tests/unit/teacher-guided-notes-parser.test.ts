@@ -8,6 +8,7 @@ import {
   HEADER_ONLY,
   MISSING_ANSWER_HEADER,
   NO_PROMPT_HEADER,
+  RIGHT_CELL_NOT_EMPTY,
   SHIFTED_GROUP,
   SINGLE_TEMPLATE,
 } from '../fixtures/guided-notes/index.js';
@@ -21,7 +22,7 @@ const summary = (result: ParseResult) => ok(result).targets.map((target) => ({
   number: target.number,
   kind: target.kind,
   rows: target.questions.map((question) => question.rowA1),
-  blanks: target.questions.map((question) => question.blanks.map((blank) => `${blank.cellA1}|${blank.marker ?? '-'}|${blank.markerIndex}`)),
+  blanks: target.questions.map((question) => question.blanks.map((blank) => `${blank.labelCellA1 ? `${blank.labelCellA1}>` : ''}${blank.cellA1}|${blank.marker ?? '-'}|${blank.markerIndex}`)),
 }));
 
 describe('Guided Notes parser (pure)', () => {
@@ -31,20 +32,20 @@ describe('Guided Notes parser (pure)', () => {
     })));
   });
 
-  it('reads the question-group template: 1 and 2 are groups of two marked questions, 3 and 4 single', () => {
+  it('reads the question-group template: blanks are the empty fill cells H5/H6/H8/H9 right of the （n） labels', () => {
     expect(summary(parseGuidedNotes(GROUP_TEMPLATE))).toEqual([
-      { number: '1', kind: 'questionGroup', rows: [5, 6], blanks: [['G5|（1）|0'], ['G6|（2）|0']] },
-      { number: '2', kind: 'questionGroup', rows: [8, 9], blanks: [['G8|（1）|0'], ['G9|（2）|0']] },
+      { number: '1', kind: 'questionGroup', rows: [5, 6], blanks: [['G5>H5|（1）|0'], ['G6>H6|（2）|0']] },
+      { number: '2', kind: 'questionGroup', rows: [8, 9], blanks: [['G8>H8|（1）|0'], ['G9>H9|（2）|0']] },
       { number: '3', kind: 'question', rows: [11], blanks: [['G11|-|0']] },
       { number: '4', kind: 'question', rows: [13], blanks: [['G13|-|0']] },
     ]);
     const first = ok(parseGuidedNotes(GROUP_TEMPLATE)).targets[0].questions[0].blanks[0];
-    expect(first.originalContent).toBe('（1）');
+    expect(first).toEqual({ cellA1: 'H5', labelCellA1: 'G5', marker: '（1）', markerIndex: 0, originalContent: '' });
   });
 
   it('finds headers anywhere and ignores extra columns (no fixed positions)', () => {
     expect(summary(parseGuidedNotes(SHIFTED_GROUP))).toEqual([
-      { number: '1', kind: 'questionGroup', rows: [3, 4], blanks: [['J3|（1）|0'], ['J4|（2）|0']] },
+      { number: '1', kind: 'questionGroup', rows: [3, 4], blanks: [['J3>K3|（1）|0'], ['J4>K4|（2）|0']] },
       { number: '2', kind: 'question', rows: [5], blanks: [['J5|-|0']] },
     ]);
   });
@@ -54,6 +55,14 @@ describe('Guided Notes parser (pure)', () => {
     expect(targets).toHaveLength(8);
     expect(targets.every((target) => target.kind === 'question')).toBe(true);
     expect(targets[4]).toEqual({ number: '5', kind: 'question', rows: [6], blanks: [['C6|（1）|0', 'C6|（2）|1']] });
+  });
+
+  it('keeps the blank in the marker cell when the cell to its right is not empty or outside the 作答 range', () => {
+    expect(summary(parseGuidedNotes(RIGHT_CELL_NOT_EMPTY))).toEqual([
+      { number: '1', kind: 'question', rows: [2], blanks: [['C2|（1）|0']] },
+      { number: '2', kind: 'question', rows: [3], blanks: [['C3>D3|（1）|0']] },
+      { number: '3', kind: 'question', rows: [4], blanks: [['C4|（1）|0', 'C4|（2）|1']] },
+    ]);
   });
 
   it('accepts half-width markers', () => {

@@ -28,8 +28,8 @@ describe('Guided Notes import', () => {
     expect(preview.targets.map((t: { number: string; kind: string }) => `${t.number}:${t.kind}`))
       .toEqual(['1:questionGroup', '2:questionGroup', '3:question', '4:question']);
     expect(preview.targets[0].questions).toEqual([
-      { row: 5, blanks: [{ cellA1: 'G5', marker: '（1）', originalContent: '（1）' }] },
-      { row: 6, blanks: [{ cellA1: 'G6', marker: '（2）', originalContent: '（2）' }] },
+      { row: 5, blanks: [{ cellA1: 'H5', labelCellA1: 'G5', marker: '（1）', originalContent: '' }] },
+      { row: 6, blanks: [{ cellA1: 'H6', labelCellA1: 'G6', marker: '（2）', originalContent: '' }] },
     ]);
     expect(f.count('questions')).toBe(0);
     expect(f.count('teacher_sheet_sources')).toBe(0);
@@ -57,7 +57,7 @@ describe('Guided Notes import', () => {
     expect(view.source).toMatchObject({ sheetTitle: '學習單', spreadsheetUrl: expect.stringContaining(SHEET_ID) });
     const cells = f.server.database.prepare(`SELECT c.cell_a1, c.marker, b.label FROM teacher_blank_cells c JOIN blanks b ON b.id = c.blank_id
       ORDER BY c.cell_a1`).all() as { cell_a1: string; marker: string | null; label: string | null }[];
-    expect(cells.map((c) => `${c.cell_a1}|${c.marker ?? '-'}|${c.label ?? '-'}`)).toEqual(['G11|-|-', 'G13|-|-', 'G5|（1）|（1）', 'G6|（2）|（2）', 'G8|（1）|（1）', 'G9|（2）|（2）']);
+    expect(cells.map((c) => `${c.cell_a1}|${c.marker ?? '-'}|${c.label ?? '-'}`)).toEqual(['G11|-|-', 'G13|-|-', 'H5|（1）|（1）', 'H6|（2）|（2）', 'H8|（1）|（1）', 'H9|（2）|（2）']);
     const list = (await f.api.get('/sessions')).body.data.find((a: { sessionId: string }) => a.sessionId === f.sessionId);
     expect(list.imported).toBe(true);
   });

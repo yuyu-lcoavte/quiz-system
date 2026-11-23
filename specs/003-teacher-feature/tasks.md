@@ -212,6 +212,15 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 - [ ] T086 Final `npm.cmd run check`; record TypeScript, test and build results, including Foundation and Student regression suites, in the quickstart Validation log.
 - [X] T087 Highlight the current-round target in `apps/web/src/modules/teacher/TargetList.tsx`: the Waiting or Active row is bold with a light background (`bg-indigo-50`), shows 「▶」 before the number and has `aria-current="true"`; other rows unchanged. Test in `tests/web/teacher-target-list.test.tsx`. **Done 2026-11-23** (requested after the US3 manual run).
 
+### Q16 clarification (2026-11-23, after US4 manual 4.3)
+
+Template answer area spans two columns (「作答」 header G4:H4): G holds the marker label 「（1）」, H is the empty fill cell. Spec FR-028/FR-034 and contracts updated.
+
+- [X] T088 [US3] Parser fill-cell detection in `apps/server/src/modules/teacher/guided-notes/parser.ts`: the 「作答」 column range comes from the header cell's merge; for an answer cell with exactly one marker, the next cell to the right that is still inside that range, starts its own cell/merge on the same row and is empty becomes the blank's cell (`cellA1`), with the marker cell kept as `labelCellA1`; otherwise (two or more markers, right cell not empty, or no such cell) the blank stays in the marker cell. No fixed columns. Add `labelCellA1` to `ParsedBlank` and `ImportPreviewBlank` in `packages/contracts/src/teacher.ts`.
+- [X] T089 [US4] Write-back for fill cells in `apps/server/src/modules/teacher/write-back/`: a fill cell's original is empty, so its answer is written into the fill cell as is and the marker cell is never touched; restore puts the fill cell back to its original (empty). Marker-cell fallback and unmarked cells unchanged.
+- [X] T090 [US3] Import preview in `apps/web/src/modules/teacher/ImportWizard.tsx` shows the label cell and the fill cell (e.g. 「G5（1）→H5」); marker-cell blanks keep 「G5（1）」.
+- [X] T091 Tests and docs: update `tests/fixtures/guided-notes/index.ts`, `tests/unit/teacher-guided-notes-parser.test.ts` (group template blanks H5, H6, H8, H9; single template unchanged; shifted variant follows; two markers in one cell stay appended), `tests/api/teacher-import.test.ts`, `tests/api/teacher-write-back.test.ts`, `tests/web/teacher-import-wizard.test.tsx`; update US3 3.3 and US4 expectations in `tests/manual/teacher-feature.md`; record results in `specs/003-teacher-feature/quickstart.md`.
+
 ---
 
 ## Dependencies and Execution Order

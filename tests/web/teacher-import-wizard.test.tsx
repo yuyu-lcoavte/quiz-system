@@ -13,13 +13,17 @@ const preview: ImportPreviewView = {
   spreadsheetId: '1TestSpreadsheetId_abcdefghijklmnop',
   sheetId: 0,
   sheetTitle: '學習單',
-  questionNumberCount: 2,
+  questionNumberCount: 3,
   targets: [
     { number: '1', kind: 'questionGroup', questions: [
-      { row: 5, blanks: [{ cellA1: 'G5', marker: '（1）', originalContent: '（1）' }] },
-      { row: 6, blanks: [{ cellA1: 'G6', marker: '（2）', originalContent: '（2）' }] },
+      { row: 5, blanks: [{ cellA1: 'H5', labelCellA1: 'G5', marker: '（1）', originalContent: '' }] },
+      { row: 6, blanks: [{ cellA1: 'H6', labelCellA1: 'G6', marker: '（2）', originalContent: '' }] },
     ] },
-    { number: '3', kind: 'question', questions: [{ row: 11, blanks: [{ cellA1: 'G11', marker: null, originalContent: '' }] }] },
+    { number: '3', kind: 'question', questions: [{ row: 11, blanks: [{ cellA1: 'G11', labelCellA1: null, marker: null, originalContent: '' }] }] },
+    { number: '5', kind: 'question', questions: [{ row: 15, blanks: [
+      { cellA1: 'G15', labelCellA1: null, marker: '（1）', originalContent: '（1）＿（2）＿' },
+      { cellA1: 'G15', labelCellA1: null, marker: '（2）', originalContent: '（1）＿（2）＿' },
+    ] }] },
   ],
   warnings: ['G20: This row has an answer cell but no question number; it was ignored.'],
   previewDigest: 'a'.repeat(64),
@@ -51,9 +55,10 @@ describe('ImportWizard', () => {
     await user.type(screen.getByLabelText('試算表網址'), URL);
     await user.click(screen.getByRole('button', { name: '預覽' }));
     expect(props.preview).toHaveBeenCalledWith(URL);
-    expect(await screen.findByText(/共 2 題/)).toBeTruthy();
+    expect(await screen.findByText(/共 3 題/)).toBeTruthy();
     const rows = screen.getAllByRole('row').map((row) => row.textContent ?? '');
-    expect(rows.some((row) => row.includes('1') && row.includes('題組') && row.includes('G5（1）') && row.includes('G6（2）'))).toBe(true);
+    expect(rows.some((row) => row.includes('題組') && row.includes('G5（1）→H5') && row.includes('G6（2）→H6'))).toBe(true);
+    expect(rows.some((row) => row.includes('G15（1）') && row.includes('G15（2）') && !row.includes('→'))).toBe(true);
     expect(rows.some((row) => row.includes('3') && row.includes('單題') && row.includes('G11'))).toBe(true);
     expect(screen.getByText(/G20/)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: '確認匯入' }));

@@ -96,6 +96,7 @@ Each entry records a decision, why it was chosen, and the alternatives rejected.
   5. Rows sharing one vertical `題號` merge form a group target; a row outside such a merge is a standalone question target.
   6. Number normalization: `1.0`, `1` → `1`; other text kept trimmed. Duplicate numbers → `DUPLICATE_QUESTION_NUMBER`.
   7. Blanks: markers matched by `/[（(]\s*(\d+)\s*[）)]/g` in the answer cell; 0 markers → one blank without a marker; k markers → k blanks of one question.
+  7a. Fill cells (Q16 clarification 2026-11-23): one marker + an empty cell to its right inside the 「作答」 header range → that cell is the blank's cell, the marker cell is only a label; otherwise the blank stays in the marker cell.
   8. No question rows → `SHEET_FORMAT_INVALID`.
 - **Test data**: cell values and merges transcribed from both `docs/examples/` templates into test fixtures, plus variants: header moved to another row and column, extra columns, more questions, a cell with two markers, half-width markers, a missing header, duplicate numbers.
 
@@ -103,7 +104,7 @@ Each entry records a decision, why it was chosen, and the alternatives rejected.
 
 - **Decision**:
   - Plan = every target with a current winner, plus every previously written blank whose target now has no winner (restore). Entries are per cell (a cell with several markers becomes one entry).
-  - New content: start from the original content; insert each blank's answer right after its marker; a marker-less blank's cell becomes the answer.
+  - New content: start from the original content; insert each blank's answer right after its marker; a marker-less blank's cell becomes the answer. A fill cell's original is empty, so its answer is written as is and the marker cell is never touched (Q16 clarification 2026-11-23).
   - Restore entries use the original content.
   - Expected current content = `last_written_content` if set, else `original_content`.
   - `POST …/write-back/preview` returns entries and a `planDigest` (SHA-256 of the entries). `POST …/write-back/confirm` with that digest recomputes the plan; if the digest differs (results changed) → 409 `STALE_STATE`. It then re-reads the cells; any mismatch or missing cell → 409 `SHEET_CONFLICT` listing the cells, nothing written. Otherwise one atomic batch write, then `last_written_content` is updated in SQLite.

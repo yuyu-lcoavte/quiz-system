@@ -85,7 +85,7 @@ export class GuidedNotesImportService {
       kind: target.kind,
       questions: target.questions.map((question) => ({
         row: question.rowA1,
-        blanks: question.blanks.map((blank) => ({ cellA1: blank.cellA1, marker: blank.marker, originalContent: blank.originalContent })),
+        blanks: question.blanks.map((blank) => ({ cellA1: blank.cellA1, labelCellA1: blank.labelCellA1, marker: blank.marker, originalContent: blank.originalContent })),
       })),
     }));
     const digestSource = JSON.stringify({ spreadsheetId: ref.spreadsheetId, sheetId: tab.sheetId, sheetTitle: tab.sheetTitle, targets: result.targets });

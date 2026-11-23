@@ -133,7 +133,10 @@ export interface TeacherResultView {
 }
 
 export interface ImportPreviewBlank {
+  /** Cell the answer is written to (fill cell, or the marker cell). */
   cellA1: string;
+  /** Marker label cell when the answer goes to a separate fill cell; null otherwise. */
+  labelCellA1: string | null;
   marker: string | null;
   originalContent: string;
 }

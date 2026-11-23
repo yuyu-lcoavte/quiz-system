@@ -85,7 +85,7 @@ export function ImportWizard({ serviceAccountEmail, locked, preview, confirm, on
           )}
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-slate-200 text-sm text-slate-600"><th className="py-2">題號</th><th>類型</th><th>填空儲存格</th></tr>
+              <tr className="border-b border-slate-200 text-sm text-slate-600"><th className="py-2">題號</th><th>類型</th><th>填空儲存格（標籤→填空格）</th></tr>
             </thead>
             <tbody>
               {result.view.targets.map((target) => (
@@ -93,7 +93,9 @@ export function ImportWizard({ serviceAccountEmail, locked, preview, confirm, on
                   <td className="py-2 font-semibold">{target.number}</td>
                   <td>{target.kind === 'questionGroup' ? `題組（${target.questions.length} 題）` : '單題'}</td>
                   <td>{target.questions.map((question) =>
-                    question.blanks.map((blank) => `${blank.cellA1}${blank.marker ?? ''}`).join('、')).join('；')}</td>
+                    question.blanks.map((blank) => (blank.labelCellA1
+                      ? `${blank.labelCellA1}${blank.marker ?? ''}→${blank.cellA1}`
+                      : `${blank.cellA1}${blank.marker ?? ''}`)).join('、')).join('；')}</td>
                 </tr>
               ))}
             </tbody>

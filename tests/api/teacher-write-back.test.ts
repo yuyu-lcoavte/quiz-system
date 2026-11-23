@@ -43,14 +43,14 @@ async function setup() {
 describe('Answer write-back', () => {
   it('previews every target with a winner, keeping markers, and leaves other targets out', async () => {
     const f = await setup();
-    await f.play('1', 1, { G5: 'CPU', G6: 'OS' });
+    await f.play('1', 1, { H5: 'CPU', H6: 'OS' });
     await f.play('3', 0, { G11: '42' });
     const response = await f.preview();
     expect(response.status).toBe(200);
     const entries = response.body.data.entries as Entry[];
     expect(entries.map((e) => [e.number, e.cellA1, e.currentContent, e.newContent, e.kind])).toEqual([
-      ['1', 'G5', '（1）', '（1）CPU', 'write'],
-      ['1', 'G6', '（2）', '（2）OS', 'write'],
+      ['1', 'H5', '', 'CPU', 'write'],
+      ['1', 'H6', '', 'OS', 'write'],
       ['3', 'G11', '', '42', 'write'],
     ]);
     expect(response.body.data.planDigest).toMatch(/^[0-9a-f]{64}$/);
@@ -59,57 +59,60 @@ describe('Answer write-back', () => {
 
   it('writes all cells in one batch on confirm and remembers what was written', async () => {
     const f = await setup();
-    await f.play('1', 1, { G5: 'CPU', G6: 'OS' });
+    await f.play('1', 1, { H5: 'CPU', H6: 'OS' });
     const { planDigest } = (await f.preview()).body.data;
     const confirmed = await f.confirm(planDigest);
     expect(confirmed.status).toBe(200);
     expect(confirmed.body.data).toEqual({ written: 2 });
     expect(f.gateway.writes).toHaveLength(1);
-    expect([f.cell('G5'), f.cell('G6')]).toEqual(['（1）CPU', '（2）OS']);
-    const rows = f.server.database.prepare('SELECT cell_a1, last_written_content FROM teacher_blank_cells WHERE cell_a1 IN (?, ?) ORDER BY cell_a1').all('G5', 'G6');
-    expect(rows).toEqual([{ cell_a1: 'G5', last_written_content: '（1）CPU' }, { cell_a1: 'G6', last_written_content: '（2）OS' }]);
+    expect([f.cell('H5'), f.cell('H6')]).toEqual(['CPU', 'OS']);
+    expect([f.cell('G5'), f.cell('G6')]).toEqual(['（1）', '（2）']); // marker labels untouched
+    const rows = f.server.database.prepare('SELECT cell_a1, last_written_content FROM teacher_blank_cells WHERE cell_a1 IN (?, ?) ORDER BY cell_a1').all('H5', 'H6');
+    expect(rows).toEqual([{ cell_a1: 'H5', last_written_content: 'CPU' }, { cell_a1: 'H6', last_written_content: 'OS' }]);
     expect((await f.preview()).body.error.code).toBe('NOTHING_TO_WRITE');
   });
 
   it('replaces a previously written answer after a reopen with a new winner (no appending)', async () => {
     const f = await setup();
-    await f.play('1', 1, { G5: 'CPU', G6: 'OS' });
+    await f.play('1', 1, { H5: 'CPU', H6: 'OS' });
     await f.confirm((await f.preview()).body.data.planDigest);
-    await f.play('1', 0, { G5: 'GPU', G6: 'RAM' });
+    await f.play('1', 0, { H5: 'GPU', H6: 'RAM' });
     const entries = (await f.preview()).body.data.entries as Entry[];
     expect(entries.map((e) => [e.cellA1, e.currentContent, e.newContent, e.kind])).toEqual([
-      ['G5', '（1）CPU', '（1）GPU', 'write'],
-      ['G6', '（2）OS', '（2）RAM', 'write'],
+      ['H5', 'CPU', 'GPU', 'write'],
+      ['H6', 'OS', 'RAM', 'write'],
     ]);
     await f.confirm((await f.preview()).body.data.planDigest);
-    expect([f.cell('G5'), f.cell('G6')]).toEqual(['（1）GPU', '（2）RAM']);
+    expect([f.cell('H5'), f.cell('H6')]).toEqual(['GPU', 'RAM']);
+    expect([f.cell('G5'), f.cell('G6')]).toEqual(['（1）', '（2）']);
   });
 
   it('restores the original content when a written target is reopened and nobody submits', async () => {
     const f = await setup();
-    await f.play('1', 1, { G5: 'CPU', G6: 'OS' });
+    await f.play('1', 1, { H5: 'CPU', H6: 'OS' });
     await f.confirm((await f.preview()).body.data.planDigest);
     await f.play('1', null);
     const entries = (await f.preview()).body.data.entries as Entry[];
     expect(entries.map((e) => [e.cellA1, e.currentContent, e.newContent, e.kind])).toEqual([
-      ['G5', '（1）CPU', '（1）', 'restore'],
-      ['G6', '（2）OS', '（2）', 'restore'],
+      ['H5', 'CPU', '', 'restore'],
+      ['H6', 'OS', '', 'restore'],
     ]);
     await f.confirm((await f.preview()).body.data.planDigest);
+    expect([f.cell('H5'), f.cell('H6')]).toEqual(['', '']);
     expect([f.cell('G5'), f.cell('G6')]).toEqual(['（1）', '（2）']);
   });
 
   it('writes nothing when a cell was changed by someone else (SHEET_CONFLICT)', async () => {
     const f = await setup();
-    await f.play('1', 1, { G5: 'CPU', G6: 'OS' });
+    await f.play('1', 1, { H5: 'CPU', H6: 'OS' });
     const { planDigest } = (await f.preview()).body.data;
-    f.gateway.setCell(SHEET_ID, 0, 'G6', '（2）someone typed');
+    f.gateway.setCell(SHEET_ID, 0, 'H6', 'someone typed');
     const response = await f.confirm(planDigest);
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('SHEET_CONFLICT');
-    expect(response.body.error.details.cells).toEqual([{ cellA1: 'G6', expected: '（2）', actual: '（2）someone typed' }]);
+    expect(response.body.error.details.cells).toEqual([{ cellA1: 'H6', expected: '', actual: 'someone typed' }]);
     expect(f.gateway.writes).toHaveLength(0);
-    expect(f.cell('G5')).toBe('（1）');
+    expect(f.cell('H5')).toBe('');
   });
 
   it('reports a cell that no longer exists as a conflict', async () => {
@@ -126,7 +129,7 @@ describe('Answer write-back', () => {
 
   it('rejects a confirm whose plan no longer matches the results (STALE_STATE)', async () => {
     const f = await setup();
-    await f.play('1', 1, { G5: 'CPU', G6: 'OS' });
+    await f.play('1', 1, { H5: 'CPU', H6: 'OS' });
     const { planDigest } = (await f.preview()).body.data;
     await f.play('3', 0, { G11: '42' });
     const response = await f.confirm(planDigest);

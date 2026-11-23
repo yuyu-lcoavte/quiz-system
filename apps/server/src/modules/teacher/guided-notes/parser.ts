@@ -13,7 +13,16 @@ export interface SheetGrid {
   merges: GridMerge[];
 }
 
-export interface ParsedBlank { cellA1: string; marker: string | null; markerIndex: number; originalContent: string }
+export interface ParsedBlank {
+  /** Cell the answer is written to: the fill cell when the template has one, else the marker cell. */
+  cellA1: string;
+  /** Marker (label) cell when the answer goes to a separate fill cell; null otherwise. */
+  labelCellA1: string | null;
+  marker: string | null;
+  markerIndex: number;
+  /** Original text of `cellA1`. */
+  originalContent: string;
+}
 export interface ParsedQuestion { rowA1: number; blanks: ParsedBlank[] }
 export interface ParsedTarget { number: string; kind: 'question' | 'questionGroup'; questions: ParsedQuestion[] }
 export interface ParseWarning { message: string; cellA1?: string }
@@ -64,6 +73,12 @@ export function parseGuidedNotes(grid: SheetGrid): ParseResult {
     return { ok: false, error: { code: 'SHEET_FORMAT_INVALID', message: 'No header row with 「題號」 and 「作答」 was found.' } };
   }
 
+  // 「作答」 column range = the header cell's merge (e.g. G4:H4 → G..H); an unmerged header is one column.
+  const answerHeader = mergeAt(header.row, header.answerColumn);
+  const answerRange = answerHeader
+    ? { first: answerHeader.startColumn, end: answerHeader.endColumn }
+    : { first: header.answerColumn, end: header.answerColumn + 1 };
+
   const warnings: ParseWarning[] = [];
   if (header.row >= LATE_HEADER_ROW) warnings.push({ message: 'The header row is unusually far down.', cellA1: toA1(header.row, header.numberColumn) });
 
@@ -89,7 +104,10 @@ export function parseGuidedNotes(grid: SheetGrid): ParseResult {
     // A row whose answer cell belongs to a merge started on an earlier row has no answer cell of its own.
     if (answerAnchor.row !== row) continue;
 
-    const question: ParsedQuestion = { rowA1: row + 1, blanks: blanksOf(answerText, toA1(answerAnchor.row, answerAnchor.column)) };
+    const question: ParsedQuestion = {
+      rowA1: row + 1,
+      blanks: blanksOf(answerText, toA1(answerAnchor.row, answerAnchor.column), fillCellRightOf(row, answerAnchor)),
+    };
     const vertical = numberAnchor.merge && numberAnchor.merge.endRow - numberAnchor.merge.startRow > 1;
 
     if (vertical) {
@@ -112,12 +130,27 @@ export function parseGuidedNotes(grid: SheetGrid): ParseResult {
     return { ok: false, error: { code: 'SHEET_FORMAT_INVALID', message: 'No question rows were found below the header.' } };
   }
   return { ok: true, targets, warnings };
+
+  /**
+   * Q16 clarification: the next cell right of the answer cell (after its own merge), still inside the 「作答」 range,
+   * starting its own cell/merge on this row and empty, is the fill cell. Returns its A1 address, or null.
+   */
+  function fillCellRightOf(row: number, answer: { row: number; column: number; merge?: GridMerge }): string | null {
+    const column = answer.merge ? answer.merge.endColumn : answer.column + 1;
+    if (column >= answerRange.end) return null;
+    const own = anchor(row, column);
+    if (own.row !== row || own.column !== column) return null;
+    return cell(row, column).trim() === '' ? toA1(row, column) : null;
+  }
 }
 
-function blanksOf(text: string, cellA1: string): ParsedBlank[] {
+function blanksOf(text: string, cellA1: string, fillCellA1: string | null): ParsedBlank[] {
   const markers = [...text.matchAll(MARKER)].map((match) => match[0]);
-  if (markers.length === 0) return [{ cellA1, marker: null, markerIndex: 0, originalContent: text }];
-  return markers.map((marker, markerIndex) => ({ cellA1, marker, markerIndex, originalContent: text }));
+  if (markers.length === 0) return [{ cellA1, labelCellA1: null, marker: null, markerIndex: 0, originalContent: text }];
+  if (markers.length === 1 && fillCellA1) {
+    return [{ cellA1: fillCellA1, labelCellA1: cellA1, marker: markers[0], markerIndex: 0, originalContent: '' }];
+  }
+  return markers.map((marker, markerIndex) => ({ cellA1, labelCellA1: null, marker, markerIndex, originalContent: text }));
 }
 
 function duplicate(number: string, cellA1: string): ParseResult {

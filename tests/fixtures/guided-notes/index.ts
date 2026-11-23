@@ -66,14 +66,14 @@ export const GROUP_TEMPLATE = grid(
   [...HEADER_MERGES, 'B5:B6', 'C5:F5', 'C6:F6', 'B8:B9', 'C8:F8', 'C9:F9', 'C11:F11', 'G11:H11', 'C13:F13', 'G13:H13'],
 );
 
-/** Group template layout moved: header on row 2, columns shifted right by 2 (D/E/J), an extra column I, numbers as "1". */
+/** Group template layout moved: header on row 2, columns shifted right by 2 (D/E, 作答 J2:K2), an extra column I, numbers as "1". */
 export const SHIFTED_GROUP = grid(
   {
     D2: '題號', E2: '題目', I2: '備註', J2: '作答',
     D3: '1', E3: '題目1-1', J3: '（1）', E4: '題目1-2', J4: '（2）',
     D5: '2', E5: '題目二', I5: '老師備註',
   },
-  ['E2:H2', 'D3:D4', 'E3:H3', 'E4:H4', 'E5:H5'],
+  ['E2:H2', 'J2:K2', 'D3:D4', 'E3:H3', 'E4:H4', 'E5:H5', 'J5:K5'],
   '工作表2',
 );
 
@@ -87,6 +87,12 @@ export const EIGHT_WITH_MULTI_BLANK = grid({
 export const HALF_WIDTH_GROUP = grid(
   { A1: '題號', B1: '題目', C1: '作答', A2: '1', C2: '(1)', C3: '( 2 )' },
   ['A2:A3'],
+);
+
+/** 作答 spans C:D. Row 2: right cell has text → marker cell. Row 3: empty right cell → fill cell D3. Row 4: two markers → same cell C4. */
+export const RIGHT_CELL_NOT_EMPTY = grid(
+  { A1: '題號', B1: '題目', C1: '作答', A2: '1', C2: '（1）', D2: '已填', A3: '2', C3: '（1）', A4: '3', C4: '（1）＿（2）＿' },
+  ['C1:D1'],
 );
 
 export const MISSING_ANSWER_HEADER = grid({ A1: '題號', B1: '題目', A2: '1', A3: '2' });

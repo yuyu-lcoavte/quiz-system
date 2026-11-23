@@ -23,7 +23,13 @@ type ParseResult =
 
 interface ParsedTarget { number: string; kind: 'question' | 'questionGroup'; questions: ParsedQuestion[] }
 interface ParsedQuestion { rowA1: number; blanks: ParsedBlank[] }      // rowA1 is 1-based
-interface ParsedBlank { cellA1: string; marker: string | null; markerIndex: number; originalContent: string }
+interface ParsedBlank {
+  cellA1: string;            // cell the answer is written to (fill cell, or the marker cell)
+  labelCellA1: string | null; // marker cell when the answer goes to a separate fill cell, else null
+  marker: string | null;
+  markerIndex: number;
+  originalContent: string;   // original text of cellA1
+}
 ```
 
 `targets` keep sheet order; that order becomes target position.
@@ -37,6 +43,7 @@ interface ParsedBlank { cellA1: string; marker: string | null; markerIndex: numb
 5. Consecutive rows whose `題號` cell comes from the same vertical merge form one `questionGroup` target with one question per row; other rows are `question` targets with one question.
 6. Number: `/^\d+(\.0+)?$/` → integer text (`1.0` → `1`); otherwise trimmed text. A number used by two targets → `DUPLICATE_QUESTION_NUMBER` with the second cell's address.
 7. Blanks: markers `/[（(]\s*(\d+)\s*[）)]/g` in the row's `作答` cell. No marker → one blank, `marker: null`, `markerIndex: 0`. k markers → k blanks, in order, `markerIndex` 0…k-1.
+7a. Fill cells (Q16 clarification 2026-11-23): the 「作答」 column range is the header cell's merge (e.g. `G4:H4` → G..H; a single unmerged header → one column). When the row's answer cell holds exactly one marker and the next cell to its right (after the answer cell's own merge) is still inside that range, starts its own cell/merge on the same row and is empty, that cell is the blank's `cellA1` (original `''`) and the marker cell is `labelCellA1`. Otherwise the blank stays in the marker cell (`labelCellA1: null`). Columns are never fixed.
 8. No question rows → `SHEET_FORMAT_INVALID`.
 9. Warnings (not errors): rows after the last question with content in the `作答` column but no number; header found below row 20.
 
@@ -45,9 +52,10 @@ interface ParsedBlank { cellA1: string; marker: string | null; markerIndex: numb
 | Fixture | Expected |
 |---|---|
 | Single-question template (transcribed from `docs/examples/`) | 6 `question` targets, numbers 1–6, each one blank without marker in the `作答` anchor (`G5`, `G7`, …) |
-| Question-group template | 4 targets: 1 and 2 are groups with 2 questions each, blanks `（1）`, `（2）`; 3 and 4 single questions |
-| Header moved to row 2, columns shifted by 2, extra column between | Same structure as the template it came from, addresses shifted |
-| 8 questions, one cell `（1）＿＿（2）＿＿` | that question has 2 blanks in one cell (not a group) |
+| Question-group template | 4 targets: 1 and 2 are groups with 2 questions each; blanks in fill cells H5, H6, H8, H9 with labels G5, G6, G8, G9; 3 and 4 single questions (G11, G13) |
+| Header moved to row 2, columns shifted by 2, extra column between | Same structure as the template it came from, addresses shifted (fill cells K3, K4) |
+| 8 questions, one cell `（1）＿＿（2）＿＿` | that question has 2 blanks in that same cell (not a group; answers appended after markers) |
+| Marker cell whose right cell is not empty | blank stays in the marker cell |
 | Half-width `(1)` markers | Recognized like full-width |
 | Missing `作答` header | `SHEET_FORMAT_INVALID` |
 | Two rows numbered `3` | `DUPLICATE_QUESTION_NUMBER` |
