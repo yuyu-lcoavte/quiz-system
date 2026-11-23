@@ -143,16 +143,21 @@ Use an activity that has a reopened target and at least one Team that did not su
 
 | # | Steps | Expected | Result |
 |---|---|---|---|
-| 5.1 | Teacher: press 匯出 CSV on the activity page | A file `activity-<活動代號>.csv` downloads | Not run |
-| 5.2 | Open the file in Excel (double-click) | Chinese shows correctly; columns 題號, 第幾輪, 組別, 答案, 順位, 是否勝出, 送出時間; rows = rounds × teams | Not run |
-| 5.3 | Import the file into Google Sheets (File → Import) | Same content, Chinese correct | Not run |
-| 5.4 | Check a reopened target | Its rounds appear with 第幾輪 1, 2…; each round has its own winner (是) | Not run |
-| 5.5 | Check a Team that did not submit | 答案, 順位, 送出時間 empty; 是否勝出 否 | Not run |
-| 5.6 | Check a group question row | 答案 like 「（1）CPU；（2）OS」 | Not run |
-| 5.7 | Check 送出時間 against the clock in class | Taiwan local time, `YYYY-MM-DD HH:mm:ss` | Not run |
-| 5.8 | Have a student answer 「=1+1」, then export | The cell shows the text `=1+1` (prefixed with '), not the number 2 | Not run |
-| 5.9 | Student browser: open `/api/v1/teacher/sessions/<id>/export.csv` | 401, no file | Not run |
+| 5.1 | Teacher: press 匯出 CSV on the activity page | A file `activity-<活動代號>.csv` downloads | Pass (2026-11-23) |
+| 5.2 | Open the file in Excel (double-click) | Chinese shows correctly; columns 題號, 第幾輪, 組別, 答案, 順位, 是否勝出, 送出時間; rows = rounds × teams | Pass (2026-11-23) |
+| 5.3 | Import the file into Google Sheets (File → Import) | Same content, Chinese correct | Pass (2026-11-23) |
+| 5.4 | Check a reopened target | Its rounds appear with 第幾輪 1, 2…; each round has its own winner (是) | Pass (2026-11-23) |
+| 5.5 | Check a Team that did not submit | 答案, 順位, 送出時間 empty; 是否勝出 否 | Pass (2026-11-23) |
+| 5.6 | Check a group question row | 答案 like 「（1）CPU；（2）OS」 | Pass (2026-11-23) |
+| 5.7 | Check 送出時間 against the clock in class | Taiwan local time, `YYYY-MM-DD HH:mm:ss` | Pass (2026-11-23) |
+| 5.8 | Use a **single question** (not a group): reopen a single target, have a student answer 「=1+1」 (with the leading =), end, then export. A group answer always starts with its marker 「（1）」, so it can never begin with = and does not test this | The cell shows the text `=1+1` (prefixed with '), not the number 2 | Pass (2026-11-23): single question 3 reopened, 第1組 answered 「=1+1」, the cell shows the text, not 2. A first attempt with a group answer (and no =) could not exercise the check, which led to this step wording |
+| 5.9 | Student browser: open `/api/v1/teacher/sessions/<id>/export.csv` | 401, no file | Pass (2026-11-23) |
 
 Notes / problems found (US5):
 
-- (not run yet)
+- 2026-11-23 run by the Teacher Feature owner: 5.1–5.9 all passed.
+- 5.2: Excel showed Chinese correctly; 14 rows = 7 rounds × 2 Teams. 5.3: Google Sheets import showed the same content.
+- 5.4: target 1 round 1 won by 第2組 and round 2 by 第1組, each with its own 「是」.
+- 5.5: the non-submitting Team had empty 答案/順位/送出時間 and 「否」. 5.6: group answer 「（1）CPU；（2）OS」. 5.7: Taiwan time, e.g. 2026-11-23 15:19:39.
+- 5.8: the first attempt used a group question (and omitted the =); a group answer starts with 「（1）」 and is never treated as a formula, so it could not test the guard. Step 5.8 now says to use a single question; re-done that way and passed.
+- 5.9: a student browser opening the export URL got 401 and no file.

@@ -197,7 +197,7 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 - [X] T078 [US5] Implement `apps/server/src/modules/teacher/export/activity-record-service.ts` (rows from Rounds × Teams using `teacher-result-projection.ts`).
 - [X] T079 [US5] Implement `apps/server/src/api/teacher/export-controller.ts` (`GET /sessions/:sessionId/export.csv`) and register it. T076 passes.
 - [X] T080 [US5] Add an export button in `apps/web/src/modules/teacher/ExportButton.tsx` and place it on `TeacherSessionPage.tsx`.
-- [ ] T081 [US5] Add the US5 section to `tests/manual/teacher-feature.md` (open in Excel and Google Sheets); run `npm.cmd run check` and the manual section; record results.
+- [X] T081 [US5] Add the US5 section to `tests/manual/teacher-feature.md` (open in Excel and Google Sheets); run `npm.cmd run check` and the manual section; record results. **Done 2026-11-23**: manual US5 5.1–5.9 pass (5.8 reworded to use a single question).
 
 **Checkpoint**: All five stories complete.
 
