@@ -142,7 +142,7 @@ No step got stuck. Recorded in `tests/manual/teacher-feature.md` (D.1, D.2).
 | Step | Result |
 |---|---|
 | TypeScript (`npm run typecheck`: contracts build, contracts/server/web typecheck, tests typecheck) | Pass |
-| Vitest (`npm test`) | Pass: 77 test files / 427 tests in 32 s. 31 Teacher test files; the other 47 files are the Foundation and Student suites from the baseline (47 files / 231 tests on 2026-11-22), all still passing. |
+| Vitest (`npm test`) | Pass: 77 test files / 427 tests in 32 s. 30 Teacher test files; the other 47 files are the Foundation and Student suites from the baseline (47 files / 231 tests on 2026-11-22), all still passing. |
 | Build (`npm run build`: contracts, server, web) | Pass |
 
 Manual acceptance recorded separately: US1 (T048), US2 (T054), US3 (T067), US4 (T074), US5 (T081) and the timed demo (T085) all pass; see `tests/manual/teacher-feature.md`. Not covered here: the OpenSpec group's implementation and the shared HackMD (synced by hand); shared-file edits listed as 「需與學生端負責人協調」 still need the Student owner's review in the PR.
