@@ -1,9 +1,11 @@
 import type {
   ActivitySummary,
+  ImportPreviewView,
   TeacherMeView,
   TeacherMonitorView,
   TeacherResultView,
   TeacherSessionView,
+  WriteBackPlanView,
 } from '@quiz/contracts';
 import type { RoundTargetReference, SessionStateSnapshot, UUID } from '@quiz/contracts/domain';
 import { teacherErrorMessage } from './error-messages.js';
@@ -83,6 +85,14 @@ export function createTeacherApiClient(options: TeacherApiClientOptions = {}) {
       call<SessionStateSnapshot>('POST', `${sessionPath(sessionId)}/rounds/start`, { expectedStateVersion }),
     end: (sessionId: UUID, expectedStateVersion: number) =>
       call<SessionStateSnapshot>('POST', `${sessionPath(sessionId)}/rounds/end`, { expectedStateVersion }),
+    importPreview: (sessionId: UUID, url: string) =>
+      call<ImportPreviewView>('POST', `${sessionPath(sessionId)}/import/preview`, { url }),
+    importConfirm: (sessionId: UUID, url: string, previewDigest: string) =>
+      call<TeacherSessionView>('POST', `${sessionPath(sessionId)}/import/confirm`, { url, previewDigest }),
+    writeBackPreview: (sessionId: UUID) =>
+      call<WriteBackPlanView>('POST', `${sessionPath(sessionId)}/write-back/preview`),
+    writeBackConfirm: (sessionId: UUID, planDigest: string) =>
+      call<{ written: number }>('POST', `${sessionPath(sessionId)}/write-back/confirm`, { planDigest }),
     monitor: (sessionId: UUID) => call<TeacherMonitorView>('GET', `${sessionPath(sessionId)}/monitor`),
     results: (sessionId: UUID, roundId?: UUID) =>
       call<TeacherResultView>('GET', `${sessionPath(sessionId)}/results${roundId ? `?roundId=${roundId}` : ''}`),

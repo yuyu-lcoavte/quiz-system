@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { TargetStatusView, TeacherSessionView } from '@quiz/contracts';
 import { parseUUID, type UUID } from '@quiz/contracts/domain';
+import { ExportButton } from '../../modules/teacher/ExportButton.js';
+import { ImportWizard } from '../../modules/teacher/ImportWizard.js';
 import { MonitorPanel } from '../../modules/teacher/MonitorPanel.js';
 import { ResultsPanel } from '../../modules/teacher/ResultsPanel.js';
 import { RoundControlPanel } from '../../modules/teacher/RoundControlPanel.js';
 import { TargetList } from '../../modules/teacher/TargetList.js';
+import { WriteBackDialog } from '../../modules/teacher/WriteBackDialog.js';
 import { displayError, isConflict, TeacherApiError } from '../../modules/teacher/teacher-api-client.js';
 import { secondaryButton, useTeacherApi } from '../../modules/teacher/use-teacher-api.js';
 import { createSessionStateClient, type SessionStateClient } from '../../services/session-state-client.js';
@@ -22,6 +25,7 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const latestVersion = useRef(-1);
+  const [serviceAccountEmail, setServiceAccountEmail] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!sessionId) return;
@@ -35,6 +39,12 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
   }, [api, sessionId]);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  useEffect(() => {
+    let active = true;
+    api.me().then((me) => { if (active) setServiceAccountEmail(me.serviceAccountEmail); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [api]);
 
   useEffect(() => {
     if (!sessionId) return undefined;
@@ -72,7 +82,10 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
           <p className="text-sm font-semibold text-indigo-700">目前模組：老師端</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">活動管理</h1>
         </div>
-        <Link to="/teacher/dashboard" className={secondaryButton}>返回活動清單</Link>
+        <div className="flex flex-wrap gap-3">
+          {sessionId && <ExportButton sessionId={sessionId} />}
+          <Link to="/teacher/dashboard" className={secondaryButton}>返回活動清單</Link>
+        </div>
       </div>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {!view && !error && <p className="text-slate-600">讀取中…</p>}
@@ -98,6 +111,29 @@ export function TeacherSessionPage({ createStateClient = createSessionStateClien
           <div>
             <h2 className="text-xl font-semibold">題目</h2>
             <TargetList targets={view.targets} canSelect={canSelect} busy={busy} onSelect={select} />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">匯入 Guided Notes</h2>
+            {view.source && (
+              <p className="mt-1 text-sm text-slate-600">已匯入：分頁「{view.source.sheetTitle}」（{new Date(view.source.importedAt).toLocaleString('zh-TW')}）</p>
+            )}
+            {view.source && (
+              <div className="mt-2">
+                <WriteBackDialog
+                  preview={() => api.writeBackPreview(sessionId)}
+                  confirm={(digest) => api.writeBackConfirm(sessionId, digest)}
+                />
+              </div>
+            )}
+            <div className="mt-2">
+              <ImportWizard
+                serviceAccountEmail={serviceAccountEmail}
+                locked={view.state.currentRoundId !== null}
+                preview={(url) => api.importPreview(sessionId, url)}
+                confirm={(url, digest) => api.importConfirm(sessionId, url, digest)}
+                onImported={() => { void reload(); }}
+              />
+            </div>
           </div>
         </>
       )}

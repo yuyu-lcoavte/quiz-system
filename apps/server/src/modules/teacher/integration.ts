@@ -4,10 +4,19 @@ import { TeacherLoginSessionService } from './auth/login-session-service.js';
 import { createTeacherSocketIdentity, type TeacherSocketIdentity } from './auth/teacher-socket-identity.js';
 import type { TeacherConfig } from './config.js';
 import { createTeacherRepositories } from './persistence/index.js';
+import { GoogleSheetsGateway } from './sheets/google-sheets-gateway.js';
+import type { SheetsGateway } from './sheets/sheets-gateway.js';
+
+/** Google Sheets only when GOOGLE_SERVICE_ACCOUNT_KEY_FILE is set (path already checked to be outside the repo). */
+function createConfiguredSheetsGateway(config: TeacherConfig): SheetsGateway | null {
+  return config.serviceAccountKeyFile ? new GoogleSheetsGateway({ keyFile: config.serviceAccountKeyFile }) : null;
+}
 
 export interface TeacherIntegrationOverrides {
   /** Injectable clock for tests. */
   readonly now?: () => Date;
+  /** Injected gateway (tests use the in-memory fake); null = Sheets not configured. Omitted = built from config. */
+  readonly sheetsGateway?: SheetsGateway | null;
 }
 
 /**
@@ -21,6 +30,7 @@ export interface TeacherIntegrationOverrides {
 export function createTeacherIntegration(config: TeacherConfig, overrides: TeacherIntegrationOverrides = {}): TeacherIntegrationOptions {
   const now = overrides.now ?? (() => new Date());
   let socketIdentity: TeacherSocketIdentity | null = null;
+  const sheetsGateway = overrides.sheetsGateway !== undefined ? overrides.sheetsGateway : createConfiguredSheetsGateway(config);
 
   return {
     createTeacherRouter: (services) => {
@@ -35,7 +45,7 @@ export function createTeacherIntegration(config: TeacherConfig, overrides: Teach
           verifyCookie: (value) => loginSessions.verify(value),
         });
       }
-      return createTeacherRouter({ config, services, repositories, now, loginSessions });
+      return createTeacherRouter({ config, services, repositories, now, loginSessions, sheetsGateway });
     },
     resolveSocketActorContext: (socket) => socketIdentity?.resolveSocketActorContext(socket) ?? null,
     authorizeWatch: (actor, sessionId) => socketIdentity?.authorizeWatch(actor, sessionId) ?? false,

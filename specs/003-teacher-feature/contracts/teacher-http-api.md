@@ -57,7 +57,7 @@ These responses exist only under `/api/v1/teacher` and require a Teacher cookie;
 
 | Method and path | Body | Success | Errors |
 |---|---|---|---|
-| `POST /sessions/:sessionId/import/preview` | `{ url }` | `{ data: { spreadsheetId, sheetId, sheetTitle, questionNumberCount, targets: [{ number, kind, questions: [{ row, blanks: [{ cellA1, marker, originalContent }] }] }], warnings[], previewDigest } }` — nothing saved | 400 `INVALID_SHEET_URL`, 403 `SHEET_NOT_SHARED`, 404 `SHEET_NOT_FOUND`, 422 `SHEET_FORMAT_INVALID`, 422 `DUPLICATE_QUESTION_NUMBER`, 502 `SHEETS_UNAVAILABLE`, 503 `SHEETS_NOT_CONFIGURED` |
+| `POST /sessions/:sessionId/import/preview` | `{ url }` | `{ data: { spreadsheetId, sheetId, sheetTitle, questionNumberCount, targets: [{ number, kind, questions: [{ row, blanks: [{ cellA1, labelCellA1, marker, originalContent }] }] }], warnings[], previewDigest } }` — nothing saved | 400 `INVALID_SHEET_URL`, 403 `SHEET_NOT_SHARED`, 404 `SHEET_NOT_FOUND`, 422 `SHEET_FORMAT_INVALID`, 422 `DUPLICATE_QUESTION_NUMBER`, 502 `SHEETS_UNAVAILABLE`, 503 `SHEETS_NOT_CONFIGURED` |
 | `POST /sessions/:sessionId/import/confirm` | `{ url, previewDigest }` | 201 `{ data: TeacherSessionView }` | preview errors, 409 `IMPORT_LOCKED` (Session already has a Round), 409 `PREVIEW_CHANGED` (sheet changed since preview) |
 
 Error `details` may include `{ row, column, cellA1 }` to point at the problem; never sheet contents beyond the cell in question.

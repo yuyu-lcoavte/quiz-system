@@ -52,7 +52,7 @@ Expected: typecheck, all Vitest suites (Foundation, Student and the new `teacher
 | Monitor and results | `tests/api/teacher-monitor.test.ts` | submitted/not submitted, order, answers; no drafts; Student cookie 401 |
 | Parser | `tests/unit/teacher-guided-notes-parser.test.ts` | all fixtures in [contracts/guided-notes-parser.md](contracts/guided-notes-parser.md) |
 | Import | `tests/api/teacher-import.test.ts` | preview saves nothing; confirm creates matching Questions/Blanks/Groups; each sheet error code; `PREVIEW_CHANGED`; `IMPORT_LOCKED` after first Round |
-| Write-back | `tests/unit/teacher-cell-composer.test.ts`, `tests/api/teacher-write-back.test.ts` | `（1）` + `CPU` → `（1）CPU`; empty cell → answer; two markers in one cell; rewrite after reopen replaces; restore after no-winner reopen; conflict → nothing written; stale plan → 409 |
+| Write-back | `tests/unit/teacher-cell-composer.test.ts`, `tests/api/teacher-write-back.test.ts` | fill cell H5 gets `CPU` while G5 `（1）` stays; marker-cell fallback `（1）` + `CPU` → `（1）CPU`; empty cell → answer; two markers in one cell; rewrite after reopen replaces; restore after no-winner reopen; conflict → nothing written; stale plan → 409 |
 | CSV | `tests/unit/teacher-csv.test.ts`, `tests/api/teacher-export.test.ts` | BOM, CRLF, quoting, Asia/Taipei time, formula-injection prefix, rows = Rounds × Teams, non-submitters empty |
 
 ## Manual end-to-end (demo script)
@@ -97,3 +97,56 @@ Actual results only; anything not run is listed as not run.
 | 2026-11-22 | Phase 4 (T049–T053) | `npm.cmd run check` | Pass: typecheck, 65 test files / 344 tests, build. `teacher-monitor` (API, real Student join/submit, drafts never exposed) and `teacher-monitor-panel` (1 s polling only while Active, answers hidden until toggled, results/無勝者) failed first for the expected reasons, then passed. US2 manual (T054) not run yet. |
 | 2026-11-22 | Phase 4 manual (T054) | `tests/manual/teacher-feature.md` US2 2.1–2.7, same three browsers | All 7 pass, including 2.4 (moved from US1.9: full order, winner 第2組 with 「（1）1；（2）11」) and 2.6 (第1組's Network shows no 第2組 data). US1.9 student side also confirmed (both Teams 已結束, 第2組 winner). One issue: 作答狀況 still showed 「（已隱藏）」 after End (FR-022). |
 | 2026-11-23 | Phase 4 fix | `npm.cmd run check` | Pass: typecheck, 65 test files / 346 tests, build. MonitorPanel now always shows answers once Ended and hides the toggle; two new tests failed first, then passed. Not re-checked by hand. |
+| 2026-11-23 | Phase 5 (T056–T066) | `npm.cmd run check` | Pass: typecheck, 70 test files / 392 tests, build. New suites `teacher-sheet-url`, `teacher-guided-notes-parser` (both templates transcribed + 8 variants), `teacher-import` (fake gateway), `teacher-google-sheets-gateway` (recording Sheets API stand-in, no network) and `teacher-import-wizard` each failed first for the expected reason, then passed. One test fix: the import login test first lacked an Origin and got 403 (Origin check runs before login, as designed). No real Google call made; US3 manual (T067) not run yet. |
+| 2026-11-23 | Phase 5 manual (T067) | `tests/manual/teacher-feature.md` US3 3.1–3.12 with real Google Sheets and a service account | All 12 pass. Preview about 2 s for 3.3/3.4/3.5 (goal ≤ 5 s). Moved layout (3.4) parsed correctly; imported group question played by two Teams (3.12, winner 第2組 「（1）1111；（2）22」). Also re-checked the US2 fix by hand: answers shown after End, no toggle. |
+| 2026-11-23 | T087 highlight + Phase 6 (T068–T073) | `npm.cmd run check` | Pass: typecheck, 74 test files / 416 tests, build. `teacher-cell-composer`, `teacher-write-back` (fake gateway: write, rewrite after reopen, restore, conflict, missing cell, stale plan, NOTHING_TO_WRITE, NOT_IMPORTED) and `teacher-write-back-dialog` failed first, then passed. The first full run failed the test typecheck on `teacher-target-list.test.tsx` (committed in the T087 commit without running the test typecheck); fixed by typing the rows. US4 manual (T074) not run yet. |
+| 2026-11-23 | US4 manual first run (T074, partial) | `tests/manual/teacher-feature.md` 4.1–4.3 | 4.1, 4.2 pass. 4.3 wrote G5 「（1）CPU」/G6 「（2）OS」/G11 「42」: matched the document then, but not the template's fill cells (H5/H6). Led to the Q16 clarification (T088–T091). 4.4–4.8 not run; 3.3/4.2/4.3 need a re-run. |
+| 2026-11-23 | Q16 fill-cell clarification (T088–T091) | `npm.cmd run check` | Pass: typecheck, 74 test files / 417 tests, build. Updated parser/import/write-back/wizard tests failed first (12 failures: group template now H5/H6/H8/H9, shifted variant K3/K4, write-back targets H5/H6, preview 「G5（1）→H5」) while the single template, two-marker cell and half-width cases kept passing; then all passed. Write-back service needed no code change (a fill cell's original is empty). Diagrams unchanged. |
+| 2026-11-23 | US4 manual re-run (T074) | `tests/manual/teacher-feature.md` 3.3 and 4.1–4.8, fresh sheet copy re-imported after the Q16 fix | All pass: preview G5（1）→H5…; H5/H6 written, G5/G6 unchanged; reopen replaced (GPU/RAM), no-winner restore emptied G11; conflict wrote nothing and succeeded after the cell was put back; unshared → not-shared message; seed-demo activity has no write-back button. |
+| 2026-11-23 | Phase 7 (T075–T080) | `npm.cmd run check` | Pass: typecheck, 77 test files / 427 tests, build. `teacher-csv` (BOM, CRLF, quoting, formula prefix, Asia/Taipei time), `teacher-export` (Rounds × Teams, reopened rounds, non-submitters, group answers, filename, 401) and `teacher-export-button` failed first for the expected reasons, then passed. US5 manual (T081) not run yet. |
+| 2026-11-23 | Phase 7 manual (T081) | `tests/manual/teacher-feature.md` US5 5.1–5.9 | All pass: Excel and Google Sheets show Chinese, 14 rows = 7 rounds × 2 Teams; reopened rounds each with their own winner; non-submitters empty/否; 「（1）CPU；（2）OS」; Taiwan time; 「=1+1」 in a single question exported as text; student gets 401. Step 5.8 reworded to use a single question (group answers start with 「（1）」 and cannot test the formula guard). |
+
+## Security sweep (T083, 2026-11-23)
+
+| Check | Result |
+|---|---|
+| Log/console output in `apps/server/src/modules/teacher`, `apps/server/src/api/teacher`, `apps/server/src/main.ts`, `apps/web/src/{modules,pages}/teacher` | Only `main.ts` startup lines (booleans: login configured, Sheets configured) and the two scripts: `teacher:hash-password` prints the hash only (never the password; refuses argv), `teacher:seed-demo` prints the activity code and database path. No password, hash, session secret, CSRF token, cookie value, sheet URL or key path is logged. |
+| Error messages | Config errors and the Google key error name the variable only, not its value or path (`teacher-config`, `teacher-google-sheets-gateway` tests). Google error bodies are never forwarded (mapped to SHEET_NOT_SHARED / SHEET_NOT_FOUND / SHEETS_UNAVAILABLE). Unknown errors go through the shared handler as INTERNAL_ERROR without a stack. |
+| Response bodies | `/me` returns the CSRF token by design (Teacher only, `no-store`). Error `details` exist only for parse errors (cell address) and SHEET_CONFLICT (cell address, expected and actual cell text; Teacher only, the Teacher's own sheet). Password hash and secret never appear (asserted in `teacher-auth`). |
+| `git ls-files` | No `.env`, service-account JSON, key/PEM file, SQLite database or `plantuml.jar` tracked; only `.env.example`, whose values are placeholders. `git grep` finds no private-key or client-secret strings. |
+| Key location | `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` inside the repository is rejected at startup (`teacher-config` test). |
+
+No issues found.
+
+## Diagram consistency check (T084, 2026-11-23)
+
+| Diagram | Result |
+|---|---|
+| `003-teacher-feature-component` | Matches: main.ts → app.ts hook → Teacher router → security middleware → services; Socket identity; SheetsGateway; Teacher repositories (006); Foundation lifecycle/events and Student coordinator. No change. |
+| `003-teacher-feature-sequence` | Matches: login, create, import preview/confirm, select/start, 1 s monitor polling (answers hidden until toggled), End through the coordinator with commit-then-publish, write-back preview/confirm with conflict check, CSV export. No change. |
+| `003-teacher-feature-class` | Updated to the implementation: login handled by `TeacherAuthController` (password-hash module, rate limiter, `TeacherLoginSessionService`, `TeacherCsrfService`; the CSRF service has no dependency on the session service); function modules (`parseSheetUrl`, `parseGuidedNotes`, `composeCell`, `writeCsv`, `createTeacherActorContext`) shown as «module»; `GuidedNotesImportService` and `Teacher*Repository` names; `TeacherResultProjection.rounds()` used by CSV; `WriteBackService` reads current winners from Foundation tables (not via the projection); `ActivityService → TargetCatalog`; fill-cell `cellA1` / `labelCellA1` (Q16 clarification). |
+
+Rendered with `java -jar plantuml.jar "./diagrams/*.puml"` (exit 0, every `.puml` has a PNG); only the 003 class PNG changed and was checked as readable; the other PNGs were restored with `git restore`.
+
+## Full demo timing (T085, 2026-11-23)
+
+| Criterion | Measured | Result |
+|---|---|---|
+| SC-001: login → first round started ≤ 3 min | within 2 min | Pass |
+| SC-009: full demo (Teacher + 2 Teams: login, create, import, answer, monitor/顯示答案, end, reopen, write back, export CSV) ≤ 5 min | about 2 min | Pass |
+
+No step got stuck. Recorded in `tests/manual/teacher-feature.md` (D.1, D.2).
+
+## Final check (T086, 2026-11-23)
+
+| Step | Result |
+|---|---|
+| TypeScript (`npm run typecheck`: contracts build, contracts/server/web typecheck, tests typecheck) | Pass |
+| Vitest (`npm test`) | Pass: 77 test files / 427 tests in 32 s. 30 Teacher test files; the other 47 files are the Foundation and Student suites from the baseline (47 files / 231 tests on 2026-11-22), all still passing. |
+| Build (`npm run build`: contracts, server, web) | Pass |
+
+Manual acceptance recorded separately: US1 (T048), US2 (T054), US3 (T067), US4 (T074), US5 (T081) and the timed demo (T085) all pass; see `tests/manual/teacher-feature.md`. Not covered here: the OpenSpec group's implementation and the shared HackMD (synced by hand); shared-file edits listed as 「需與學生端負責人協調」 still need the Student owner's review in the PR.
+
+## Convergence (2026-11-23)
+
+`/speckit-converge` found 2 items, appended as Phase 9: T092 (FR-029 partial: preview did not show original cell content) and T093 (unreferenced Teacher placeholder pages). T092 done: the preview now shows 「G5（1）→H5（空白）」, 「G15：（1）＿（2）＿」 (one entry per cell) and 「G11（空白）」; the wizard test failed first, then passed. T093: decided to keep both placeholder files (Foundation files, unreferenced, no effect on pages/build/tests). `npm.cmd run check`: pass, 77 test files / 427 tests, typecheck and build.

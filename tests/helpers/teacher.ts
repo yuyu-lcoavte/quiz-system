@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { UUID } from '@quiz/contracts/domain';
 import { createFoundationRepositories } from '../../apps/server/src/persistence/repositories/index.js';
+import type { SheetsGateway } from '../../apps/server/src/modules/teacher/sheets/sheets-gateway.js';
 import { scryptSync } from 'node:crypto';
 import request from 'supertest';
 import { createHttpServer } from '../../apps/server/src/app.js';
@@ -33,6 +34,8 @@ export interface TeacherTestServerOptions {
   readonly env?: Record<string, string | undefined>;
   /** Also enable the Student routes and Student Socket handshake (needed for join/submit flows). */
   readonly withStudents?: boolean;
+  /** In-memory Google Sheets stand-in; omitted = Sheets not configured. */
+  readonly sheetsGateway?: SheetsGateway;
 }
 
 export const STUDENT_TEST_SECRET = 'student-test-secret-'.repeat(3);
@@ -46,7 +49,7 @@ export function createTeacherTestServer(options: TeacherTestServerOptions = {}) 
     TEACHER_ALLOWED_ORIGINS: TEACHER_TEST_ORIGIN,
     ...options.env,
   });
-  const integration = createTeacherIntegration(config, { now: options.now });
+  const integration = createTeacherIntegration(config, { now: options.now, sheetsGateway: options.sheetsGateway ?? null });
   const server = createHttpServer({
     database: foundation.database,
     ...integration,

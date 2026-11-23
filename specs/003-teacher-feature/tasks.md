@@ -137,21 +137,21 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 
 ### Tests for User Story 3
 
-- [ ] T056 [P] [US3] Create fixtures in `tests/fixtures/guided-notes/`: transcriptions of both `docs/examples/` templates (values + merges, including spacer rows such as `B6:H6` and group merges `B5:B6`, `B8:B9`) and variants listed in `contracts/guided-notes-parser.md` (header moved and columns shifted, extra column, 8 questions with a two-marker cell, half-width markers, missing `作答` header, duplicate number, header only).
-- [ ] T057 [P] [US3] Write `tests/unit/teacher-sheet-url.test.ts`: accepts `https://docs.google.com/spreadsheets/d/<id>/edit#gid=<n>` and `?gid=`; no gid → first tab; other hosts, short ids, or non-URLs → `INVALID_SHEET_URL`.
-- [ ] T058 [P] [US3] Write `tests/unit/teacher-guided-notes-parser.test.ts` covering every fixture's expected output from `contracts/guided-notes-parser.md` (single template: 6 question targets, blanks at `G5`, `G7`, …; group template: 4 targets, 1 and 2 groups).
-- [ ] T059 [P] [US3] Write `tests/api/teacher-import.test.ts` with the fake gateway: preview saves nothing; confirm creates Questions/Blanks/Groups and blank-cell rows matching the preview, with targets ordered by position; re-import before the first Round replaces previous data; after a Round → 409 `IMPORT_LOCKED`; sheet changed between preview and confirm → 409 `PREVIEW_CHANGED`; gateway errors map to `SHEET_NOT_SHARED` 403, `SHEET_NOT_FOUND` 404, `SHEETS_UNAVAILABLE` 502; no gateway → 503 `SHEETS_NOT_CONFIGURED`; `GET /me` shows the service-account email.
+- [X] T056 [P] [US3] Create fixtures in `tests/fixtures/guided-notes/`: transcriptions of both `docs/examples/` templates (values + merges, including spacer rows such as `B6:H6` and group merges `B5:B6`, `B8:B9`) and variants listed in `contracts/guided-notes-parser.md` (header moved and columns shifted, extra column, 8 questions with a two-marker cell, half-width markers, missing `作答` header, duplicate number, header only).
+- [X] T057 [P] [US3] Write `tests/unit/teacher-sheet-url.test.ts`: accepts `https://docs.google.com/spreadsheets/d/<id>/edit#gid=<n>` and `?gid=`; no gid → first tab; other hosts, short ids, or non-URLs → `INVALID_SHEET_URL`.
+- [X] T058 [P] [US3] Write `tests/unit/teacher-guided-notes-parser.test.ts` covering every fixture's expected output from `contracts/guided-notes-parser.md` (single template: 6 question targets, blanks at `G5`, `G7`, …; group template: 4 targets, 1 and 2 groups).
+- [X] T059 [P] [US3] Write `tests/api/teacher-import.test.ts` with the fake gateway: preview saves nothing; confirm creates Questions/Blanks/Groups and blank-cell rows matching the preview, with targets ordered by position; re-import before the first Round replaces previous data; after a Round → 409 `IMPORT_LOCKED`; sheet changed between preview and confirm → 409 `PREVIEW_CHANGED`; gateway errors map to `SHEET_NOT_SHARED` 403, `SHEET_NOT_FOUND` 404, `SHEETS_UNAVAILABLE` 502; no gateway → 503 `SHEETS_NOT_CONFIGURED`; `GET /me` shows the service-account email.
 
 ### Implementation for User Story 3
 
-- [ ] T060 [P] [US3] Implement `apps/server/src/modules/teacher/sheets/sheets-gateway.ts` (interface and `HttpError` mapping helpers) and `tests/helpers/fake-sheets-gateway.ts` (in-memory sheets, recorded writes, injectable failures, cell change between reads).
-- [ ] T061 [P] [US3] Implement `apps/server/src/modules/teacher/guided-notes/sheet-url.ts` to pass T057 (full URL never logged).
-- [ ] T062 [P] [US3] Implement the pure parser `apps/server/src/modules/teacher/guided-notes/parser.ts` per `contracts/guided-notes-parser.md` to pass T058. It must not import anything from `modules/teacher/dev/`. Starts only after gate T055.
-- [ ] T063 [US3] Implement `apps/server/src/modules/teacher/guided-notes/import-service.ts` (preview with `previewDigest`; confirm re-reads, compares digest, then in one transaction deletes previous imported data when no Round exists and inserts QuestionGroups, Questions, Blanks, `teacher_sheet_sources`, `teacher_blank_cells`).
-- [ ] T064 [US3] Implement `apps/server/src/api/teacher/import-controller.ts` (`POST import/preview`, `POST import/confirm`), register it, and return `serviceAccountEmail` from `GET /me`. T059 passes.
-- [ ] T065 [US3] Implement `apps/server/src/modules/teacher/sheets/google-sheets-gateway.ts` with `googleapis` (`GoogleAuth` key file, scope `spreadsheets`, `spreadsheets.get` for merges, `values.get` FORMATTED_VALUE, `values.batchGet`, atomic `batchUpdate`, 10 s timeout, error mapping without Google bodies), and select it in `integration.ts` only when `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` is configured.
-- [ ] T066 [US3] Implement `apps/web/src/modules/teacher/ImportWizard.tsx` (service-account email and sharing steps, URL input, preview table of numbers/groups/cells, confirm/cancel, error messages per code from `error-messages.ts`) and add it to `TeacherSessionPage.tsx`.
-- [ ] T067 [US3] Add the US3 section to `tests/manual/teacher-feature.md` (real sheets: both templates and a modified copy; not-shared and wrong-URL cases; record the time from pressing preview to the preview appearing for each sheet, against the 5-second plan goal); run `npm.cmd run check` and the manual section; record results.
+- [X] T060 [P] [US3] Implement `apps/server/src/modules/teacher/sheets/sheets-gateway.ts` (interface and `HttpError` mapping helpers) and `tests/helpers/fake-sheets-gateway.ts` (in-memory sheets, recorded writes, injectable failures, cell change between reads).
+- [X] T061 [P] [US3] Implement `apps/server/src/modules/teacher/guided-notes/sheet-url.ts` to pass T057 (full URL never logged).
+- [X] T062 [P] [US3] Implement the pure parser `apps/server/src/modules/teacher/guided-notes/parser.ts` per `contracts/guided-notes-parser.md` to pass T058. It must not import anything from `modules/teacher/dev/`. Starts only after gate T055.
+- [X] T063 [US3] Implement `apps/server/src/modules/teacher/guided-notes/import-service.ts` (preview with `previewDigest`; confirm re-reads, compares digest, then in one transaction deletes previous imported data when no Round exists and inserts QuestionGroups, Questions, Blanks, `teacher_sheet_sources`, `teacher_blank_cells`).
+- [X] T064 [US3] Implement `apps/server/src/api/teacher/import-controller.ts` (`POST import/preview`, `POST import/confirm`), register it, and return `serviceAccountEmail` from `GET /me`. T059 passes.
+- [X] T065 [US3] Implement `apps/server/src/modules/teacher/sheets/google-sheets-gateway.ts` with `googleapis` (`GoogleAuth` key file, scope `spreadsheets`, `spreadsheets.get` for merges, `values.get` FORMATTED_VALUE, `values.batchGet`, atomic `batchUpdate`, 10 s timeout, error mapping without Google bodies), and select it in `integration.ts` only when `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` is configured.
+- [X] T066 [US3] Implement `apps/web/src/modules/teacher/ImportWizard.tsx` (service-account email and sharing steps, URL input, preview table of numbers/groups/cells, confirm/cancel, error messages per code from `error-messages.ts`) and add it to `TeacherSessionPage.tsx`.
+- [X] T067 [US3] Add the US3 section to `tests/manual/teacher-feature.md` (real sheets: both templates and a modified copy; not-shared and wrong-URL cases; record the time from pressing preview to the preview appearing for each sheet, against the 5-second plan goal); run `npm.cmd run check` and the manual section; record results. **Done 2026-11-23**: manual US3 3.1–3.12 pass with real Google Sheets; preview about 2 s.
 
 **Checkpoint**: P2 complete — real Guided Notes drive the quiz.
 
@@ -165,16 +165,16 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 
 ### Tests for User Story 4
 
-- [ ] T068 [P] [US4] Write `tests/unit/teacher-cell-composer.test.ts`: `（1）` + `CPU` → `（1）CPU`; empty cell → answer; marker-less non-empty original → answer; two markers in one cell each followed by its answer; half-width markers; restore returns the original.
-- [ ] T069 [P] [US4] Write `tests/api/teacher-write-back.test.ts`: preview covers every target with a winner plus restore entries for previously written targets now without a winner; untouched targets absent; expected content = `last_written_content ?? original_content`; confirm writes once and updates `last_written_content`; after a reopen produces a new winner, the next write-back replaces the previously written answer (`（1）CPU` → `（1）GPU`, not appended); a changed or missing cell → 409 `SHEET_CONFLICT` with `details.cells`, nothing written; results changed after preview → 409 `STALE_STATE`; nothing to write → 409 `NOTHING_TO_WRITE`; seeded (not imported) activity → 409 `NOT_IMPORTED`.
+- [X] T068 [P] [US4] Write `tests/unit/teacher-cell-composer.test.ts`: `（1）` + `CPU` → `（1）CPU`; empty cell → answer; marker-less non-empty original → answer; two markers in one cell each followed by its answer; half-width markers; restore returns the original.
+- [X] T069 [P] [US4] Write `tests/api/teacher-write-back.test.ts`: preview covers every target with a winner plus restore entries for previously written targets now without a winner; untouched targets absent; expected content = `last_written_content ?? original_content`; confirm writes once and updates `last_written_content`; after a reopen produces a new winner, the next write-back replaces the previously written answer (`（1）CPU` → `（1）GPU`, not appended); a changed or missing cell → 409 `SHEET_CONFLICT` with `details.cells`, nothing written; results changed after preview → 409 `STALE_STATE`; nothing to write → 409 `NOTHING_TO_WRITE`; seeded (not imported) activity → 409 `NOT_IMPORTED`.
 
 ### Implementation for User Story 4
 
-- [ ] T070 [P] [US4] Implement the pure `apps/server/src/modules/teacher/write-back/cell-composer.ts` to pass T068. Starts only after gate T055.
-- [ ] T071 [US4] Implement `apps/server/src/modules/teacher/write-back/write-back-service.ts` (plan from current results and blank-cell rows, `planDigest`, re-read, compare, one `writeCells` batch, then update `last_written_content`/`last_written_at`).
-- [ ] T072 [US4] Implement `apps/server/src/api/teacher/write-back-controller.ts` (`POST write-back/preview`, `POST write-back/confirm`) and register it. T069 passes.
-- [ ] T073 [US4] Implement `apps/web/src/modules/teacher/WriteBackDialog.tsx` (entry table with current → new content and write/restore kind, confirm, conflict list) and add it to `TeacherSessionPage.tsx`.
-- [ ] T074 [US4] Add the US4 section to `tests/manual/teacher-feature.md` (real sheet write, marker kept, conflict after a manual edit, restore after a no-winner reopen); run `npm.cmd run check` and the manual section; record results.
+- [X] T070 [P] [US4] Implement the pure `apps/server/src/modules/teacher/write-back/cell-composer.ts` to pass T068. Starts only after gate T055.
+- [X] T071 [US4] Implement `apps/server/src/modules/teacher/write-back/write-back-service.ts` (plan from current results and blank-cell rows, `planDigest`, re-read, compare, one `writeCells` batch, then update `last_written_content`/`last_written_at`).
+- [X] T072 [US4] Implement `apps/server/src/api/teacher/write-back-controller.ts` (`POST write-back/preview`, `POST write-back/confirm`) and register it. T069 passes.
+- [X] T073 [US4] Implement `apps/web/src/modules/teacher/WriteBackDialog.tsx` (entry table with current → new content and write/restore kind, confirm, conflict list) and add it to `TeacherSessionPage.tsx`.
+- [X] T074 [US4] Add the US4 section to `tests/manual/teacher-feature.md` (real sheet write, marker kept, conflict after a manual edit, restore after a no-winner reopen); run `npm.cmd run check` and the manual section; record results. **Done 2026-11-23**: first run found the fill-cell issue (T088–T091); re-run with a fresh re-imported copy: 4.1–4.8 pass.
 
 **Checkpoint**: P3 complete.
 
@@ -188,16 +188,16 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 
 ### Tests for User Story 5
 
-- [ ] T075 [P] [US5] Write `tests/unit/teacher-csv.test.ts`: UTF-8 BOM, CRLF, RFC 4180 quoting of commas/quotes/newlines, cells starting with `=`, `+`, `-`, `@` prefixed with `'`, `是`/`否`, time `YYYY-MM-DD HH:mm:ss` in `Asia/Taipei`.
-- [ ] T076 [P] [US5] Write `tests/api/teacher-export.test.ts`: header `題號,第幾輪,組別,答案,順位,是否勝出,送出時間`; one row per Round × Team; reopened target lists both rounds with different `第幾輪`; non-submitter has empty answer/order/time and `否`; answers joined like `（1）CPU；（2）OS`; `Content-Disposition` filename `activity-<code>.csv`; unauthenticated → 401.
+- [X] T075 [P] [US5] Write `tests/unit/teacher-csv.test.ts`: UTF-8 BOM, CRLF, RFC 4180 quoting of commas/quotes/newlines, cells starting with `=`, `+`, `-`, `@` prefixed with `'`, `是`/`否`, time `YYYY-MM-DD HH:mm:ss` in `Asia/Taipei`.
+- [X] T076 [P] [US5] Write `tests/api/teacher-export.test.ts`: header `題號,第幾輪,組別,答案,順位,是否勝出,送出時間`; one row per Round × Team; reopened target lists both rounds with different `第幾輪`; non-submitter has empty answer/order/time and `否`; answers joined like `（1）CPU；（2）OS`; `Content-Disposition` filename `activity-<code>.csv`; unauthenticated → 401.
 
 ### Implementation for User Story 5
 
-- [ ] T077 [P] [US5] Implement the pure `apps/server/src/modules/teacher/export/csv-writer.ts` to pass T075.
-- [ ] T078 [US5] Implement `apps/server/src/modules/teacher/export/activity-record-service.ts` (rows from Rounds × Teams using `teacher-result-projection.ts`).
-- [ ] T079 [US5] Implement `apps/server/src/api/teacher/export-controller.ts` (`GET /sessions/:sessionId/export.csv`) and register it. T076 passes.
-- [ ] T080 [US5] Add an export button in `apps/web/src/modules/teacher/ExportButton.tsx` and place it on `TeacherSessionPage.tsx`.
-- [ ] T081 [US5] Add the US5 section to `tests/manual/teacher-feature.md` (open in Excel and Google Sheets); run `npm.cmd run check` and the manual section; record results.
+- [X] T077 [P] [US5] Implement the pure `apps/server/src/modules/teacher/export/csv-writer.ts` to pass T075.
+- [X] T078 [US5] Implement `apps/server/src/modules/teacher/export/activity-record-service.ts` (rows from Rounds × Teams using `teacher-result-projection.ts`).
+- [X] T079 [US5] Implement `apps/server/src/api/teacher/export-controller.ts` (`GET /sessions/:sessionId/export.csv`) and register it. T076 passes.
+- [X] T080 [US5] Add an export button in `apps/web/src/modules/teacher/ExportButton.tsx` and place it on `TeacherSessionPage.tsx`.
+- [X] T081 [US5] Add the US5 section to `tests/manual/teacher-feature.md` (open in Excel and Google Sheets); run `npm.cmd run check` and the manual section; record results. **Done 2026-11-23**: manual US5 5.1–5.9 pass (5.8 reworded to use a single question).
 
 **Checkpoint**: All five stories complete.
 
@@ -205,11 +205,21 @@ description: "Dependency-ordered implementation tasks for Teacher Feature"
 
 ## Phase 8: Polish and cross-cutting
 
-- [ ] T082 [P] Create `specs/003-teacher-feature/traceability.md` mapping every FR-001–FR-040 and SC-001–SC-009 to tasks and test files; mark anything only covered manually.
-- [ ] T083 [P] Security sweep, recorded in `specs/003-teacher-feature/quickstart.md`: no password, hash, secret, CSRF token, cookie value or key path in logs or responses (grep the code under `apps/server/src/modules/teacher/` and `apps/server/src/api/teacher/` for `console.`); `git ls-files` contains no `.env` or service-account JSON.
-- [ ] T084 Compare the implementation with `diagrams/003-teacher-feature-component.puml`, `-class.puml`, `-sequence.puml`; update the diagrams for any difference; run `java -jar plantuml.jar "./diagrams/*.puml"`, check each `.puml` has a readable PNG, then `git restore -- diagrams/002-student-feature-*.png diagrams/foundation-*.png`. Record the comparison in `specs/003-teacher-feature/quickstart.md`.
-- [ ] T085 Run the full demo in `tests/manual/teacher-feature.md` with three browser profiles (Teacher, two Teams), within 5 minutes (SC-009). Also time SC-001 separately: from submitting the login form to the first round becoming Active (login → create activity → import → next → start), target 3 minutes; record the measured time. Record actual results and anything not run.
-- [ ] T086 Final `npm.cmd run check`; record TypeScript, test and build results, including Foundation and Student regression suites, in the quickstart Validation log.
+- [X] T082 [P] Create `specs/003-teacher-feature/traceability.md` mapping every FR-001–FR-040 and SC-001–SC-009 to tasks and test files; mark anything only covered manually.
+- [X] T083 [P] Security sweep, recorded in `specs/003-teacher-feature/quickstart.md`: no password, hash, secret, CSRF token, cookie value or key path in logs or responses (grep the code under `apps/server/src/modules/teacher/` and `apps/server/src/api/teacher/` for `console.`); `git ls-files` contains no `.env` or service-account JSON.
+- [X] T084 Compare the implementation with `diagrams/003-teacher-feature-component.puml`, `-class.puml`, `-sequence.puml`; update the diagrams for any difference; run `java -jar plantuml.jar "./diagrams/*.puml"`, check each `.puml` has a readable PNG, then `git restore -- diagrams/002-student-feature-*.png diagrams/foundation-*.png`. Record the comparison in `specs/003-teacher-feature/quickstart.md`.
+- [X] T085 Run the full demo in `tests/manual/teacher-feature.md` with three browser profiles (Teacher, two Teams), within 5 minutes (SC-009). Also time SC-001 separately: from submitting the login form to the first round becoming Active (login → create activity → import → next → start), target 3 minutes; record the measured time. Record actual results and anything not run. **Done 2026-11-23**: SC-001 within 2 min, SC-009 about 2 min, no step got stuck.
+- [X] T086 Final `npm.cmd run check`; record TypeScript, test and build results, including Foundation and Student regression suites, in the quickstart Validation log. **Done 2026-11-23**: 77 files / 427 tests, typecheck and build pass.
+- [X] T087 Highlight the current-round target in `apps/web/src/modules/teacher/TargetList.tsx`: the Waiting or Active row is bold with a light background (`bg-indigo-50`), shows 「▶」 before the number and has `aria-current="true"`; other rows unchanged. Test in `tests/web/teacher-target-list.test.tsx`. **Done 2026-11-23** (requested after the US3 manual run).
+
+### Q16 clarification (2026-11-23, after US4 manual 4.3)
+
+Template answer area spans two columns (「作答」 header G4:H4): G holds the marker label 「（1）」, H is the empty fill cell. Spec FR-028/FR-034 and contracts updated.
+
+- [X] T088 [US3] Parser fill-cell detection in `apps/server/src/modules/teacher/guided-notes/parser.ts`: the 「作答」 column range comes from the header cell's merge; for an answer cell with exactly one marker, the next cell to the right that is still inside that range, starts its own cell/merge on the same row and is empty becomes the blank's cell (`cellA1`), with the marker cell kept as `labelCellA1`; otherwise (two or more markers, right cell not empty, or no such cell) the blank stays in the marker cell. No fixed columns. Add `labelCellA1` to `ParsedBlank` and `ImportPreviewBlank` in `packages/contracts/src/teacher.ts`.
+- [X] T089 [US4] Write-back for fill cells in `apps/server/src/modules/teacher/write-back/`: a fill cell's original is empty, so its answer is written into the fill cell as is and the marker cell is never touched; restore puts the fill cell back to its original (empty). Marker-cell fallback and unmarked cells unchanged.
+- [X] T090 [US3] Import preview in `apps/web/src/modules/teacher/ImportWizard.tsx` shows the label cell and the fill cell (e.g. 「G5（1）→H5」); marker-cell blanks keep 「G5（1）」.
+- [X] T091 Tests and docs: update `tests/fixtures/guided-notes/index.ts`, `tests/unit/teacher-guided-notes-parser.test.ts` (group template blanks H5, H6, H8, H9; single template unchanged; shifted variant follows; two markers in one cell stay appended), `tests/api/teacher-import.test.ts`, `tests/api/teacher-write-back.test.ts`, `tests/web/teacher-import-wizard.test.tsx`; update US3 3.3 and US4 expectations in `tests/manual/teacher-feature.md`; record results in `specs/003-teacher-feature/quickstart.md`.
 
 ---
 
@@ -273,3 +283,10 @@ Phases 1–4 (US1 + US2): login, activity, round control, monitor and results wi
 - The demo data in `apps/server/src/modules/teacher/dev/` is development-only; the import flow must never read it (enforced by T026).
 - Automated tests never call Google; real Sheets are manual tests only.
 - Do not commit `.env`, keys, `plantuml.jar` or local SQLite files.
+
+---
+
+## Phase 9: Convergence
+
+- [X] T092 [US3] Show each blank's original cell content in the import preview table in `apps/web/src/modules/teacher/ImportWizard.tsx` (the API already returns `originalContent`; show it next to the label/fill cell, e.g. 「G5（1）→H5（空白）」 or 「C6：（1）＿＿（2）＿＿」), with a case in `tests/web/teacher-import-wizard.test.tsx`, per FR-029 (partial) **Done 2026-11-23**.
+- [X] T093 Agree with the Student owner whether to delete the now-unreferenced `apps/web/src/pages/TeacherLoginPlaceholder.tsx` and `apps/web/src/pages/TeacherDashboardPlaceholder.tsx` (replaced by the real pages in `apps/web/src/app/router.tsx`), and remove them if agreed 【需與學生端負責人協調】, per plan: Coordination / R14 (unrequested) **Decided 2026-11-23: keep both files, do not delete.** They are Foundation files, no longer referenced, and do not affect the pages, build or tests; keeping them avoids changing the Student owner's files.
