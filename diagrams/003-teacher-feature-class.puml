@@ -1,5 +1,5 @@
 @startuml
-title Teacher Feature — Class Diagram (Plan)
+title Teacher Feature — Class Diagram (implementation, verified 2026-11-23)
 top to bottom direction
 hide empty members
 skinparam classAttributeIconSize 0
@@ -15,28 +15,33 @@ package "Auth" {
     allowedOrigins
     serviceAccountKeyFile
   }
-  class PasswordHasher <<pure>> {
-    hash(password)
-    verify(password, encoded)
+  class TeacherAuthController <<api>> {
+    login(password)
+    logout()
+    me() : csrfToken, serviceAccountEmail
+  }
+  class "password-hash" as PasswordHash <<module>> {
+    hashPassword(password)
+    verifyPassword(password, encoded)
   }
   class LoginRateLimiter {
     5 failures / 15 min / address
     50 failures / 15 min total
   }
-  class LoginSessionService {
-    login(password, address)
-    logout(cookie)
+  class TeacherLoginSessionService {
+    create() : cookie id.HMAC
     verify(cookie)
+    revoke(login)
   }
   class TeacherCsrfService {
-    issue(loginSessionId)
-    verify(token, loginSessionId)
+    issue(loginDigest)
+    verify(token, loginDigest)
   }
-  class TeacherActorFactory {
-    forSession(sessionId) : ActorContext
+  class "teacher-actor-factory" as ActorFactory <<module>> {
+    createTeacherActorContext(sessionId)
   }
   class TeacherSocketIdentity {
-    resolve(socket) : ActorContext | null
+    resolveSocketActorContext(socket)
     authorizeWatch(actor, sessionId)
   }
 }
@@ -48,34 +53,37 @@ package "Activity and rounds" {
     detail(sessionId)
   }
   class TargetCatalog {
-    targets(sessionId) : TargetStatus[]
+    targets(sessionId)
+    find(sessionId, target)
     next(sessionId)
   }
   class RoundControlService {
-    select(target, version)
-    next(version)
-    start(version)
-    end(version, actor)
+    select(sessionId, target, version)
+    next(sessionId, version)
+    start(sessionId, version)
+    end(sessionId, version, actor)
   }
   class TeacherResultProjection {
     monitor(sessionId)
-    results(roundId)
+    results(sessionId, roundId?)
+    rounds(sessionId)
   }
 }
 
 package "Guided Notes" {
-  class SheetUrl <<pure>> {
-    parse(url) : SheetRef
+  class "sheet-url" as SheetUrl <<module>> {
+    parseSheetUrl(url) : SheetRef
   }
-  class GuidedNotesParser <<pure>> {
-    parse(grid) : ParseResult
+  class "parser" as Parser <<module>> {
+    parseGuidedNotes(grid) : ParseResult
+    blank: cellA1 (fill cell or marker cell), labelCellA1
   }
-  class ImportService {
+  class GuidedNotesImportService {
     preview(url)
-    confirm(url, digest)
+    confirm(sessionId, url, digest)
   }
-  class CellComposer <<pure>> {
-    compose(original, answers)
+  class "cell-composer" as CellComposer <<module>> {
+    composeCell(original, answers)
   }
   class WriteBackService {
     preview(sessionId)
@@ -85,8 +93,11 @@ package "Guided Notes" {
     readSheet(ref)
     readCells(ref, cells)
     writeCells(ref, updates)
+    serviceAccountEmail()
   }
-  class GoogleSheetsGateway
+  class GoogleSheetsGateway {
+    googleapis, loaded on first call
+  }
 }
 
 package "tests/helpers (not production)" {
@@ -100,17 +111,19 @@ package "tests/helpers (not production)" {
 package "Export" {
   class ActivityRecordService {
     rows(sessionId)
+    csv(sessionId)
   }
-  class CsvWriter <<pure>> {
-    write(rows) : bytes
+  class "csv-writer" as CsvWriter <<module>> {
+    writeCsv(header, rows)
+    formatTaipeiTime(iso)
   }
 }
 
 package "Teacher persistence (006)" {
-  class LoginSessionRepository
-  class SheetSourceRepository
-  class BlankCellRepository {
-    cellA1
+  class TeacherLoginSessionRepository
+  class TeacherSheetSourceRepository
+  class TeacherBlankCellRepository {
+    cellA1 (fill cell or marker cell)
     originalContent
     marker
     lastWrittenContent
@@ -122,48 +135,50 @@ package "Foundation / Student (existing)" {
     selectTarget()
     startRound()
   }
-  class FoundationRepositories <<Foundation>>
+  class "Foundation tables / repositories" as FoundationRepositories <<Foundation>>
   class ActorContext <<Foundation>>
   class StudentTrustedEndCoordinator <<Student>> {
     endRound(input, actor)
   }
 }
 
-LoginSessionService --> PasswordHasher
-LoginSessionService --> LoginRateLimiter
-LoginSessionService --> LoginSessionRepository
-TeacherCsrfService ..> LoginSessionService
-TeacherSocketIdentity --> LoginSessionService
-TeacherActorFactory ..> ActorContext : creates
+TeacherAuthController --> PasswordHash
+TeacherAuthController --> LoginRateLimiter
+TeacherAuthController --> TeacherLoginSessionService
+TeacherAuthController --> TeacherCsrfService
+TeacherLoginSessionService --> TeacherLoginSessionRepository
+TeacherSocketIdentity --> TeacherLoginSessionService : verify(cookie)
+ActorFactory ..> ActorContext : creates
 TeacherSocketIdentity ..> ActorContext : creates
 
 ActivityService --> FoundationRepositories
+ActivityService --> TargetCatalog
 TargetCatalog --> FoundationRepositories
 RoundControlService --> TargetCatalog
 RoundControlService --> SessionLifecycleService
 RoundControlService --> StudentTrustedEndCoordinator
 TeacherResultProjection --> FoundationRepositories
 
-ImportService --> SheetUrl
-ImportService --> GuidedNotesParser
-ImportService --> SheetsGateway
-ImportService --> FoundationRepositories
-ImportService --> SheetSourceRepository
-ImportService --> BlankCellRepository
+GuidedNotesImportService --> SheetUrl
+GuidedNotesImportService --> Parser
+GuidedNotesImportService --> SheetsGateway
+GuidedNotesImportService --> FoundationRepositories
+GuidedNotesImportService --> TeacherSheetSourceRepository
+GuidedNotesImportService --> TeacherBlankCellRepository
 WriteBackService --> CellComposer
 WriteBackService --> SheetsGateway
-WriteBackService --> BlankCellRepository
-WriteBackService --> TeacherResultProjection
+WriteBackService --> TeacherBlankCellRepository
+WriteBackService --> FoundationRepositories : current winners
 GoogleSheetsGateway ..|> SheetsGateway
 FakeSheetsGateway ..|> SheetsGateway
 
-ActivityRecordService --> TeacherResultProjection
+ActivityRecordService --> TeacherResultProjection : rounds()
 ActivityRecordService --> CsvWriter
 
 ' Layout only: stack the packages in rows (Auth + rounds / Guided Notes + export / persistence + existing)
-PasswordHasher -[hidden]down- ImportService
+PasswordHash -[hidden]down- GuidedNotesImportService
 LoginRateLimiter -[hidden]down- WriteBackService
 TargetCatalog -[hidden]down- ActivityRecordService
-SheetUrl -[hidden]down- LoginSessionRepository
+SheetUrl -[hidden]down- TeacherLoginSessionRepository
 CellComposer -[hidden]down- SessionLifecycleService
 @enduml
