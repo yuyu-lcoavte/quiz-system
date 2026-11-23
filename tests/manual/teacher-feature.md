@@ -161,3 +161,16 @@ Notes / problems found (US5):
 - 5.5: the non-submitting Team had empty 答案/順位/送出時間 and 「否」. 5.6: group answer 「（1）CPU；（2）OS」. 5.7: Taiwan time, e.g. 2026-11-23 15:19:39.
 - 5.8: the first attempt used a group question (and omitted the =); a group answer starts with 「（1）」 and is never treated as a formula, so it could not test the guard. Step 5.8 now says to use a single question; re-done that way and passed.
 - 5.9: a student browser opening the export URL got 401 and no file.
+
+## Full demo (T085) — SC-001 and SC-009
+
+Three browsers (Teacher Chrome, 第1組 Chrome Incognito, 第2組 another browser); a fresh question-group Google Sheet shared with the service account.
+
+| # | Timing | Target | Result |
+|---|---|---|---|
+| D.1 | A: from pressing 登入 to pressing 開始搶答 (login → create activity → import → 下一題 → 開始) | ≤ 3 min (SC-001) | Pass (2026-11-23): within 2 min |
+| D.2 | B: whole flow — login, create activity, import, two Teams answer, monitor and 顯示答案, end, reopen, write back, export CSV | ≤ 5 min (SC-009) | Pass (2026-11-23): about 2 min |
+
+Notes:
+
+- 2026-11-23 run by the Teacher Feature owner: no step got stuck.

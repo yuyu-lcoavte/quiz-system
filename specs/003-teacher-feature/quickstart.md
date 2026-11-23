@@ -127,3 +127,22 @@ No issues found.
 | `003-teacher-feature-class` | Updated to the implementation: login handled by `TeacherAuthController` (password-hash module, rate limiter, `TeacherLoginSessionService`, `TeacherCsrfService`; the CSRF service has no dependency on the session service); function modules (`parseSheetUrl`, `parseGuidedNotes`, `composeCell`, `writeCsv`, `createTeacherActorContext`) shown as «module»; `GuidedNotesImportService` and `Teacher*Repository` names; `TeacherResultProjection.rounds()` used by CSV; `WriteBackService` reads current winners from Foundation tables (not via the projection); `ActivityService → TargetCatalog`; fill-cell `cellA1` / `labelCellA1` (Q16 clarification). |
 
 Rendered with `java -jar plantuml.jar "./diagrams/*.puml"` (exit 0, every `.puml` has a PNG); only the 003 class PNG changed and was checked as readable; the other PNGs were restored with `git restore`.
+
+## Full demo timing (T085, 2026-11-23)
+
+| Criterion | Measured | Result |
+|---|---|---|
+| SC-001: login → first round started ≤ 3 min | within 2 min | Pass |
+| SC-009: full demo (Teacher + 2 Teams: login, create, import, answer, monitor/顯示答案, end, reopen, write back, export CSV) ≤ 5 min | about 2 min | Pass |
+
+No step got stuck. Recorded in `tests/manual/teacher-feature.md` (D.1, D.2).
+
+## Final check (T086, 2026-11-23)
+
+| Step | Result |
+|---|---|
+| TypeScript (`npm run typecheck`: contracts build, contracts/server/web typecheck, tests typecheck) | Pass |
+| Vitest (`npm test`) | Pass: 77 test files / 427 tests in 32 s. 31 Teacher test files; the other 47 files are the Foundation and Student suites from the baseline (47 files / 231 tests on 2026-11-22), all still passing. |
+| Build (`npm run build`: contracts, server, web) | Pass |
+
+Manual acceptance recorded separately: US1 (T048), US2 (T054), US3 (T067), US4 (T074), US5 (T081) and the timed demo (T085) all pass; see `tests/manual/teacher-feature.md`. Not covered here: the OpenSpec group's implementation and the shared HackMD (synced by hand); shared-file edits listed as 「需與學生端負責人協調」 still need the Student owner's review in the PR.
