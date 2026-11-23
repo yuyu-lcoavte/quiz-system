@@ -283,3 +283,10 @@ Phases 1–4 (US1 + US2): login, activity, round control, monitor and results wi
 - The demo data in `apps/server/src/modules/teacher/dev/` is development-only; the import flow must never read it (enforced by T026).
 - Automated tests never call Google; real Sheets are manual tests only.
 - Do not commit `.env`, keys, `plantuml.jar` or local SQLite files.
+
+---
+
+## Phase 9: Convergence
+
+- [X] T092 [US3] Show each blank's original cell content in the import preview table in `apps/web/src/modules/teacher/ImportWizard.tsx` (the API already returns `originalContent`; show it next to the label/fill cell, e.g. 「G5（1）→H5（空白）」 or 「C6：（1）＿＿（2）＿＿」), with a case in `tests/web/teacher-import-wizard.test.tsx`, per FR-029 (partial) **Done 2026-11-23**.
+- [X] T093 Agree with the Student owner whether to delete the now-unreferenced `apps/web/src/pages/TeacherLoginPlaceholder.tsx` and `apps/web/src/pages/TeacherDashboardPlaceholder.tsx` (replaced by the real pages in `apps/web/src/app/router.tsx`), and remove them if agreed 【需與學生端負責人協調】, per plan: Coordination / R14 (unrequested) **Decided 2026-11-23: keep both files, do not delete.** They are Foundation files, no longer referenced, and do not affect the pages, build or tests; keeping them avoids changing the Student owner's files.

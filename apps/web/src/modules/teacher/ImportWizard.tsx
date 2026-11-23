@@ -1,7 +1,27 @@
 import { useState, type FormEvent } from 'react';
-import type { ImportPreviewView } from '@quiz/contracts';
+import type { ImportPreviewBlank, ImportPreviewView } from '@quiz/contracts';
 import { displayError } from './teacher-api-client.js';
 import { primaryButton, secondaryButton } from './use-teacher-api.js';
+
+const original = (text: string) => (text === '' ? '（空白）' : `：${text}`);
+
+/**
+ * FR-029: each blank's cell and its original content.
+ * Fill cell → 「G5（1）→H5（空白）」; marker or unmarked cell → 「C6：（1）＿＿（2）＿＿」 / 「G11（空白）」, one entry per cell.
+ */
+export function describeBlanks(blanks: readonly ImportPreviewBlank[]): string {
+  const parts: string[] = [];
+  const seenCells = new Set<string>();
+  for (const blank of blanks) {
+    if (blank.labelCellA1) {
+      parts.push(`${blank.labelCellA1}${blank.marker ?? ''}→${blank.cellA1}${original(blank.originalContent)}`);
+    } else if (!seenCells.has(blank.cellA1)) {
+      seenCells.add(blank.cellA1);
+      parts.push(`${blank.cellA1}${original(blank.originalContent)}`);
+    }
+  }
+  return parts.join('、');
+}
 
 interface ImportWizardProps {
   /** null when the server has no Google service account configured. */
@@ -85,17 +105,14 @@ export function ImportWizard({ serviceAccountEmail, locked, preview, confirm, on
           )}
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-slate-200 text-sm text-slate-600"><th className="py-2">題號</th><th>類型</th><th>填空儲存格（標籤→填空格）</th></tr>
+              <tr className="border-b border-slate-200 text-sm text-slate-600"><th className="py-2">題號</th><th>類型</th><th>填空儲存格與原始內容</th></tr>
             </thead>
             <tbody>
               {result.view.targets.map((target) => (
                 <tr key={target.number} className="border-b border-slate-100 align-top">
                   <td className="py-2 font-semibold">{target.number}</td>
                   <td>{target.kind === 'questionGroup' ? `題組（${target.questions.length} 題）` : '單題'}</td>
-                  <td>{target.questions.map((question) =>
-                    question.blanks.map((blank) => (blank.labelCellA1
-                      ? `${blank.labelCellA1}${blank.marker ?? ''}→${blank.cellA1}`
-                      : `${blank.cellA1}${blank.marker ?? ''}`)).join('、')).join('；')}</td>
+                  <td>{target.questions.map((question) => describeBlanks(question.blanks)).join('；')}</td>
                 </tr>
               ))}
             </tbody>

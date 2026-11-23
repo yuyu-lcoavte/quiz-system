@@ -146,3 +146,7 @@ No step got stuck. Recorded in `tests/manual/teacher-feature.md` (D.1, D.2).
 | Build (`npm run build`: contracts, server, web) | Pass |
 
 Manual acceptance recorded separately: US1 (T048), US2 (T054), US3 (T067), US4 (T074), US5 (T081) and the timed demo (T085) all pass; see `tests/manual/teacher-feature.md`. Not covered here: the OpenSpec group's implementation and the shared HackMD (synced by hand); shared-file edits listed as 「需與學生端負責人協調」 still need the Student owner's review in the PR.
+
+## Convergence (2026-11-23)
+
+`/speckit-converge` found 2 items, appended as Phase 9: T092 (FR-029 partial: preview did not show original cell content) and T093 (unreferenced Teacher placeholder pages). T092 done: the preview now shows 「G5（1）→H5（空白）」, 「G15：（1）＿（2）＿」 (one entry per cell) and 「G11（空白）」; the wizard test failed first, then passed. T093: decided to keep both placeholder files (Foundation files, unreferenced, no effect on pages/build/tests). `npm.cmd run check`: pass, 77 test files / 427 tests, typecheck and build.

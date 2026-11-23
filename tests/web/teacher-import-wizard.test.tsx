@@ -57,9 +57,12 @@ describe('ImportWizard', () => {
     expect(props.preview).toHaveBeenCalledWith(URL);
     expect(await screen.findByText(/共 3 題/)).toBeTruthy();
     const rows = screen.getAllByRole('row').map((row) => row.textContent ?? '');
-    expect(rows.some((row) => row.includes('題組') && row.includes('G5（1）→H5') && row.includes('G6（2）→H6'))).toBe(true);
-    expect(rows.some((row) => row.includes('G15（1）') && row.includes('G15（2）') && !row.includes('→'))).toBe(true);
-    expect(rows.some((row) => row.includes('3') && row.includes('單題') && row.includes('G11'))).toBe(true);
+    expect(rows.some((row) => row.includes('題組') && row.includes('G5（1）→H5（空白）') && row.includes('G6（2）→H6（空白）'))).toBe(true);
+    expect(rows.some((row) => row.includes('單題') && row.includes('G11（空白）'))).toBe(true);
+    // Two markers in one cell: the cell and its original content are shown once.
+    const multi = rows.find((row) => row.includes('G15'))!;
+    expect(multi).toContain('G15：（1）＿（2）＿');
+    expect(multi.match(/G15/g)).toHaveLength(1);
     expect(screen.getByText(/G20/)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: '確認匯入' }));
     expect(props.confirm).toHaveBeenCalledWith(URL, 'a'.repeat(64));
