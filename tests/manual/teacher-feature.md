@@ -82,7 +82,7 @@ Notes / problems found (US2):
 - 2026-11-22 run by the Teacher Feature owner with the same three browsers: 2.1–2.7 all passed.
 - 2.4: after End the Teacher page showed the full order (第2組 1st, 第1組 2nd), winner 第2組 and its answers 「（1）1；（2）11」.
 - 2.6: after 第2組 submitted, 第1組's Network panel (current-target, draft responses and Socket messages) showed only the question structure and 第1組's own draft, no data from 第2組.
-- Issue found: after End the 作答狀況 table still showed 「（已隱藏）」, contrary to FR-022 (answers always shown after End). Fixed the same day: MonitorPanel now always shows answers once Ended and hides the toggle; covered by two new tests in `tests/web/teacher-monitor-panel.test.tsx`. The fix itself has not been re-checked by hand.
+- Issue found: after End the 作答狀況 table still showed 「（已隱藏）」, contrary to FR-022 (answers always shown after End). Fixed the same day: MonitorPanel now always shows answers once Ended and hides the toggle; covered by two new tests in `tests/web/teacher-monitor-panel.test.tsx`. Re-checked by hand on 2026-11-23 during the US3 run: after End, 作答狀況 shows the answers directly and has no show/hide button.
 
 ## US3 — Guided Notes 匯入（Google Sheets）
 
@@ -90,19 +90,22 @@ Setup (once): Google Cloud project with the Google Sheets API enabled; a service
 
 | # | Steps | Expected | Result |
 |---|---|---|---|
-| 3.1 | Teacher: create a new activity, open it, look at 匯入 Guided Notes | The service-account email and the three sharing steps are shown; no key content anywhere | Not run |
-| 3.2 | Paste the question-group sheet URL **before** sharing it, press 預覽 | 「試算表尚未共用給系統的服務帳號…」 | Not run |
-| 3.3 | Share the sheet with the service-account email as Editor, press 預覽 again | 分頁「學習單」・共 4 題; 1 and 2 are 題組（2 題） with G5（1）、G6（2） / G8（1）、G9（2）; 3 and 4 單題 G11 / G13. Record the time from pressing 預覽 to the table appearing (plan goal ≤ 5 s): ___ s | Not run |
-| 3.4 | On the modified copy: insert two rows and one column above/left of the header, add a 5th question, put 「（1）＿＿（2）＿＿」 in one answer cell; preview | Numbers and cell addresses follow the new layout; the two-marker question is 單題 with two cells listed; time: ___ s | Not run |
-| 3.5 | Preview the single-question sheet | 共 6 題, all 單題, answer cells G5, G7, …, G15; time: ___ s | Not run |
-| 3.6 | Confirm the question-group import | Target list shows 1–4 with 題組/單題 and 未開放; dashboard shows 已匯入 | Not run |
-| 3.7 | Before any round: import the single-question sheet into the same activity | Questions are replaced by 1–6 | Not run |
-| 3.8 | Preview, then edit the sheet (e.g. add a question), then press 確認匯入 | 「試算表在預覽後已被修改，請重新預覽。」; nothing imported | Not run |
-| 3.9 | Paste a wrong URL (e.g. a Google Docs link) | 「試算表網址格式不正確…」 | Not run |
-| 3.10 | Remove the 作答 header text in a copy and preview | 「無法辨識試算表結構…」 | Not run |
-| 3.11 | Run one round (下一題 → 開始 → 結束) on the imported activity, then try to import again | The import section says it is locked | Not run |
-| 3.12 | Two students play an imported group question (both blanks) | Students see one input per blank; leader submits; Teacher monitor and results show the answers | Not run |
+| 3.1 | Teacher: create a new activity, open it, look at 匯入 Guided Notes | The service-account email and the three sharing steps are shown; no key content anywhere | Pass (2026-11-23) |
+| 3.2 | Paste the question-group sheet URL **before** sharing it, press 預覽 | 「試算表尚未共用給系統的服務帳號…」 | Pass (2026-11-23) |
+| 3.3 | Share the sheet with the service-account email as Editor, press 預覽 again | 分頁「學習單」・共 4 題; 1 and 2 are 題組（2 題） with G5（1）、G6（2） / G8（1）、G9（2）; 3 and 4 單題 G11 / G13. Record the time from pressing 預覽 to the table appearing (plan goal ≤ 5 s): about 2 s | Pass (2026-11-23) |
+| 3.4 | On the modified copy: insert two rows and one column above/left of the header, add a 5th question, put 「（1）＿＿（2）＿＿」 in one answer cell; preview | Numbers and cell addresses follow the new layout; the two-marker question is 單題 with two cells listed; time: about 2 s | Pass (2026-11-23) |
+| 3.5 | Preview the single-question sheet | 共 6 題, all 單題, answer cells G5, G7, …, G15; time: about 2 s | Pass (2026-11-23) |
+| 3.6 | Confirm the question-group import | Target list shows 1–4 with 題組/單題 and 未開放; dashboard shows 已匯入 | Pass (2026-11-23) |
+| 3.7 | Before any round: import the single-question sheet into the same activity | Questions are replaced by 1–6 | Pass (2026-11-23) |
+| 3.8 | Preview, then edit the sheet (e.g. add a question), then press 確認匯入 | 「試算表在預覽後已被修改，請重新預覽。」; nothing imported | Pass (2026-11-23) |
+| 3.9 | Paste a wrong URL (e.g. a Google Docs link) | 「試算表網址格式不正確…」 | Pass (2026-11-23) |
+| 3.10 | Remove the 作答 header text in a copy and preview | 「無法辨識試算表結構…」 | Pass (2026-11-23) |
+| 3.11 | Run one round (下一題 → 開始 → 結束) on the imported activity, then try to import again | The import section says it is locked | Pass (2026-11-23) |
+| 3.12 | Two students play an imported group question (both blanks) | Students see one input per blank; leader submits; Teacher monitor and results show the answers | Pass (2026-11-23) |
 
 Notes / problems found (US3):
 
-- (not run yet)
+- 2026-11-23 run by the Teacher Feature owner against real Google Sheets: 3.1–3.12 all passed.
+- Preview time (pressing 預覽 → table shown): about 2 s each for 3.3, 3.4 and 3.5 (plan goal ≤ 5 s).
+- 3.4: after inserting 2 rows above and 1 column to the left, adding question 5 and the answer cell 「（1）＿＿（2）＿＿」, all cell addresses followed the new layout and question 5 was a single question with two blanks.
+- 3.12: two Teams answered an imported group question; result 「（1）1111；（2）22」, winner 第2組.
