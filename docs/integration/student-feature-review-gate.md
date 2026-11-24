@@ -2,7 +2,7 @@
 
 **Scope**: T001–T003 verification and T004 design approval for `002-student-feature`.
 
-**Status**: T004 **design review completed on 2026-11-20**. Teacher and Student/Foundation accepted the interfaces, responsibility split and security rules in section 5 of `student-teacher-decisions.md`. T044 is independently verified; remaining formal integration and safety tests are T041, T045 and T059–T061. Teacher issues the accepted `round:end` capability through trusted authentication.
+**Status (T070, 2026-11-23)**: T004 design review completed on 2026-11-20. T044 is implemented; real Teacher startup/security and formal-path transaction evidence passed at T067/T068. Original T041/T045/T059 checkboxes remain for owner closeout, while T071/T060 final regression and T069/T061 manual acceptance remain separate. No new owner or OpenSpec approval is inferred.
 
 ## T001 — Existing workspace and Foundation reuse
 
@@ -27,7 +27,7 @@
 | Trusted HTTP identity seam | `apps/server/src/api/middleware/actor-context.ts`; `packages/contracts/src/identity.ts` | The middleware accepts only an injected server resolver and defaults to no identity; protected routes fail closed. Student supplies cookie-to-Participant resolution, not client-provided identity. |
 | SQLite connection and migrations | `apps/server/src/persistence/database.ts`, `apps/server/src/persistence/migrate.ts` | Reuse the root `DatabaseManager` connection and additive migration runner. Each opened connection enables and verifies foreign keys. |
 | Canonical repositories | `apps/server/src/persistence/repositories/index.ts` and repository files in the same directory | Reuse Foundation Session, Round, Question, Blank, QuestionGroup, Team, Participant, Submission, SubmissionAnswer and Result repositories; Student tables are additive and do not duplicate canonical entities. |
-| Session reads and lifecycle | `apps/server/src/modules/sessions/application/session-query-service.ts`, `session-state-service.ts`, `session-lifecycle-service.ts`, `foundation-transactions.ts` | Reuse Activity Code/current-target/state reads and lifecycle transactions. Teacher command UI and authorization remain Teacher-owned. The current End operation accepts a preselected Result; the proposed resolver callback is a separate internal change described under T003. |
+| Session reads and lifecycle | `apps/server/src/modules/sessions/application/session-query-service.ts`, `session-state-service.ts`, `session-lifecycle-service.ts`, `foundation-transactions.ts` | Reuse Activity Code/current-target/state reads and lifecycle transactions. Original supplied-Result persistence is reused by the implemented synchronous resolver callback Port. Teacher command UI and authorization remain Teacher-owned. |
 | HTTP routes and authorization | `apps/server/src/modules/sessions/api/session-router.ts`, `session-controller.ts`; Foundation HTTP contracts | Reuse current Session routes and envelopes. Student adds only Student-owned routes; no Foundation public path or DTO is changed. Current protected reads check server ActorContext scope and capabilities. |
 | Socket.IO | `apps/server/src/realtime/socket-server.ts`, `session-events.ts`, `session-room.ts`, `session-state-publisher.ts` | Reuse the same Socket.IO server, existing `session:*` events and server-computed Session rooms. Student registers its own draft events and resolves its own cookie identity; Foundation does not provide Student authentication. |
 | Student state client | `apps/web/src/services/session-state-client.ts` | Reuse for authoritative Session snapshots, stale-version rejection, and re-watch after reconnect; do not duplicate Foundation state events. |
@@ -47,17 +47,17 @@ The Foundation identity contract defines these existing capability names for its
 | `target:read` | Authorized current-target read (`session-controller.ts`) |
 | `results:read` | Protected Foundation results read (`session-controller.ts`) |
 
-The accepted Teacher End capability is `round:end`. Teacher middleware must authorize the Session before issuing it in a server-created ActorContext; production issuance remains Teacher implementation work.
+The accepted Teacher End capability is `round:end`. The real Teacher Router verifies login Cookie and Session, then `teacher-actor-factory.ts` issues the scoped capability. Foundation supplies the shared type but does not issue Teacher authority. T067 verifies the real trust boundary.
 
 ## T003 — Internal End service design accepted at T004
 
 ### Single Teacher End call and synchronous Winner Resolver
 
-The accepted design distinguishes Student input from the Foundation-owned input. The following documentation name for the Foundation input may be finalized in T044:
+The accepted design distinguishes Student input from the Foundation-owned input. T044 implemented the name below; Coordinator imports the canonical Port rather than declaring a second one:
 
 ```ts
 interface StudentTrustedEndCoordinator {
-  endRound(input: StudentEndRoundInput, actor: TeacherScopedActorContext): SessionStateSnapshot;
+  endRound(input: StudentEndRoundInput, actor: ActorContext | null): SessionStateSnapshot;
 }
 
 type WinnerResolver = (roundId: UUID) => Result | null;
@@ -82,7 +82,7 @@ All three calls are synchronous. The composition root injects the same `better-s
 
 ### Current implementation boundary
 
-T044 implements the Foundation-owned `FoundationLifecycleEndInput`, `WinnerResolver` and transaction entry in `foundation-transactions.ts`. `SessionLifecycleService` implements the formal `FoundationLifecycleEndPort`, publishes after the outer Commit and isolates notification failures. The original supplied-Result persistence is reused on the same connection through savepoints. T045 now composes the real lifecycle, bound resolver and existing Coordinator and exposes a ready-services Teacher router factory. Student Socket identity failures cannot invoke external fallback. Real Teacher router/security adapters are absent locally; controlled-adapter tests do not complete T045 acceptance.
+T044 implements the Foundation input, callback transaction and Port; original Result persistence is reused through same-connection savepoints. The root composes lifecycle/publisher/resolver/Coordinator once. Actual `main.ts` calls `startServer(createTeacherIntegration(config))`, supplying real Router and Socket adapters; HTTP Teacher identity remains local to its Router. T067 tests startup/security and T068 tests actual HTTP transaction behavior. Original task closeout remains distinct from this technical evidence.
 
 ## T004 review record — Design approved 2026-11-20
 
@@ -93,10 +93,10 @@ Review evidence is recorded in `student-teacher-decisions.md`, sections 5.1–5.
 3. Synchronous `WinnerResolver(roundId): Result | null` execution in Foundation's existing `BEGIN IMMEDIATE` transaction and shared connection ownership.
 4. No-winner Result handling, rollback/no-broadcast behavior, and composition-root wiring without a circular dependency.
 
-5. Student handshake or watch identity failure cannot fall back to Teacher. T045 has fixed the `app.ts` watch fallback; Teacher still must provide signed Cookie/Origin verification, rejection of Student-routed sockets and trusted watch authorization.
+5. Student handshake or watch identity failure cannot fall back to Teacher. `app.ts` fixes the watch fallback and real Teacher adapters verify signed Cookie/Origin and trusted watch authorization; T067 provides call-through observations and positive controls.
 6. Teacher HTTP Origin/CSRF and Socket Cookie/Origin verification are required for formal integration acceptance. `requestId` is tracing only; Teacher refreshes authoritative state after either 409 `STALE_STATE` or `INVALID_PHASE`.
 
-T004 is complete as a design gate. T044 has passed independent Port/transaction tests recorded in Quickstart. T045's shared-service composition and Socket boundary pass controlled-adapter tests. T041/T045 still require real Teacher integration/security verification. OpenSpec leadership-rule synchronization remains separately pending.
+T004 remains complete as a design gate. T044 and T067/T068 provide implemented Port, real security and formal transaction evidence in Quickstart. T041/T045 are not automatically closed by this review; no further missing code/security/race case was identified. OpenSpec leadership-rule synchronization remains separately pending.
 
 ## T004 technical review preparation
 
@@ -134,7 +134,7 @@ After T004, run T041 against the T044/T045 production path, then T059, T060 and 
 
 Teacher recorded no objection to FR-004 in section 5.1. Student remains responsible for synchronizing OpenSpec Q02/U02 acceptance; no OpenSpec approval is recorded. The first successful join is leader; loss of the last valid socket immediately selects the earliest eligible online teammate. With no candidate the assignment stays. A replaced leader recovers identity and reads the current role after F5/reconnect. See [Student Spec](../../specs/002-student-feature/spec.md) and [Realtime Contract](../../specs/002-student-feature/contracts/student-realtime.md).
 
-T004 design approval is complete. Foundation callback and shared-service composition are now implemented; real Teacher authorization/router and their acceptance remain outstanding.
+T004 design approval is complete. Foundation callback, composition and real Teacher authorization/router now have T067/T068 automated evidence. Historical preparation below is retained, not a new missing-work claim.
 - The current Student submission test suite uses two connections to the same temporary SQLite file. An independent writer holds `BEGIN IMMEDIATE`; the real Student submission observes contention, leaves the draft editable and emits no lock notification. After the writer releases the lock, a new submission succeeds; the synchronous resolver then sees the committed candidate without persisting a Result. This exercises the SQLite and Student prerequisites for T041.
 
 ### T041 test design (provisional)
@@ -148,12 +148,23 @@ After the actual T044/T045 End path is wired, use two connections to one isolate
 | Reopened target has no successful Submission | End creates no Result, clears the prior logical target Result, and Student projects `winner: null`. |
 | Resolver or Result write fails | Round phase, `stateVersion` and the previous Result remain unchanged. No Ended publication; a subsequent valid submission remains possible while Active. |
 
-T044's tests now exercise the formal Foundation callback Port and existing Student Coordinator with a shared Database, replacing the earlier mock transaction. T044 is checked. T041 and T045 remain unchecked until Teacher entry/composition and Socket security verification are complete.
+T044 tests exercise the formal Foundation Port/Coordinator with a shared Database. T067/T068 exercise real Teacher composition/security and HTTP races. T041/T045 remain unchecked for explicit owner closeout; their completed technical evidence must not be described as a still-missing adapter.
 
 ## T045 implementation preparation — 2026-11-21
+
+This section is historical. T067/T068 and the T070 record below supersede its then-pending Teacher adapter/security status.
 
 `createHttpServer` constructs one lifecycle/publisher/resolver/Coordinator from the shared Database. The optional `createTeacherRouter(TeacherServiceDependencies)` receives the ready services and mounts its returned router under `/api/v1/teacher`; `startServer(TeacherIntegrationOptions)` forwards the factory and trusted HTTP/Socket adapters. No Teacher routes or authority are installed by default. The Coordinator imports the canonical Foundation Port without wrapping an additional End transaction.
 
 The targeted composition and Socket tests pass 16 cases: actual Student watch, persisted Submission resolved inside the shared transaction, committed state/Result visible before Socket publication, repeated End, startup adapter injection and DB closure, revoked/expired Student identity with mixed Cookies, and controlled Teacher Cookie/Origin/watch-adapter rejection. These are automated tests, not real Teacher security or browser acceptance.
 
 T045 remains open. Teacher must supply its real router, scoped HTTP authentication/`round:end` issuance, mutation Origin/CSRF enforcement, signed-Cookie/Origin Socket resolver and provenance-aware Session watch authorizer. Validate mixed Cookies and failure paths again with those actual adapters. T041 and T059–T061 remain unchanged.
+
+## T070 current technical review — 2026-11-23
+
+- **Composition / signatures**: `main.ts` -> real `createTeacherIntegration` -> `startServer` -> `createHttpServer`; `TeacherServiceDependencies` carries the same Database/lifecycle/Coordinator. Teacher Router creates authentication and `RoundControlService`; End generates requestId and delegates once. Coordinator's actual argument is `ActorContext | null`, guarded to Teacher kind, matching Session and `round:end`; Foundation owns its input and synchronous callback. No reverse Student import or second End transaction was found.
+- **State / visibility**: A Session without a Round is Waiting with null target. Select/Next/reopen creates new Waiting only after Ended or with no current Round; Start activates it. Submit persists answers/order and locks only its Team draft, not the Round. End atomically persists Result and Ended/version before publication. Waiting target content and premature results remain unavailable to Students; reopening clears/replaces only its own logical-target Result.
+- **Security**: Teacher HTTP Cookie/Origin/CSRF and scoped capability issuance exist under its Router. Teacher Socket transport alone grants nothing; every watch resolves signed Cookie/Origin and checks issued-object provenance/kind/permission/Session existence. Student failures never call the external resolver/authorizer, including mixed Cookies. Existing-room revocation after Teacher logout remains the accepted limitation.
+- **Evidence**: T067 targeted 3 files/33 tests and full 77/436; T068 targeted 3 files/47 tests and full 77/445, including HTTP writer barriers, duplicate End, Rollback and safe publication failure. These are prior executions, not T070 test or manual runs. Current busy handling is HTTP 500; Student credential metadata may encounter it before SubmissionService. No retry guarantee is added.
+- **Contract result**: No incompatible public Foundation HTTP/DTO/Socket change was found. Student documentation now matches existing DTOs/errors, 24-hour credential behavior and actual trust/initialization boundaries. Actual paths replace the old proposed Port filename. Student diagrams reflect installed Teacher integration and verified transaction/security flow; PNG evidence is in Quickstart.
+- **Task state**: T041 and T045 have their required technical evidence via T067/T068; only explicit owner review/checkbox closeout is outstanding here, with no additional unbuilt work identified. T059 technical review is covered here but its checkbox remains unchanged. T071/T060 require final integrated checks after this review; T069/T061 require real Windows/Teacher/two-Team browser results and timings. No other reviewer or OpenSpec approval is declared.

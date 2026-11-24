@@ -29,7 +29,7 @@ component "Foundation Module" as Foundation {
   component "Foundation session-state events" as StateEvents
 }
 component "Teacher Feature Backend" as TeacherModule
-component "Server Composition Root" as Composition
+component "Server Composition Root\nmain.ts / app.ts" as Composition
 interface "Synchronous winner callback\n(roundId) => Result | null" as WinnerPort
 database "Shared SQLite\nFoundation entities + Student tables" as DB
 
@@ -59,7 +59,7 @@ WinnerService --> DB : accepted order in caller transaction
 ResultProjection --> DB : persisted Result / winning answers
 ReadService --> DB
 Lifecycle --> DB
-TeacherModule ..> EndCoordinator : injected services; Teacher adapter pending
+TeacherModule ..> EndCoordinator : RoundControlService.end\none trusted internal call
 EndCoordinator --> Lifecycle : FoundationLifecycleEndPort
 Lifecycle --> WinnerPort : callback inside write transaction
 WinnerService ..|> WinnerPort : synchronous resolver
@@ -68,6 +68,7 @@ StateEvents --> Web : existing Foundation state contract
 Composition --> EndCoordinator : construct once after lifecycle
 Composition ..> Lifecycle
 Composition --> WinnerService : shared Database
+Composition --> TeacherModule : createTeacherIntegration\nRouter factory receives ready services
 
 note bottom of StudentModule
 First-time join after first Active is allowed only into an existing Team.
@@ -89,17 +90,19 @@ end note
 note bottom of Foundation
 Existing public HTTP/DTO/Socket.IO contracts remain unchanged.
 Foundation and Student share one SQLite connection.
-T044 adds the approved internal End callback with Foundation-owned input.
+T044 implements the approved internal End callback with Foundation-owned input.
 Foundation imports no Student types. Server returns the composed Coordinator.
 Teacher Router factory runs after lifecycle and Coordinator are ready.
 Notify after outer Commit; log delivery failures and return the committed snapshot.
 end note
 
 note right of TeacherModule
-Foundation currently grants only read/watch capabilities.
 Teacher owns signed Cookie, Origin, CSRF and trusted watch authorization.
-Without its supplied adapter, Teacher endpoints are unavailable.
+The real main.ts installs the Teacher integration.
+Teacher HTTP scopes round:end; Socket watch checks trusted provenance and Session existence.
+Transport connection alone does not authenticate a Teacher.
 Teacher integration calls one Student End coordinator.
 Teacher owns login/UI; Student selects the winner.
+T067/T068 provide automated evidence; browser acceptance remains separate.
 end note
 @enduml

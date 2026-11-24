@@ -44,14 +44,14 @@ The browser refreshes `/me` on connection, reconnection and invalidation. A full
 
 A pre-start team change atomically clears the source assignment if empty, appoints the earliest online teammate, or flags the earliest remaining teammate for online recheck if all are offline. Normal disconnect rules remain unchanged. After a move the browser refreshes membership and Session state; draft subscriptions use the new Team and current Round.
 
-OpenSpec synchronization remains separately tracked; Teacher has recorded no objection to the leader rules. T004 accepted the End interface and responsibility design on 2026-11-20. T044 supplies the Foundation callback Port. T045 now composes the shared services and exposes a typed Teacher router factory; production Teacher capability/security adapters and formal acceptance remain pending.
+OpenSpec synchronization remains separately tracked; Teacher has recorded no objection to the leader rules. T004 accepted the End interface and responsibility design on 2026-11-20. T044 supplies the Foundation callback Port. The shared services, typed Teacher router factory and real Teacher capability/security adapters are implemented. T067/T068 passed formal-path automated security and transaction tests; T041/T045 checkboxes remain open for owner closeout, not because an adapter is missing.
 
 ## Constitution Check
 
 ### Initial gate
 
 - **Requirements consistency**: Pass. Uses the clarified Student Spec and the agreed Student/Teacher responsibility split; no new product behavior is inferred from the teacher handoff guide.
-- **Modularity**: Pass with an integration review gate. Student is an in-process module in the existing application. The two internal Teacher-facing services are documented as proposed interfaces and must be reviewed with the Teacher Feature member before cross-feature implementation.
+- **Modularity**: Pass. Student is an in-process module in the existing application. T004 approved the single Teacher-facing End coordinator and Foundation callback; Teacher manual leader transfer is Cancelled, so it is not a second service to implement. Future cross-module interface changes still require review.
 - **Data and security**: Pass. Server-derived ActorContext, opaque HttpOnly cookie, Origin/CSRF checks, server-side membership/leader resolution, dynamic target validation, and no client-supplied acceptedOrder.
 - **Quality**: Pass at planning level. The test plan includes normal, invalid, unauthorized, stale, duplicate, cross-Team/Session, reconnect and concurrent End/Submit cases. No tests are claimed as executed in this Plan stage.
 - **Diagram First**: Pass when the three Plan-level `.puml` and generated PNG files are produced and inspected beside this Plan.
@@ -59,7 +59,7 @@ OpenSpec synchronization remains separately tracked; Teacher has recorded no obj
 
 ### Post-design gate
 
-The contracts are additive Student contracts. T004 accepted the `round:end` capability and synchronous Foundation End Port. T044 implements `FoundationLifecycleEndInput` and `WinnerResolver` in `foundation-transactions.ts`; `SessionLifecycleService` implements `FoundationLifecycleEndPort`. It owns the outer immediate transaction, checks scope/state/version before the callback, reuses existing End/Result persistence via same-connection savepoints, and captures the committed snapshot inside the outer transaction. The lifecycle publishes only after Commit and logs notification failures while returning success. Caller-owned transactions and asynchronous resolvers are rejected. T045's server composition and Student Socket fallback fix are implemented; real Teacher adapters and their security acceptance remain pending. Foundation public HTTP/DTO/Socket.IO contracts retain their existing shape.
+The contracts are additive Student contracts. T004 accepted the `round:end` capability and synchronous Foundation End Port. T044 implements `FoundationLifecycleEndInput` and `WinnerResolver` in `foundation-transactions.ts`; `SessionLifecycleService` implements `FoundationLifecycleEndPort`. It owns the outer immediate transaction, checks scope/state/version before the callback, reuses existing End/Result persistence via same-connection savepoints, and captures the committed snapshot inside the outer transaction. The lifecycle publishes only after Commit and logs notification failures while returning success. Caller-owned transactions and asynchronous resolvers are rejected. T045's composition/fallback implementation and real Teacher adapters are covered by T067/T068; original task closeout and final manual acceptance are tracked separately. Foundation public HTTP/DTO/Socket.IO contracts retain their existing shape.
 
 ## Architecture and Data Flow
 
@@ -102,7 +102,8 @@ apps/server/src/
 │   ├── persistence/                # Student-only repositories and migration support
 │   └── realtime/                   # Student draft event auth, rooms, publisher
 └── modules/sessions/application/
-    └── end-round-with-winner-resolver.ts       # Foundation-owned transaction port; no Student import
+    ├── foundation-transactions.ts             # Foundation-owned input / synchronous transaction callback
+    └── session-lifecycle-service.ts           # FoundationLifecycleEndPort / post-Commit publication
 
 apps/web/src/
 ├── pages/                          # replace existing Student placeholders in place
@@ -125,8 +126,8 @@ tests/
 ## Design Gate Summary
 
 - Foundation has no student enrollment, Cookie identity resolver, leader state, drafts, Student submission API, draft events or Student result projection; these are Student-owned additions, not existing capabilities.
-- The Teacher handoff defines the single trusted End command and synchronous Foundation callback. T004 design and T044 Port implementation are complete. `createHttpServer` now injects the existing lifecycle and bound winner resolver into the Coordinator using the same Database as Student submission. Its optional `createTeacherRouter` factory receives the ready services after Socket/publisher construction; `startServer(TeacherIntegrationOptions)` forwards trusted Teacher adapters. Student-routed Socket identity failures return null without external fallback. No Teacher implementation is installed by default; real Teacher Cookie/Origin/CSRF and watch authorization acceptance remain T045 dependencies. See `contracts/internal-services.md` for the composition signature.
-- Foundation's existing End service accepts a preselected Result and publishes after its own transaction. The plan adds an internal resolver callback executed while that same `BEGIN IMMEDIATE` transaction is held; no Foundation public contract is changed.
+- The Teacher handoff defines the single trusted End command and synchronous Foundation callback. `createHttpServer` injects the lifecycle and bound winner resolver into the Coordinator using the same Database as Student submission. Its `createTeacherRouter` factory receives ready services after Socket/publisher construction. The actual npm dev entry is `main.ts`, which calls `startServer(createTeacherIntegration(config))`; Teacher authentication is local to the Teacher router and its Socket adapters, not a global Teacher resolver on shared Student reads. Bare `startServer()` remains an optional-adapter seam. Student-routed Socket identity failures return null without external fallback. T067/T068 verify this real composition; see `contracts/internal-services.md` and Quickstart for evidence and remaining closeout.
+- Foundation's existing End service accepts a preselected Result and publishes after its own transaction. T044 added the internal resolver callback, verified by T068, executed while that same `BEGIN IMMEDIATE` transaction is held; no Foundation public contract is changed.
 - Session admission timing is now decided: first-time enrollment into an existing Team remains available after first Active; Team creation and post-start transfer remain disallowed. No Teacher admission-stop setting is added.
 
 ## Complexity Tracking

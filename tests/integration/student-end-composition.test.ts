@@ -1,5 +1,7 @@
 import { once } from 'node:events';
 import { createServer } from 'node:net';
+import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
 import { Router } from 'express';
 import { io, type Socket } from 'socket.io-client';
 import request from 'supertest';
@@ -12,6 +14,8 @@ import { DatabaseManager } from '../../apps/server/src/persistence/database.js';
 import { draftFixture } from '../helpers/student-draft.js';
 import { cookieOf } from '../helpers/student.js';
 import { ids } from '../helpers/foundation.js';
+import { createTestDatabase } from '../helpers/sqlite.js';
+import { teacherTestPasswordHash, TEACHER_TEST_PASSWORD, TEACHER_TEST_SECRET, STUDENT_TEST_SECRET } from '../helpers/teacher.js';
 
 const origin = 'http://127.0.0.1:5173';
 const studentSecurity = { secret: 'test-secret-'.repeat(4), allowedOrigins: [origin] };
@@ -187,3 +191,66 @@ it('forwards supplied Teacher adapters through startServer and closes its one ma
   }
   expect(services?.database.open).toBe(false);
 });
+
+it('T067 boots the real main.ts with real Teacher authentication and Socket authorization', async () => {
+  const database = createTestDatabase();
+  const reservation = createServer();
+  reservation.listen(0, '127.0.0.1');
+  await once(reservation, 'listening');
+  const address = reservation.address();
+  if (!address || typeof address === 'string') throw new Error('No test port');
+  await new Promise<void>(resolve => reservation.close(() => resolve()));
+  // Real entry point and adapters; no mocked factory, resolver, router or credential verifier.
+  const child = spawn(process.execPath, ['--import', 'tsx', resolve('apps/server/src/main.ts')], {
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, NODE_ENV: 'test', PORT: String(address.port), SQLITE_PATH: database.path,
+      TEACHER_PASSWORD_HASH: teacherTestPasswordHash(), TEACHER_SESSION_SECRET: TEACHER_TEST_SECRET,
+      TEACHER_ALLOWED_ORIGINS: origin, STUDENT_CSRF_SECRET: STUDENT_TEST_SECRET, STUDENT_ALLOWED_ORIGINS: origin,
+      GOOGLE_SERVICE_ACCOUNT_KEY_FILE: '' },
+  });
+  let client: Socket | undefined;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => { clearTimeout(timer); child.stdout.off('data', output); child.off('exit', stopped); child.off('error', failed); };
+      let seen = '';
+      const output = (chunk: Buffer) => { seen += chunk.toString(); if (seen.includes('Shared server listening on')) { cleanup(); resolve(); } };
+      const stopped = (code: number | null) => { cleanup(); reject(new Error(`Teacher entry exited before listening (${code}).`)); };
+      const failed = (error: Error) => { cleanup(); reject(error); };
+      const timer = setTimeout(() => { cleanup(); reject(new Error('Teacher entry did not start in time.')); }, 10_000);
+      child.stdout.on('data', output);
+      child.stderr.resume();
+      child.once('exit', stopped);
+      child.once('error', failed);
+    });
+    const url = `http://127.0.0.1:${address.port}`;
+    expect((await request(url).get('/api/v1/teacher/me')).status).toBe(401);
+    const login = await request(url).post('/api/v1/teacher/auth/login').set('Origin', origin).send({ password: TEACHER_TEST_PASSWORD });
+    expect(login.status).toBe(204);
+    const cookie = String(login.headers['set-cookie'][0]).split(';')[0];
+    const me = await request(url).get('/api/v1/teacher/me').set('Cookie', cookie);
+    expect(me.status).toBe(200);
+    const created = await request(url).post('/api/v1/teacher/sessions').set('Cookie', cookie)
+      .set('Origin', origin).set('X-CSRF-Token', me.body.data.csrfToken).send({ teamCount: 2 });
+    expect(created.status).toBe(201);
+    const sessionId = created.body.data.sessionId;
+    client = io(url, { autoConnect: false, reconnection: false, transports: ['websocket'], extraHeaders: { Cookie: cookie, Origin: origin } });
+    const connected = event(client, 'connect');
+    client.connect();
+    await connected;
+    const snapshot = event<SessionStateSnapshot>(client, 'session:state');
+    client.emit('session:watch', { sessionId });
+    expect(await snapshot).toMatchObject({ sessionId, phase: 'Waiting' });
+    // Confirm mutation Origin/CSRF remain enforced on the real mounted Router.
+    expect((await request(url).post('/api/v1/teacher/sessions').set('Cookie', cookie).set('Origin', origin).send({ teamCount: 2 })).status).toBe(403);
+    expect((await request(url).post('/api/v1/teacher/sessions').set('Cookie', cookie).set('Origin', 'https://evil.example')
+      .set('X-CSRF-Token', me.body.data.csrfToken).send({ teamCount: 2 })).status).toBe(403);
+  } finally {
+    client?.disconnect();
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = once(child, 'exit');
+      child.kill();
+      await exited;
+    }
+  }
+}, 20_000);

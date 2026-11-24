@@ -1,7 +1,7 @@
 # 課堂搶答系統｜Student × Teacher 跨模組設計決議
 
-> **狀態**：T004 介面及責任分工設計審閱已完成（2026-11-20）。T041／T044／T045 實作與正式安全、整合驗收待完成。Teacher 已對組長離線遞補表示無異議，OpenSpec 同步由 Student 負責人持續處理，尚無完成紀錄。
-> **日期**：2026-11-10，更新於 2026-11-20。
+> **狀態**：T004 設計審閱完成（2026-11-20），T044 已實作，T067／T068 已提供正式組裝、安全及交易測試證據。T070 按現有程式核對契約／圖表；T041／T045 仍保留待負責人結案，T071 最終檢查與 T069 人工驗收另計。Teacher 對組長遞補無異議；OpenSpec 同步尚無完成紀錄，不推定已核准。
+> **日期**：2026-11-10；目前狀態更新於 2026-11-23。
 > **來源**：`specs/002-student-feature/spec.md` 的 Specify／Clarify 決議、既有 Foundation 能力與共同需求。  
 > **對象**：老師端負責人、學生端負責人。
 
@@ -14,7 +14,7 @@
 | 身分恢復 | 同一瀏覽器在有效憑證仍存在時可恢復原 Participant 與 Team；不能只信任 Cookie 中自行宣稱的 Team ID | Student |
 | 組長產生 | 第一位**成功加入** Team 者由後端原子指定為唯一組長 | Student |
 | 組長斷線（Teacher 無異議，OpenSpec 同步待紀錄） | 最後有效 Socket.IO 連線中斷後立即依加入順序遞補在線合資格組員。其他連線仍在或無在線候選時維持指派；被替換的組長重連不取回資格。提交權限依伺服器目前指派 | Student |
-| 組長轉組 | 搶答首次開始前，原組長轉組時由 Student 後端依加入順序自動遞補，優先選在線者；開始後不得自由換組 | Student |
+| 組長轉組 | 首次 Active 前由後端依加入順序自動遞補在線者；全員離線時由最早現有成員暫任並待上線重查，空組可無組長。首次 Active 後禁止既有成員換組 | Student |
 | 共同編輯 | 草稿以 Team × Round 保存，組員即時共享；同一 Blank 的衝突採**伺服器最後接受修改勝出** | Student |
 | 草稿恢復 | 重新整理／重連後恢復伺服器權威草稿 | Student |
 | 填空完整性 | 單題多 Blank 必須全部有非空白答案才可提交；題組依既有共同需求完成所有必填項 | Student |
@@ -34,7 +34,7 @@
 
 ### 決議 T-02：老師端 End 須整合 Student 勝者服務
 
-**請老師端實作**：教師按下 End 的正式 UI／受保護後端入口，只呼叫 `StudentTrustedEndCoordinator.endRound(input, actorContext)`；不得由前端挑選勝者。`round:end` 已由 T004 接受為 Teacher 後端核發的 Session-scoped capability，正式核發與安全驗證仍由 Teacher Feature 實作及測試。
+**老師端已接上的責任**：End 的受保護後端入口經 `RoundControlService.end` 只呼叫 `StudentTrustedEndCoordinator.endRound(input, actorContext)` 一次，不採用前端勝者。`round:end` 由可信 Teacher Router 驗證登入及 Session 後核發；T067／T068 已有正式 adapter 安全與 HTTP 交易證據，瀏覽器完整操作仍須另行驗收。
 
 **學生端實作**：驗證已接受的 Submission 與 `acceptedOrder`，選出有效的最早提交者，提供 Student 專用已公布結果投影。
 
@@ -52,8 +52,8 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 
 | 項目 | 設計狀態與責任 | 驗收重點 |
 | --- | --- | --- |
-| Teacher 單一 End 呼叫與交易內 Student winner callback | T004 已接受介面與分工；Student／Foundation 負責 T044／T045，Teacher 接上唯一 Coordinator 入口 | 結束與提交並發時結果一致、Rollback 不廣播、Commit 後通知且通知失敗不改變成功結果 |
-| Student 專用結果投影 API／DTO | 沿用 Student 契約與既有投影，正式 Teacher End 路徑待整合驗證 | 只在 Ended 顯示、只提供勝者組名／答案，不外洩其他組 |
+| Teacher 單一 End 呼叫與交易內 Student winner callback | T004 設計、T044 Port 與正式組裝已具備，T068 通過正式 HTTP 競爭／失敗測試 | 並發結果一致、Rollback 不廣播、Commit 後通知與通知失敗不改變成功結果已有證據；原任務勾選另行結案 |
+| Student 專用結果投影 API／DTO | 正式持久化結果已由 T068 及既有 API／頁面測試驗證；瀏覽器 Teacher End 流程待驗 | 只在 Ended 顯示、只提供勝者組名／答案，不外洩其他組 |
 | Student 草稿事件與同步 DTO | 沿用 Student 契約與既有草稿同步，跨模組驗收依後續任務執行 | Team／Round 隔離、最後接受修改生效、重連恢復、不與 Foundation 事件衝突 |
 | 老師端題目匯入／Guided Notes 回寫細節 | Teacher | 依共同需求處理，與 Foundation 題目結構相容 |
 
@@ -61,9 +61,9 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 
 ## 四、後續分工與驗證
 
-- **Student／Foundation**：T004 設計 Gate 已完成；後續以 T041 測試先行、T044 同交易 Port、T045 正式組裝驗證已接受的介面。T045 同時修正 `app.ts` 的 Student Socket 失效 fallback。OpenSpec 組長規則同步由 Student 負責人處理。
-- **Teacher**：依第五節實作專用 HTTP 入口、可信 `round:end` 核發及 Cookie／Origin／CSRF 防護，透過既有 Server 組裝呼叫唯一 Coordinator。教師 Socket 授權與學生路徑隔離須經正式測試。
-- **雙方共同驗證**：首位組員同時加入的競爭、組長斷線遞補、草稿衝突與恢復、只有組長能提交、結束和提交同時發生、雙 Client 同步、跨 Session／Team 隔離及無勝者結束。
+- **Student／Foundation**：同交易 Port、正式組裝與 fallback 隔離均已實作；T067／T068 已提供安全與並行交易證據，原 T041／T045 等待負責人依證據結案。OpenSpec 組長規則同步仍由 Student 負責人處理。
+- **Teacher**：正式 Router、登入 Cookie／Origin／CSRF、scoped `round:end` 及 Socket watch adapter 已接上唯一 Coordinator，未注入共用 Session 路徑的 Teacher HTTP 身分。安全驗證有 T067 證據。
+- **雙方共同驗證**：既有自動化與 T067／T068 涵蓋首位組員、遞補、草稿／提交、End 競爭及資料隔離；正式 Teacher 與至少兩組 Student 的瀏覽器流程、加入／同步時間量測仍待 T069／T061。T070 不代表已取得雙方新的逐項簽核。
 
 ### 給老師端組員的一句話
 
@@ -92,7 +92,7 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 ### 5.2 需修改或補充
 
 1. **Socket 授權方式調整**：Foundation `resolveSocketActorContext(socket)` 無法取得 watch payload 的 sessionId。Teacher 的 Socket 解析器只驗證老師身分，回傳不含 `sessionId` 的老師 ActorContext；Session 存在與 `session:watch` 權限改由 `authorizeWatch(actor, sessionId)` 檢查。Teacher Socket 連線不得帶 `auth.sessionId`，避免進入 Student handshake。無需修改 Foundation 的 `socket-server.ts`、`session-events.ts` 或 `ActorContext` 型別；但 `app.ts` 的學生身分 fallback 需調整（見下）。
-   - **現況（2026-11-20 對照程式碼）**：
+   - **歷史基線（2026-11-20 對照程式碼，以下缺口已由 T045 實作及 T067 驗證，不是目前狀態）**：
      - Handshake：Student middleware（`apps/server/src/modules/student/realtime/student-draft-socket.ts` 的 `registerStudentDraftSocket`）只在 `auth.sessionId` 存在時走學生驗證；sessionId 格式錯誤、Origin 不在白名單或 Cookie 解析失敗時直接拒絕連線，不會退回其他驗證。`auth.sessionId` 不存在時直接放行，**不檢查 Origin 或任何身分**。
      - Watch：`apps/server/src/app.ts` 的 `resolveSocketActorContext`（約第 66～70 行）在每次 `session:watch` 時重新解析學生身分；若 handshake 時已是學生 Socket、但重新解析失敗（例如憑證已失效），會**退回呼叫外部 `options.resolveSocketActorContext`**，也就是日後的 Teacher resolver。這不符合下列規則，必須調整。
      - `authorizeWatch`（約第 72～73 行）：不在 `studentActors` 中的身分一律交給外部 `options.authorizeWatch`。
@@ -113,7 +113,7 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 
 ### 5.3 已知風險（不阻擋 T004）
 
-- 同一瀏覽器同時持有老師與學生 Cookie：因 Teacher HTTP 解析器只對老師專用路徑生效，學生頁面呼叫共用 `/sessions/:id/...` 讀取路徑時仍以學生身分授權，不會取得老師權限。Demo 時老師與各組學生仍須使用不同瀏覽器設定檔或無痕視窗，因為同一瀏覽器只有一份學生 Cookie，不同學生會互相覆蓋身分。
+- 同一瀏覽器同時持有老師與學生 Cookie：Teacher HTTP 解析器只對老師專用路徑生效，共用 `/sessions/:id/...` 讀取仍以學生身分授權，不會取得老師權限。Demo 使用不同瀏覽器設定檔建立獨立學生身分；同一設定檔的分頁共用 Cookie，會共用／恢復同一 Participant，不能當成多名獨立學生。
 - Teacher Cookie 簽章驗證、HTTP 寫入操作的 Origin 白名單與 CSRF 防護，以及 Socket 的 Cookie＋Origin 驗證，為**正式整合驗收的必要條件**；未通過不得視為整合完成。具體機制於 Teacher plan 規劃。
 - 老師登出後已加入的 Socket room 不會被移除；單一老師本機 Demo 接受此限制。
 
@@ -121,7 +121,15 @@ Student 結果頁所需的組別名稱、答案明細，採 Student 專用的結
 
 Teacher Feature 負責人的審閱意見與 Student／Foundation 負責人於 2026-11-20 的設計接受紀錄已具備，T004 Gate 完成。5.1 與 5.2 第 1～6 點作為後續實作依據。T041／T044／T045 的設計審閱阻擋解除，仍須依 Tasks 的前置順序執行及驗證。
 
-T004 只確認介面、責任分工與安全規則。T044／T045 程式、安全測試、T041 正式路徑競爭測試及 T059～T061 整合驗收仍待完成。Teacher 負責 Cookie、Origin、CSRF 與 Teacher Socket 驗證；T045 負責 `app.ts` fallback 隔離及組裝測試。OpenSpec 的組長離線遞補同步另行追蹤。
+T004 只確認介面、責任分工與安全規則。現在 T044 Port、T045 組裝／fallback 程式與 Teacher adapters 均存在；T067、T068 已補上真實安全與競爭驗證。T070 核對結果未發現尚缺的原 T041／T045 技術驗收項目，但本輪依要求保留其未勾選，待負責人正式結案。T071／T060 最終回歸、T069／T061 人工驗收與 OpenSpec 同步仍另行追蹤。
+
+### 5.5 T070 實作對照（2026-11-23，技術核對紀錄）
+
+- **實際入口**：`main.ts` → `createTeacherIntegration` → `startServer`／`createHttpServer`。Teacher factory 收到已就緒的同一 Database／lifecycle／Coordinator；HTTP 認證留在 Teacher Router，不使用全域 Teacher `resolveActorContext`。
+- **實際安全**：Teacher HTTP Cookie 為簽章 `teacher_session`，Origin／CSRF 與 Session scope 均由 Router middleware 檢查；Teacher Socket 於 watch 驗證 Cookie／Origin，再以可信 ActorContext 物件與權限／Session 存在授權。Student 路徑驗證失敗不進外部 resolver，已有混合 Cookie 與實際 startup 測試。
+- **實際交易**：Teacher 產生 requestId、只呼叫 Coordinator；Foundation 同連線同步解析及保存 Ended／Result，Commit 後才發布。T068 以真實 HTTP、隔離資料庫、寫鎖 barrier 與受控失敗驗證，不是以假 Teacher adapter 代替；`SQLITE_BUSY` 沿用安全的 HTTP 500。
+- **契約結果**：沒有發現 Foundation 公開路徑／DTO／`session:*` Payload 不相容變更。Student 專用 DTO／事件、Teacher 專用 Router 和內部 End Port 各自保留責任邊界；Teacher 手動轉交組長仍 Cancelled。
+- **證據／限制**：T067：3 檔／33 項、完整 77／436；T068：3 檔／47 項、完整 77／445，均為已執行自動化紀錄。T070 不重跑或虛報人工驗收，也不宣稱另一位組員或 OpenSpec 在本輪新增核准。
 
 ---
 

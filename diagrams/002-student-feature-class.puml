@@ -225,6 +225,8 @@ Reuse End/Result persistence on the same connection; snapshot is read in transac
 Commit precedes notification; delivery is not awaited.
 Log notification failures and return the committed snapshot.
 Composition creates the lifecycle, resolver and Coordinator once.
-Teacher Router factory receives the ready services; Teacher adapter acceptance pending.
+main.ts installs createTeacherIntegration; the Router factory receives ready services.
+T067 verifies real Teacher identity/watch; T068 verifies the composed End path.
+Original task closeout and browser acceptance are tracked separately.
 end note
 @enduml

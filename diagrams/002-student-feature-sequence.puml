@@ -55,6 +55,19 @@ else invalid or Session already started
   StudentApi --> UI : reject without changing membership
 end
 
+== Teacher select / next / reopen and explicit start ==
+Teacher -> Lifecycle : selectTarget (validated catalog target; no Round or previous Ended)
+Lifecycle -> DB : transaction: new Round ID, Waiting, currentRoundId, stateVersion; COMMIT
+Lifecycle --> Foundation : publish committed Waiting snapshot
+Teacher -> Lifecycle : startRound (current Waiting Round / expected version)
+Lifecycle -> DB : transaction: Active, changedAt, stateVersion; COMMIT
+Lifecycle --> Foundation : publish committed Active snapshot
+note over Teacher,DB
+Next and reopening an ended target create a fresh Waiting Round.
+Only an explicit Start enters Active; Submission does not end the Round.
+A Session without a Round is Waiting with null currentRoundId and target.
+end note
+
 == Activity state and target ==
 note over UI,Foundation
 The browser sends the Student-specific HttpOnly `student_session` cookie to both
@@ -137,13 +150,15 @@ DB --> StudentApi : committed Submission + locked draft
 StudentApi --> UI : accepted outcome for this Team
 StudentApi --> DraftSocket : publish student:draft:locked after commit
 
-== Submission / End serialization (Teacher adapter acceptance pending) ==
+== Submission / End serialization (real integration verified by T068) ==
 note over Teacher,Lifecycle
 Server builds one lifecycle, resolver and Coordinator on the shared Database.
-The optional Teacher Router factory receives ready services.
-Teacher Cookie/Origin/CSRF and real router acceptance remain pending.
+main.ts installs createTeacherIntegration; its Router factory receives ready services.
+Real Teacher Cookie/Origin/CSRF and Socket authorization are verified by T067.
 T044 supplies the Foundation-owned synchronous transaction Port.
-Student Winner Resolver is implemented and tested independently.
+T068 exercises real HTTP writers with deterministic lock barriers.
+SQLITE_BUSY may surface before a competing operation reaches its domain service;
+post-Commit retries revalidate phase. No automatic retry guarantee is added.
 end note
 alt Submission gets SQLite write lock first
   Student -> StudentApi : concurrent valid submission
@@ -192,6 +207,12 @@ No Foundation↔Student import cycle exists.
 end note
 
 == Student Socket trust boundary ==
+note over Foundation,Teacher
+Without auth.sessionId, connection alone grants no Teacher identity.
+On watch, the real Teacher resolver verifies signed Cookie and allowed Origin;
+authorizeWatch checks trusted provenance, Teacher kind, capability and Session existence.
+Teacher HTTP separately scopes round:end. Logout room revocation remains a known limitation.
+end note
 UI -> Foundation : session:watch after Student handshake
 Foundation -> DB : re-resolve credential and canonical Participant in handshake Session
 alt credential no longer valid or identity scope changed
