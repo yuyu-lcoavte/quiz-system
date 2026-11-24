@@ -1,15 +1,15 @@
 # 課堂搶答系統｜Teacher Foundation 介接指南
 
 > **用途**：提供老師端負責人一份可直接參考的共用架構交接文件。  
-> **文件日期**：2026-11-10  
-> **專案基準**：Shared Foundation `001-shared-foundation` 已完成 T001～T038；Student Feature `002-student-feature` 已完成 Specify、Clarify、Plan、Tasks（61 項任務），尚未開始 Implement。
+> **文件日期**：2026-11-10；目前狀態核對於 2026-11-23（T070）。
+> **專案基準**：Shared Foundation 已完成 T001～T038；Student 與正式 Teacher Integration 的主要功能已實作，T067 安全與 T068 交易整合測試完成。Student 保留 71 個任務編號（T025／T026 Cancelled）；未勾選項目以最新 Tasks 的結案／驗收狀態為準，不再表示 Teacher 程式不存在。
 > **重要**：本文件依目前已確認的 SpecKit 規格與實作回報整理，**不是新 API 的核准規格**。實作時，以倉庫中最新程式碼與 `contracts/` 為準。未建立的老師操作、身分驗證與跨模組介面均有明確標示。
 
 ## 1. 交接摘要
 
 老師端**直接使用既有 Foundation**，不應另建一個後端、SQLite 資料庫或 Socket.IO 通訊系統。共用基礎已提供 React + TypeScript + Vite 前端、Express + Socket.IO 後端、SQLite 持久化、共用型別、活動狀態及結果儲存服務。
 
-Foundation 的 38 項任務已完成。驗收回報為 16 個測試檔、84 項測試通過；Windows 本機已驗證前後端啟動、共用路由與 Socket.IO polling 握手。**真正的老師登入、題目匯入、管理操作、學生加入作答及真人雙端搶答仍未實作／未完成端到端人工驗收**，請勿將既有佔位頁視為成品。
+Foundation 的 16 個測試檔／84 項及 Windows 路由／polling 握手是早期歷史基準。現有正式老師登入、活動與題目操作、學生加入／共同作答／提交均已有程式；T068 的完整 `check` 為 77 檔／445 項，TypeScript 與 Build 通過。這些自動化證據不代表真人 Teacher／兩組學生的完整操作、加入計時與同步量測已驗收，後者仍屬 T069／T061。
 
 ### 模組責任
 
@@ -40,10 +40,11 @@ npm.cmd run dev
 | 路徑 | 目前狀態 | 老師端應做的事 |
 | --- | --- | --- |
 | `/` | 共用首頁已完成 | 可沿用老師／學生入口 |
-| `/teacher/login` | 老師登入佔位頁 | 實作真正的登入及錯誤處理 |
-| `/teacher/dashboard` | 老師管理佔位頁 | 實作教師授權後的管理介面 |
-| `/student/join` | 學生加入佔位頁 | 由 Student Feature 接手 |
-| `/student/session/:sessionId` | 學生活動佔位頁 | 由 Student Feature 接手 |
+| `/teacher/login` | 已接正式 Teacher 登入 | 保持後端 Cookie／Origin 驗證 |
+| `/teacher/dashboard` | 已接 Teacher 管理介面 | 保持後端授權及活動讀取邊界 |
+| `/teacher/sessions/:sessionId` | Teacher 專屬活動操作頁 | 使用 Teacher API，不以頁面可開啟取代授權 |
+| `/student/join` | 已接 Student 查詢／加入及恢復 | 沿用活動代號與既有 Team，不建立新 Team |
+| `/student/session/:sessionId` | 已接狀態、草稿、提交及結果 | 角色與資料可見性仍由後端決定 |
 
 **注意**：頁面存在不代表已具備老師登入或存取保護。老師的受保護操作必須在**後端**驗證教師身分與權限。
 
@@ -54,7 +55,7 @@ npm.cmd run dev
 - `Session` 透過 `activityCode` 供學生查找，並以 `currentRoundId`、`stateVersion` 追蹤目前輪次與版本。
 - `Round` 只能對應一題 **Question** 或一個 **QuestionGroup**；空 QuestionGroup 可以存為草稿，但**不能當作有效 Round 目標**。
 - 單一 Question 可有 0 個或多個 Blank；是否可成功提交由 Student Feature 的實際題目結構與需求驗證。
-- 輪次依 `Waiting → Active → Ended` 轉換；下一題／重新開題建立新的 Round ID，不能直接覆寫舊 Round。
+- 輪次依 `Waiting → Active → Ended` 轉換；下一題／重新開題只在尚無 Round 或目前 Round 已 Ended 時選取，建立新 Round ID 先進入 Waiting，Teacher 再按 Start 才 Active。Session 尚無 Round 時亦顯示 Waiting。Submit 只鎖定本組草稿，不會自動 End 整輪。
 - 同一 Team 在同一 Round 至多有一筆成功 Submission；`acceptedOrder` 由可信 Student 後端依提交接受順序產生，老師前端不得指定。
 - `Result` 與 `Ended` 由 Foundation 既有交易機制確保持久化一致；沒有有效勝者時不得捏造 Result。
 
@@ -94,8 +95,8 @@ Foundation 已有事件（請以 `specs/001-shared-foundation/contracts/realtime
 
 ## 7. 可信身分與權限
 
-- Foundation 提供共用 `ActorContext` 型別及由可信伺服器解析器注入的 Middleware 邊界；目前 `startServer()` 未配置正式身分解析器。Student Cookie 身分解析由 Student Feature 提供，Teacher 身分解析由 Teacher Feature 提供；未接上可信解析器前，受保護操作必須 fail closed。Foundation 不提供真正的教師帳密登入實作。
-- Teacher Feature 必須建立教師驗證／Session 管理，並在後端驗證是授權老師才能操作管理功能。
+- Foundation 提供共用 `ActorContext` 型別與 Middleware 邊界。正式 npm dev 入口 `apps/server/src/main.ts` 以 `startServer(createTeacherIntegration(config))` 接上真實 Teacher Router／Socket adapters；Student Cookie resolver 供學生及共用 Session 讀取。直接不帶參數呼叫 `startServer()` 仍不會自行安裝 Teacher 功能。
+- Teacher 驗證／Session 管理已存在；Teacher HTTP Cookie、Origin／CSRF 與 Session-scoped ActorContext 只在 Teacher Router 內處理，沒有注入全域 Teacher HTTP resolver。Teacher Socket 不帶 `auth.sessionId`，於每次 watch 驗證簽章 Cookie 與 Origin，再以可信物件／權限／Session 存在授權。傳輸連上不代表已授權。
 - 不得信任瀏覽器自行提供的 `teacher`、`teamId`、`isLeader` 或 `acceptedOrder`。
 - 既有測試用 ActorContext 注入僅限測試環境，不得用於正式操作。
 - Student Feature 的活動內身分不另設帳密；由後端核發可驗證的憑證並支援同瀏覽器恢復。學生身分及組長資格不是老師登入的替代品。
@@ -114,11 +115,13 @@ Teacher、Student 與 Foundation 的 End 介面已於 2026-11-20 通過 T004 設
 4. Foundation 與 Student 使用同一 `better-sqlite3` Database instance；Foundation 的 SQLite End 交易與 Student resolver 都同步執行，Foundation 在一個 `BEGIN IMMEDIATE` 交易內呼叫 resolver、持久化 `Ended`／`Result`／`stateVersion`。Commit 後呼叫既有 Socket.IO publisher，不等待送達；通知錯誤記錄後仍回傳已 Commit 的成功快照。不得在交易內等待通知，也不得讓交易 callback 回傳／等待 Promise。
 5. Student 結果投影在 Ended 後公開勝出組別名稱與其成功答案，**不公開其他組答案／順位**；沒有 Submission 時不建立 Result。
 
-**權限與介面狀態**：`round:end` 名稱與責任已通過設計審閱；由可信 Teacher middleware 驗證身分及指定 Session 後核發，Foundation 不自行授予。現有工作區尚無正式 Teacher 權限核發／Cookie／Origin／CSRF adapter。
+**權限與介面狀態**：`round:end` 已由 Teacher 的 `teacher-actor-factory.ts` 核發；Router 先驗證 Teacher 登入，再由 `session-scope.ts` 驗證指定 Session 存在並產生 ActorContext。Foundation 不自行授予權限。Teacher Cookie／Origin／CSRF 與 Socket adapters 均有正式實作及 T067 安全證據。
 
 **必要並行安全條件**：不允許「先查勝者」與「稍後 End」之間有新提交插入。T044 已實作正式同步交易內 callback，不改 Foundation 公開 HTTP、DTO 或 Socket.IO 契約。
 
 **2026-11-21 組裝接點**：`app.ts` 的 `createHttpServer` 已建立共用 Database 上的唯一 lifecycle、publisher、Winner Resolver 及既有 Coordinator。Teacher 透過 `createTeacherRouter(services)` 取得 `database`、`sessionLifecycle`、`endCoordinator`，回傳的 Router 掛載於 `/api/v1/teacher`。`startServer(TeacherIntegrationOptions)` 可轉送該 factory、HTTP／Socket resolver 與 watch authorizer；未提供時不安裝 Teacher 路由。Teacher 後端只呼叫 `services.endCoordinator.endRound(input, actorContext)`，不另包交易。具體型別見 Student `contracts/internal-services.md`。Student Socket 重新解析失敗已禁止 fallback；受控 adapter 測試不能代替真實 Teacher 的簽章 Cookie、Origin／CSRF 及授權驗收，因此 T045 仍未完成。
+
+**目前核對（2026-11-23）**：上述受控 adapter 是歷史證據。正式 `createTeacherIntegration` 已經由 factory 注入同一批服務，`RoundControlService.end` 產生 requestId、取得目前 Round 後只呼叫 Coordinator 一次。T067 以真實登入／Socket 與 `main.ts` 子程序完成安全及啟動測試，T068 完成兩種寫鎖順序、Rollback／不發布與通知失敗等正式 HTTP 案例。T041／T045 的技術驗收項目已有對應證據，本輪不代負責人勾選結案，也不新增未決技術阻擋。
 
 ## 8.3 活動開始後的首次加入
 
@@ -126,16 +129,14 @@ Teacher、Student 與 Foundation 的 End 介面已於 2026-11-20 通過 T004 設
 - 這是首次加入，不是既有學生轉組；已加入 Participant 首次 Active 後不可轉組。
 - Student 不建立 Team，且本專題不新增 Teacher「停止加入」設定。
 
-## 9. 老師端仍須自行完成（Foundation 沒有提供）
+## 9. Teacher 責任與仍待共同驗收
 
-- 老師正式登入、權限管理與保護頁面。
-- 活動／題目／題組建立及教師操作流程。
-- Guided Notes／題目匯入、回寫與輸出（Google Sheets／Excel 等細節依共同需求由老師端確認）。
-- 開始、結束、下一題、重開的教師操作入口與錯誤提示。
-- 完整 Teacher × Student 整合及實際雙組別 Demo。
-- Teacher admission-stop 設定；目前決議允許晚到學生加入既有 Team。
+- 老師登入、權限及頁面、活動／題目管理、Start／End／Next／重開入口已有 Teacher 程式；Foundation 不重複實作這些業務。
+- Guided Notes 依 Q13 直接讀寫線上 Google Sheets，由 Teacher 管理匯入、Service Account 授權與答案寫回；`.xlsx` 僅作格式參考，沒有待開發的上傳流程。本輪沒有驗收外部 Google Sheets 實際服務。
+- 完整 Teacher × 至少兩組 Student 的 Windows Demo、三次加入計時及兩秒內畫面同步仍須記錄人工結果。
+- 不新增 Teacher「停止加入」設定或教師手動指定組長；晚到者可首次加入既有 Team，既有學生首次 Active 後不得轉組。
 
-上述未實作部分**不應視為 Foundation 的缺陷**，而是後續 Feature 的工作範圍。
+區分已有業務程式、已通過的自動化測試與尚未執行的共同人工驗收，不因 Foundation 本身沒有業務入口而重建服務。
 
 ## 10. 建議老師端實作前依序查閱
 
@@ -158,4 +159,4 @@ Teacher、Student 與 Foundation 的 End 介面已於 2026-11-20 通過 T004 設
 
 ---
 
-**文件維護**：這是 2026-11-10 的介接基線。Student Plan 與 Teacher 實作若產生實際函式／DTO 路徑，應更新本文件並以 Git PR 留下可追蹤的版本，不應只靠口頭約定。
+**文件維護**：保留 2026-11-10 基線與歷史證據，2026-11-23 已按現有程式完成 T070 技術核對。上方交接勾選項是人員簽核／人工驗收，不由 AI 自動勾選；本輪不宣稱新增另一位組員或 OpenSpec 的審閱。後續跨模組變更仍須以 PR 留下可追蹤紀錄。

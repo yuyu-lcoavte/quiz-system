@@ -1,6 +1,6 @@
-# Student HTTP Contract (Plan Proposal)
+# Student HTTP Contract
 
-Base path: `/api/v1/student`. All success/error bodies use the existing Foundation envelope: `{ data: T }` / `{ error: { code, message, details? }, meta? }`. These routes are Student-owned additions and do not change Foundation's `/api/v1/sessions` routes or DTOs. The names and DTOs are Plan proposals for Teacher Feature review where an internal service is involved.
+Base path: `/api/v1/student`. All success/error bodies use the existing Foundation envelope: `{ data: T }` / `{ error: { code, message, details? }, meta? }`. These implemented Student-owned routes do not change Foundation's `/api/v1/sessions` routes or DTOs. T070 checked the current controllers/shared types against this document; the internal End design was accepted at T004 and tested through real Teacher integration at T067/T068. This records technical consistency, not a new review by every module owner.
 
 ## Identity and Join
 
@@ -34,7 +34,7 @@ Team ID is a selection request, not an authorization claim; the server verifies 
 
 ```json
 { "data": {
-  "sessionId": "<uuid>", "participantId": "<uuid>",
+  "sessionId": "<uuid>", "participantId": "<uuid>", "displayName": "Student name",
   "team": { "teamId": "<uuid>", "name": "Team A" },
   "isLeader": true, "csrfToken": "<short-lived-token>"
 } }
@@ -47,7 +47,7 @@ The response does not return the bearer cookie value. A repeated request with th
 - Cookie name: `student_session`; value is a high-entropy opaque random secret.
 - Store only SHA-256 digest and lifecycle metadata server-side. The cookie does not encode Participant, Team or permission data.
 - Attributes: `HttpOnly`, `SameSite=Lax` for the existing same-origin Vite/API/Socket.IO flow, `Path=/`, `Secure` in production HTTPS, and no `Domain`; local HTTP development omits `Secure` only under explicit development configuration. The Student-specific `student_session` cookie is parsed only by Student HTTP identity middleware and the Student Socket.IO handshake resolver; the broad Path does not grant authorization to other routes.
-- Proposed default absolute lifetime: 24 hours, configurable by server environment. Revoked/expired/missing association returns 401; the UI offers rejoin/recovery and never restores by display name.
+- Current HTTP cookie and default credential absolute lifetime: 24 hours. `EnrollmentService` has an internal lifetime constructor argument, but the current server exposes no environment option for it. Revoked/expired/missing association returns 401; the UI offers rejoin/recovery and never restores by display name.
 - `GET /api/v1/student/sessions/{sessionId}/me` resolves the cookie's server-side Session-to-Participant association and returns current Team/leader status. It does not mutate identity or membership.
 - `/me` is the authoritative, `Cache-Control: no-store` membership read after initial load, reconnect, F5 or a Student membership invalidation. `isLeader` reflects the current persisted assignment; the same Cookie and Participant ID may now return `false`.
 - The authenticated no-store `/me` also returns `teamChange`: `null` after first Active (including later Waiting), otherwise `{ teams }` listing other existing Teams in the Session as `{ teamId, name }`. It does not expose candidates. The mutation rechecks eligibility inside the write transaction.
@@ -76,7 +76,7 @@ Allowed to a member of the Team during Active. Creates an empty draft if none ex
 
 ```json
 { "data": {
-  "roundId": "<uuid>", "version": 4, "status": "editable",
+  "sessionId": "<uuid>", "roundId": "<uuid>", "version": 4, "status": "editable",
   "answers": [{ "blankId": "<uuid>", "value": "draft", "revision": 4 }]
 } }
 ```
@@ -131,12 +131,14 @@ Reuse the common envelope and stable Foundation codes where semantics match:
 
 | HTTP | Codes | Examples |
 |---|---|---|
-| 400 | `INVALID_INPUT`, `INVALID_ACTIVITY_CODE` | Invalid UUID, malformed answer, invalid team selection. |
+| 400 | `INVALID_INPUT` | Invalid UUID/code format, malformed answer, invalid team selection or Blank outside the target. |
 | 401 | `UNAUTHENTICATED` | Missing, expired, revoked or unmapped credential. |
-| 403 | `FORBIDDEN` | Non-member, non-leader submit, forbidden phase, failed Origin/CSRF. |
-| 404 | `SESSION_NOT_FOUND`, `TARGET_NOT_FOUND` | Unknown Session, Team, Round or Blank. |
+| 403 | `FORBIDDEN` | Non-member, non-leader submit, premature result read, failed Origin/CSRF. |
+| 404 | `SESSION_NOT_FOUND`, `TARGET_NOT_FOUND` | Unknown Session/code or resource where the route uses not-found semantics; invalid Team/Blank relationship may instead be `400 INVALID_INPUT`. |
 | 409 | `INVALID_PHASE`, `DUPLICATE_SUBMISSION`, `STALE_STATE` | No longer Active/current, already submitted, conflicting membership transition. |
 | 429 | `RATE_LIMITED` | Join-options/enrollment throttling. |
-| 500 | `INTERNAL_ERROR` | Unexpected errors; details stay server-side. |
+| 500 | `INTERNAL_ERROR` | Unexpected errors, including current SQLite busy handling; details stay server-side. |
 
 Student-only codes may be added as string codes in the common envelope without changing the Foundation error envelope structure. Do not put tokens, submitted answers from other teams or raw database exceptions in `details`.
+
+T068 confirms that an End-held write lock may first block Student credential `last_seen` metadata before the submission transaction. Authentication is not bypassed. After End commits, a retry reaches the real submission phase check and returns `409 INVALID_PHASE`. No new retry/idempotency promise or error status is introduced by this documentation.

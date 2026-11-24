@@ -22,13 +22,13 @@
 | FR-014 非空白及目標驗證 | T033、T035–T037、T048 | `submission-validation.ts`、`submission-service.ts` | `student-submission.test.ts`、`student-activity-draft.test.tsx` |
 | FR-015 同組同輪唯一及鎖定 | T033–T038、T048、T053 | `submission-service.ts`、`draft-repository.ts`、`student-draft-socket.ts`、`StudentDraftPanel.tsx` | `student-submission-transaction.test.ts`、`student-draft.test.ts`（Realtime）、`student-activity-draft.test.tsx`；雙瀏覽器鎖定待驗 |
 | FR-016 後端接受順位 | T033–T037 | `submission-service.ts`、Foundation `submission-repository.ts` | `student-submission.test.ts`、`student-submission-transaction.test.ts` |
-| FR-017 勝者及 End 交易 | T040–T041、T043–T046、T059、T061 | `winner-resolver.ts`、`student-result-service.ts`、`foundation-transactions.ts`、`session-lifecycle-service.ts`、`student-trusted-end-coordinator.ts`、`app.ts` | `student-end-race.test.ts` 驗證正式 Foundation Port；`student-end-composition.test.ts` 驗證共用 Database、正式 Coordinator、Commit 後可見結果／通知及 startup adapter 注入；`student-socket-auth.test.ts` 驗證失效學生不得 fallback、混合 Cookie 與受控 Teacher adapter。真實 Teacher HTTP／Socket 安全仍待 T045，T041 保持未完成 |
+| FR-017 勝者及 End 交易 | T040–T041、T043–T046、T059、T061、T067–T068、T070 | `winner-resolver.ts`、`student-result-service.ts`、`foundation-transactions.ts`、`session-lifecycle-service.ts`、`student-trusted-end-coordinator.ts`、`app.ts`、`main.ts`、Teacher `integration.ts`／`round-control-service.ts` | T067：真實 Cookie／Socket、混合身分與無 fallback、實際 startup；T068：`teacher-end.test.ts` 真實 HTTP／寫鎖 barrier／失敗／重複 End，配合 `student-end-race.test.ts` 與 `student-end-composition.test.ts`。原 T041／T045 保留待負責人結案，沒有另列缺少的 adapter；人工驗收另計 |
 | FR-018 重用 Foundation 資料 | T001–T003、T005–T008、T012、T029、T036、T043、T046 | `app.ts`、Foundation repositories、增量 Student migration | `student-migration.test.ts`、`student-repositories.test.ts`、`student-submission-transaction.test.ts` |
 | FR-019 權威快照及重連 | T039、T042、T049、T054 | `student-session-state.ts`、`session-state-client.ts`、`student-socket.ts` | `student-session-state.test.ts`、`student-vite-proxy.test.ts`；瀏覽器重連待驗 |
 | FR-020 兩秒內同步與資料隔離 | T027、T039–T040、T042、T046、T054、T061 | `student-session-state.ts`、`session-state-client.ts`、`student-result-service.ts` | `student-session-state.test.ts`、`student-result.test.ts`、`session-state.test.ts`；正式 Teacher 觸發的瀏覽器計時待驗 |
 | FR-021 Ended 前禁止讀結果 | T040、T046、T049、T054 | `student-result-service.ts`、`StudentSessionPlaceholder.tsx` | `student-result.test.ts`、`student-result-state.test.tsx` |
 | FR-022 勝出組及答案投影 | T040、T046、T049、T054 | `student-result-service.ts`、`result-controller.ts`、`StudentSessionPlaceholder.tsx` | `student-result.test.ts`、`student-result-state.test.tsx`；瀏覽器已驗預載的 Demo 結果，正式 Teacher End 待驗 |
-| FR-023 新 Round 與結果覆蓋 | T039–T042、T044、T049、T054、T061 | `student-session-state.ts`、`StudentSessionPlaceholder.tsx`、Foundation `foundation-transactions.ts` | `student-session-state.test.ts`、`student-result.test.ts`、`submission-result.test.ts`；Teacher 驅動的換輪／重新開題及 End 整合仍待驗 |
+| FR-023 新 Round 與結果覆蓋 | T039–T042、T044、T049、T054、T061、T068 | `student-session-state.ts`、`StudentSessionPlaceholder.tsx`、Foundation `foundation-transactions.ts` | 既有狀態／頁面測試及 T068 正式 Teacher HTTP 已驗新 Round、無勝者清除與其他 Session／目標隔離；瀏覽器 Teacher 驅動的換輪／重開仍待 T069／T061 |
 | FR-024 安全且可理解的錯誤 | T009、T013–T015、T017、T027、T033、T047–T054 | `student-router.ts`、`student-identity-client.ts`、`StudentJoinPlaceholder.tsx`、`StudentSessionPlaceholder.tsx`、`StudentSubmissionControls.tsx` | `student-join-options.test.ts`、`student-csrf.test.ts`、`student-submission.test.ts`、三組 Student 頁面測試；手機／桌面操作待驗 |
 | FR-025 無帳密及身分恢復 | T007、T011–T012、T019、T022–T023、T047、T051 | `identity-repository.ts`、`student-identity-service.ts`、`student-identity-client.ts` | `student-identity.test.ts`（API）、`student-leader-reconnect.test.ts`、`student-join-pages.test.tsx`；瀏覽器重新整理已驗，短暫離線後身分比對待驗 |
 
@@ -38,16 +38,16 @@
 
 | Requirement | New tasks | Affected implementation and evidence |
 | --- | --- | --- |
-| FR-004 / FR-005 | T062–T064, T066 | Enrollment and team-change order, trusted multi-socket presence, ordered fallback and no-candidate handling. `student-leader-reconnect.test.ts` retains a no-candidate case and needs online-successor cases; `student-migration.test.ts` covers the new backfill and constraints. |
-| FR-013 / SC-002 / SC-004 | T062, T064–T066 | Existing submission transaction rechecks `team_leaders`; extend `student-submission-transaction.test.ts` for both writer orders and assert former/current leader outcomes with no duplicate submission. |
-| FR-024 / FR-025 | T064–T066 | `/me` and Student-only invalidation update current role; add UI coverage for F5, missed notice, obsolete membership response and preserved draft. Browser recheck requires separate identities and a multi-tab case. |
+| FR-004 / FR-005 | T062–T064, T066 | Enrollment/team-change order, multi-socket presence, online-successor/no-candidate cases exist in `student-leader-reconnect.test.ts`; `student-migration.test.ts` covers backfill/constraints. The historical T066 browser results are recorded separately; extended team-change browser checks remain pending. |
+| FR-013 / SC-002 / SC-004 | T062, T064–T066 | Submission rechecks `team_leaders`; `student-submission-transaction.test.ts` covers both writer orders and former/current leader outcomes without duplicate submission. |
+| FR-024 / FR-025 | T064–T066 | `/me` invalidation and UI tests cover stale membership responses, F5/reconnect and preserved draft. T066's recorded multi-tab outcomes do not replace the final Teacher-driven acceptance. |
 
-T066 的實測結果記於 [Windows 人工驗收](../../tests/manual/student-feature.md)。跨模組 End 驗收依賴 T004。見 [Gate 紀錄](../../docs/integration/student-feature-review-gate.md)。
+T066 的實測結果記於 [Windows 人工驗收](../../tests/manual/student-feature.md)。T004 設計 Gate 已通過；跨模組 End 已有 T067／T068 自動化證據，任務結案與人工驗收見 [Gate 紀錄](../../docs/integration/student-feature-review-gate.md)。
 
 | 準則 | Tasks | 實作 | 自動化證據及人工驗收 |
 | --- | --- | --- | --- |
 | SC-001 加入 ≤120 秒／無效代號不加入 | T017–T018、T021–T023、T047、T050–T051、T055、T061 | `StudentJoinPlaceholder.tsx`、`join-options-service.ts`、`enrollment-service.ts` | `student-join-options.test.ts`、`student-join-pages.test.tsx`；已觀察到瀏覽器加入成功，三次全新身分的計時仍待測 |
-| SC-002 自稱權限無效 | T011–T016、T027、T033、T037 | `student-identity.ts`、`student-draft-socket.ts`、`submission-controller.ts` | `student-identity-middleware.test.ts`、`student-socket-auth.test.ts`、`student-submission.test.ts`；瀏覽器 Cookie／CSRF 檢查待驗 |
+| SC-002 自稱權限無效 | T011–T016、T027、T033、T037、T067 | `student-identity.ts`、`student-draft-socket.ts`、`submission-controller.ts`、Teacher Socket adapter | 既有 Student 安全測試及 `teacher-socket.test.ts` 真實混合 Cookie、簽章、Origin、trusted watch guards、失效學生無 fallback；瀏覽器 Cookie／CSRF 檢查另計 |
 | SC-003 N 個 Blank 與零 Blank | T033、T035、T048、T052–T053 | `StudentTargetEditor.tsx`、`StudentSubmissionControls.tsx`、`submission-validation.ts` | `student-activity-draft.test.tsx`、`student-submission.test.ts`；瀏覽器已驗兩題四格的 Demo，零 Blank 由自動化測試覆蓋 |
 | SC-004 每輪一筆及可信順位 | T033–T038 | `submission-service.ts`、Foundation `submission-repository.ts` | `student-submission.test.ts`、`student-submission-transaction.test.ts` |
 | SC-005 兩秒內更新、重連一致 | T039、T042、T054、T055、T061 | `student-session-state.ts`、`session-state-client.ts` | `student-session-state.test.ts`、`session-state.test.ts`、`student-vite-proxy.test.ts`；正式 Teacher 流程的兩個瀏覽器計時與重連待測 |
@@ -56,3 +56,17 @@ T066 的實測結果記於 [Windows 人工驗收](../../tests/manual/student-fea
 | SC-008 完整答案與鎖定 | T033–T038、T048、T053、T055、T061 | `submission-validation.ts`、`submission-service.ts`、`StudentDraftPanel.tsx` | `student-submission.test.ts`、`student-submission-transaction.test.ts`、`student-activity-draft.test.tsx`；雙瀏覽器鎖定待驗 |
 
 T004 審閱與 T041、T044、T045、T059 的依賴以 [跨模組 Gate 紀錄](../../docs/integration/student-feature-review-gate.md) 和 [Tasks](tasks.md) 為準。T060 最終回歸與 T061 正式驗收仍依賴已審閱的整合。兩分鐘加入門檻、同一組長身分的瀏覽器重連、正式 Teacher 操作、瀏覽器版面與連線觀察都須記錄實測結果。
+
+## T070 證據與狀態核對（2026-11-23）
+
+T067 已通過指定 3 檔／33 項、完整 77／436；T068 已通過指定 3 檔／47 項、完整 77／445，TypeScript／Build 成功，保留 Vite 產物大小警告。這是先前的實際執行結果，T070 沒有重跑完整測試，也未執行人工驗收。
+
+正式責任、HTTP／Socket DTO／內部同步 End Port、實際 `main.ts` 組裝及三張 Student 圖已比對；未發現不相容的 Foundation 公開契約變更。T041／T045 所需技術證據已具備，仍依本輪限制保留未勾選，待負責人明確結案，不虛構新的缺漏或新增驗收門檻。T059 技術核對由 T070 承接但不自動勾選；T071／T060 需最後回歸，T069／T061 需真實 Teacher／兩組學生流程與時間量測。OpenSpec 規則同步與另一位組員簽核未取得新證據，不宣稱完成。
+
+## T071 本輪回歸證據（2026-11-23）
+
+`NODE_ENV=test; npm.cmd run check` 在允許 localhost 連線的執行環境完成：TypeScript／Production Build 成功，**77 檔／445 項通過**，完整命令 exit 0。涵蓋上述 FR／SC 對應的既有 Foundation、Student 與正式 Teacher 測試，包含 T067 Cookie／Socket／權限安全、T068 Submit–End 取鎖／失敗／Result 一致性、Next／重開、草稿與提交鎖定、權威狀態重連、組長遞補，以及 Migration 路徑／外鍵／資料隔離。未新增需求或改動測試。
+
+沙箱內首次嘗試因 localhost `EACCES` 造成 207 項失敗（238 項通過），以獨立 TCP probe 確認環境限制；取得執行權限後重跑全數通過，未放寬安全驗證。保留 Vite >500 kB 警告及 jsdom 環境啟動效能提示；詳見 Quickstart T071 紀錄。
+
+這提供 T060、T041／T045 結案所需的最新自動化證據，但本輪只勾選 T071。SC-001 三次加入計時、SC-005 真實雙端同步計時及 T069／T061 其餘人工案例仍待驗收，不從自動化推定通過。

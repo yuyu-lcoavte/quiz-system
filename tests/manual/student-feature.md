@@ -70,3 +70,54 @@ Vite 在測試期間再次記錄 `ECONNABORTED`，上述操作均完成。遞補
 1. 以正式授權的 Teacher 後端與介面建立測試活動並控制同一 Session。讓至少兩個已加入的 Student 用戶端觀察 Waiting → Active → Ended、下一題和重新開題。正常連線下，記錄每個用戶端收到新 `stateVersion` 且畫面更新的時間，須在狀態變更後 2 秒內。確認新 Round 有不同 ID，舊草稿、提交與鎖定不沿用。
 2. 在 T041／T044／T045 完成後，使用隔離的兩連線測試分別控制 Submission 和 End 先取得 SQLite 寫鎖。驗證 End 勝者取自同交易讀取、無勝者時無人工補造 Result、Result 於 Ended 廣播前已提交，並核對失敗回滾不廣播。瀏覽器另驗證 Ended 前讀不到勝出答案，以及有勝者／無勝者的顯示。
 3. T059 完成介面比對後，於 T061 記錄正式 Teacher 與 Student 的實際操作、三次加入時間與初始組長重連結果。Demo 的三個代號對應獨立 Session，僅供分階段畫面驗證。Teacher End及同活動切換下一輪仍待整合驗收。
+
+## 2026-11-23 T069 本輪瀏覽器驗收（部分完成）
+
+**結論：T069／T061 維持 `[ ]`。** 分支 `feature/student`；需求檢查表 16／16，正式 Teacher Integration 存在，T067／T068／T070／T071 已完成。保留所有既有未提交變更。本輪是 Windows Codex 內建瀏覽器的實際 UI 操作，沒有以 API、Service 呼叫、Mock 或單元測試替代操作；也不是使用者本人已重新驗收的聲明。
+
+### 環境與資料界線
+
+- 使用正式 `npm.cmd run dev`：Vite `127.0.0.1:5173`、Express `127.0.0.1:3000`，Teacher integration 顯示 login configured true、Google Sheets configured false。
+- SQLite 為新建、gitignored 的 `data/t069-acceptance-TYpkNg/acceptance.sqlite`，與原正式／開發資料分離。只對該次程序傳入獨立驗收環境值，不改 `.env`、密碼演算法、Cookie、Socket 授權或其他組員的設定。
+- 使用現有 `teacher:hash-password` 腳本，透過其既有 stdin 路徑產生本輪專用隨機密碼的雜湊，不輸出密碼／雜湊／Cookie。官方 `teacher:seed-demo` 建立 WTKARZ，但此次尚未操作該活動的題目。這只是官方開發資料準備，不宣稱經過 Google Sheets 匯入。
+- 正式老師 UI 另外建立活動 **DDR6VR**（Session `f49a7e1d-fd4f-41cb-8048-d440ac1ba3ed`），兩組、未開題。以下加入／換組皆在此新活動實際操作。
+- 驗收後停止本輪啟動程序，移除本輪短期憑證檔；SQLite 留供資料檢視。未保存可供下次登入的測試密碼，不將此短期設定當作使用者原設定。
+
+### 實際結果
+
+| 項目 | 狀態 | 證據／限制 |
+| --- | --- | --- |
+| 現有密碼 CLI 與老師登入 | PASS | 原有 CLI 產生有效 scrypt 格式；以專用憑證在正式 `/teacher/login` 登入，跳至管理頁。未測原本使用者密碼，也不能據此斷言先前失敗原因。 |
+| 老師建立活動 | PASS | 在管理頁以 2 組按「建立活動」，顯示 DDR6VR、第1組／第2組、尚未開題。 |
+| 學生經代號加入／Waiting | PASS | 內建瀏覽器 `127.0.0.1` 的驗收 A、`localhost` 的驗收 B 分別以 DDR6VR 加入，顯示本人、組別、組長及 Waiting、即時連線正常；沒有題目。兩個主機各有獨立 Student Cookie。 |
+| 唯一組長開始前換組 | PASS | A 初入第1組為組長；按「更換組別」選第2組、確認後顯示第2組與組長，無指定接任者選項。 |
+| 原空組之後加入與角色 | PASS | A 離開後，B 加入第1組成功並成為組長；兩位學生分屬兩組。非空組在線／全離線交接未重驗。 |
+| SC-001 三次新身分加入 | BLOCKED（完成 2／3） | 兩次 UI 計時上限均 <120 秒，見下表；第三獨立瀏覽器尚未開始，工具即中止，不補造第三筆。 |
+| 正式新活動匯入題目 | BLOCKED | 畫面明示「伺服器尚未設定 Google 服務帳號，無法匯入 Guided Notes。」本輪未使用其他組員的金鑰，不放寬檢查。 |
+| 老師開始／雙端 Active 同步 ≤2 秒 | NOT TESTED | 新活動無題目；官方 Seed 雖已準備，但瀏覽器控制中止前尚未開始該流程，沒有同步計時。 |
+| 同組共同草稿／跨組隔離／組長提交鎖定 | NOT TESTED | 本輪沒有進入 Active，也尚未建立第三個 Student 身分以覆蓋同組兩人加另一組。T071 自動化通過不算本項瀏覽器 PASS。 |
+| 老師 End／勝者／無勝者 | NOT TESTED | 未操作 End，沒有本輪瀏覽器結果證據。 |
+| Next／重新開題、Round／題目／草稿重置 | NOT TESTED | 未操作；需同活動實際 Teacher 控制並觀察兩端。 |
+| 單題／題組作答及單題 Demo | NOT TESTED | 已準備 Seed 資料但未從 UI 開放或作答，不將建立資料算驗收。 |
+| F5／斷線恢復／多分頁／組長離線遞補 | NOT TESTED | 本輪未操作；保留前述歷史證據，但不重複宣稱本次通過。 |
+| 桌面／手機、Cookie／CSRF 封包與錯誤操作 | NOT TESTED | 未進行尺寸與封包檢查。 |
+
+### SC-001 實際計時方式
+
+使用同一個瀏覽器控制程序的 `Date.now()`：從點擊「查詢活動」前開始，到活動頁已觀察到學生身分／組別／角色停止。包含查詢、輸入名稱、選組、加入及操作工具間隔，因此是**觀察時間上限**，不是純網路延遲；未扣除工具或思考時間。兩者都是該主機在此隔離環境首次建立的學生憑證，不是恢復既有 Participant。
+
+| 次數 | 身分／操作 | 觀察上限 | 判定 |
+| --- | --- | --- | --- |
+| 1 | 127.0.0.1，A 加入第1組 | 11.702 秒 | PASS（本次 ≤120 秒） |
+| 2 | localhost，B 加入原空的第1組 | 8.912 秒 | PASS（本次 ≤120 秒） |
+| 3 | 第三獨立瀏覽器身分 | 無測量值 | BLOCKED |
+
+工具在準備第三個 Windows Chrome 視窗時，無法可靠確認目前網址以執行安全政策，故停止 Computer Use。停止後未再透過其他技術繞過瀏覽器限制。沒有可報告的兩端狀態同步秒數、故障排除後的 ECONNABORTED 結論或完整驗收截圖。這是工具阻礙，非已證實的產品 FAIL。
+
+### 使用者後續操作與密碼設定
+
+1. 從 Repository 根目錄在新的 PowerShell 終端執行 `npm.cmd run teacher:hash-password`。輸入自訂密碼後按 Enter，再輸入同一密碼按 Enter；隱藏輸入不顯示字元或星號屬正常。不要將密碼當命令列參數，也不要貼進驗收紀錄。
+2. 在自己的、未追蹤的根目錄 `.env` 設定完整 `TEACHER_PASSWORD_HASH`（只複製 scrypt 雜湊，不含 npm 標題／提示）及至少 32 random bytes 的 `TEACHER_SESSION_SECRET`；保留既有 Student secret／Origin 設定。若用 PowerShell `$env:TEACHER_PASSWORD_HASH`，值須以單引號包住，避免 scrypt 中的 `$` 被插值。Shell 已設定的值優先於 `.env`；修改後須重啟後端，必要時用新的終端避免舊 shell 值殘留。以上為操作說明，本輪未替使用者改檔。
+3. 請用自己的新建隔離 `SQLITE_PATH`，不要對既有資料庫執行 Seed；同一終端設定後執行官方 `npm.cmd run teacher:seed-demo` 與 `npm.cmd run dev`。啟動應顯示 login configured true。登入頁只輸入原密碼，不輸入雜湊；本機優先使用同一個 `127.0.0.1:5173` 主機，三個獨立 Chrome／Edge 設定檔分別作 A、B、C，Teacher 可另開視窗。獨立分頁本身不等於獨立身分。
+4. 使用本文件原有完整清單重驗：三次全新身分各自計時、A/B 同組加 C 另一組、開始前換組／角色、Teacher 開始／End／Next／重開、單題與題組、草稿與鎖定、勝者／無勝者、多分頁/F5/斷線遞補。雙端狀態 ≤2 秒必須分別記錄實測；不得將工具往返時間不明的觀察推為精確同步延遲。
+5. 若要驗證「老師 UI 建立活動 → 匯入 → 完整搶答」，需使用已授權的 Google Service Account、在 Repository 外保存金鑰，並將測試 Sheet 分享給該帳號，再於正式匯入 UI 操作。Seed 流程不代表此項通過。T041／T045／T059 等原始核取方塊仍待負責人依既有技術證據結案，不由本次部分操作自動勾選。

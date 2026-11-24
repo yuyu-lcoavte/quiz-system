@@ -23,7 +23,7 @@
 ### Session 2026-11-14
 
 - 組長最後一條有效 Socket.IO 連線由伺服器偵測為中斷時，立即從同組在線且合資格者依加入該組的順序遞補，跳過離線或不合資格者。任何一條有效連線仍在就不觸發。無額外緩衝，也無教師可設定的遞補秒數。
-- 遞補原子提交後通知同組重讀目前身分與提交資格。原組長重連恢復原 Participant，若已被替換便不自動取回組長資格。無其他在線合資格者時不強制指派。此 Student 決議須同步 OpenSpec／Teacher，T004 待審閱。
+- 遞補原子提交後通知同組重讀目前身分與提交資格。原組長重連恢復原 Participant，若已被替換便不自動取回組長資格。無其他在線合資格者時不強制指派。Teacher 已於 2026-11-20 表示無異議，T004 設計審閱已完成；OpenSpec 同步仍待負責人記錄，不推定已核准。
 - 後續有組員上線或成功重新訂閱時，重查已偵測離線、尚未交接的現任組長；若此時有合資格人選，依相同順序遞補。
 
 ### 組長管理需求變更
@@ -176,10 +176,10 @@
 
 - Q15／Q18 的名稱仍需維持明確區分：一道 Question 含多個 Blank，與 QuestionGroup 含多道 Question 並共同提交。學生端行為按此結構區分，不以單一「題組」字眼混稱。
 - Q16 是否保留來源 Guided Notes 的 `(1)`、`(2)` 標記，以及匯出時如何回寫，屬 Teacher 匯入／匯出決議；Student 只顯示 Teacher 提供的 Blank 資料，不解析 Excel 或推測標記語意。
-- U10 題組如何從來源檔案辨識、Q13 `.xlsx` 流程是否符合助教要求，屬 Teacher Feature 與課程驗收的待確認項目；Student 僅消費已建立的 QuestionGroup。
+- Q13／U08 已依助教要求採線上 Google Sheets 直接讀寫，不保留 `.xlsx` 上傳流程；Q16 標記保留與 U10 題組辨識依最新共同需求及 Teacher 文件處理。Student 僅消費已建立的 Question／Blank／QuestionGroup，不解析來源試算表。本項同步需求來源現況，不新增學生端匯入功能。
 - Q22 共用測試案例的細節待兩組協調；本規格列出學生端驗收行為，但不宣稱已取得逐項共同測試案例審閱。
 - OpenSpec／Teacher 須同步 FR-004 的最後有效連線、立即遞補、加入順序、無候選與重連行為，以及同組通知與提交的共同驗收。無教師設定遞補秒數的功能。
-- Teacher 只呼叫 Student 的單一可信 End coordinator；該 coordinator 使用 `round:end` capability 驗證 ActorContext，將 Student winner resolver callback 傳給 Foundation 內部 lifecycle transaction。此 capability 目前亦非 Foundation 既有能力；Teacher／Student／Foundation 負責人仍需審閱內部介面提案。Student result projection 為 Student-owned；不修改 Foundation 的 `ResultView` 或其他對外契約。
+- Teacher 只呼叫 Student 的單一可信 End coordinator；該 coordinator 使用 Teacher 後端核發的 `round:end` capability 驗證 ActorContext，將 Student winner resolver callback 傳給 Foundation 內部 lifecycle transaction。T004 已接受此分工及介面，T044 Port 已實作，T067／T068 已提供正式組裝、安全與競爭測試證據；原 T041／T045 保留未勾選，待負責人依證據結案。Student result projection 為 Student-owned；不修改 Foundation 的 `ResultView` 或其他對外契約。
 
 ## Dependencies and Compatibility
 
@@ -188,8 +188,8 @@
 - Reuse the Foundation Activity Code lookup, Session/state/current-target/results reads, common success/error envelope, verified `ActorContext`, shared entity semantics, acceptedOrder persistence boundary, lifecycle state and Socket.IO snapshot/event contract.
 - Foundation already enforces no question-content access for Participants while Waiting and allows the authorized Participant to read the target in Active; Student UI must reflect but cannot replace those backend checks.
 - Foundation shared routes are `/student/join` and `/student/session/:sessionId`; this Feature fills those module entry points without changing route names.
-- Foundation's reserved Student responsibilities include enrollment, team selection, draft editing and answer submission. Student-owned mutation contracts are proposed in this Feature Plan; the Teacher-facing internal interfaces and new capability strings require cross-feature review before implementation.
-- Foundation `ResultView` does not carry the winning Team display name or answer rows. Student Feature provides its own authorized result projection from shared persisted data. Teacher calls the single Student trusted End coordinator; Student supplies its winner resolver callback to Foundation's internal End transaction so selection, Ended and Result persistence are serialized together. No Foundation public contract change is required; review the proposed internal seam with the Teacher/Foundation owners before implementation.
+- Foundation's reserved Student responsibilities include enrollment, team selection, draft editing and answer submission. Student-owned mutation contracts are implemented in this feature. T004 approved the Teacher-facing End interface and capability; T067/T068 provide automated integration evidence. No additional permission or Teacher leader-transfer proposal is introduced.
+- Foundation `ResultView` does not carry the winning Team display name or answer rows. Student Feature provides its own authorized result projection from shared persisted data. Teacher calls the single Student trusted End coordinator; Student supplies its winner resolver callback to Foundation's internal End transaction so selection, Ended and Result persistence are serialized together. The approved seam is implemented and tested without a Foundation public contract change; new cross-module changes still require coordination.
 
 ## Out of Scope
 

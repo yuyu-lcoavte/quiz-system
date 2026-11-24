@@ -9,8 +9,14 @@ The existing Foundation `session:watch`, `session:state`, `session:state:changed
 - Reject a browser Origin outside the configured exact-origin allowlist before authorizing the socket. The `student_session` cookie is `HttpOnly` and never passed in Socket auth payload. A missing, expired, revoked, unmapped, or unauthorized cookie/scope must fail the handshake or watch authorization and must not join a Room.
 - A socket may join only the server-derived room `student:team:{teamId}:round:{roundId}` after verifying the authenticated Participant belongs to that Team and Session and the requested Round is the current Active Round.
 - Clients supply `sessionId` and `roundId` as lookup targets, never a room name or Team ID. The event Session ID must equal the verified handshake scope. The server derives the Team from ActorContext.
-- Recheck authentication, membership, Round phase, target Blank and draft status for every edit event. Validate exact Origin on connection and require the session-bound CSRF token on every state-changing socket event; read-only watch does not mutate state.
+- Recheck authentication, membership, Round phase, target Blank and draft status for every edit event. Validate exact Origin on connection and require the session-bound CSRF token on every answer-edit event. Watch is not an answer mutation, though snapshot retrieval may initialize an empty draft and trusted presence reconciliation may update leadership under the existing failover rules.
 - Draft edits require the synchronizer CSRF token in the payload. The token is held in memory by the web app, not localStorage.
+
+### Teacher/Student trust boundary verified at T067
+
+Student `auth.sessionId` selects the Student handshake path. A failed handshake or failed subsequent identity re-resolution cannot call the external Teacher resolver/authorizer; the outer Session handler maps null identity to `session:error UNAUTHENTICATED`. Both valid Cookies do not promote a Student-scoped socket to Teacher. An invalid watch joins no new requested room; this is not a claim that all previously joined rooms are actively revoked.
+
+Without `auth.sessionId`, transport connection alone grants no identity. The real Teacher resolver validates its signed `teacher_session` Cookie and exact allowed Origin on every `session:watch`, then issues an unscoped Teacher context. Teacher `authorizeWatch` checks resolver-issued object provenance, Teacher kind, `session:watch` and Session existence. Teacher HTTP constructs Session-scoped `round:end` separately; shared Session reads do not acquire Teacher identity from that Cookie. No Foundation event/payload changes result. The accepted Teacher logout limitation remains: a new watch rejects a revoked login, but existing rooms are not immediately evicted.
 
 ## Events
 
